@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   ArrowLeft,
@@ -32,13 +32,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import jsPDF from "jspdf";
+import { toPng } from "html-to-image";
 
 export default function PDPDetailView() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const printAreaRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedPDPData, setEditedPDPData] = useState<typeof pdpData | null>(null);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   
   const pdpData = {
     title: '2023 Annual Plan',
@@ -120,6 +124,43 @@ export default function PDPDetailView() {
     setIsMobileModalOpen(false);
     // Show success message
     alert('PDP data saved successfully!');
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!printAreaRef.current || isDownloadingPdf) return;
+    try {
+      setIsDownloadingPdf(true);
+      const dataUrl = await toPng(printAreaRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+        filter: (node: HTMLElement) => !node.classList?.contains("no-print"),
+      });
+
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise((resolve) => {
+        img.onload = () => resolve(null);
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const ratio = Math.min(pdfWidth / img.width, pdfHeight / img.height);
+      const imgW = img.width * ratio;
+      const imgH = img.height * ratio;
+      const imgX = (pdfWidth - imgW) / 2;
+      const imgY = 0;
+
+      pdf.addImage(img, "PNG", imgX, imgY, imgW, imgH);
+      const fileName = `PDP-${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Error generating PDF. Please try again.");
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   const handleCancel = () => {
@@ -239,11 +280,12 @@ export default function PDPDetailView() {
                     <span className="ml-1">Print</span>
                   </Button>
                   <Button 
-                    onClick={() => window.print()} 
-                    className="px-3 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm hidden sm:flex"
+                    onClick={handleDownloadPDF} 
+                    disabled={isDownloadingPdf}
+                    className="px-3 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm hidden sm:flex disabled:opacity-50"
                   >
                     <FileDown size={16} />
-                    <span className="ml-1">PDF</span>
+                    <span className="ml-1">{isDownloadingPdf ? "Generating..." : "PDF"}</span>
                   </Button>
                 </>
               )}
@@ -252,7 +294,7 @@ export default function PDPDetailView() {
         </div>
       </div>
 
-      <div id="pdp-print-area" className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+      <div ref={printAreaRef} id="pdp-print-area" className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Progress Bar */}
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-200">
           <div className="flex justify-between items-center mb-2">

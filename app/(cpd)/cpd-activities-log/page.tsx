@@ -14,10 +14,13 @@ import { useRouter } from 'next/navigation';
 
 export default function CPDActivitiesLog() {
   const router = useRouter();
+  const defaultCategory = 'All Categories';
+  const defaultType = 'All Types';
+  const defaultYear = 'All Years';
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('All Categories');
-  const [typeFilter, setTypeFilter] = useState('All Types');
-  const [yearFilter, setYearFilter] = useState('All Years');
+  const [categoryFilter, setCategoryFilter] = useState(defaultCategory);
+  const [typeFilter, setTypeFilter] = useState(defaultType);
+  const [yearFilter, setYearFilter] = useState(defaultYear);
   const [selectedActivity, setSelectedActivity] = useState<typeof activities[0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -192,6 +195,33 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedActivity(null);
+  };
+
+  const getActivityYear = (date: string) => {
+    const match = date.match(/\b\d{4}\b/);
+    return match ? match[0] : '';
+  };
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredActivities = activities.filter((activity) => {
+    const matchesSearch = normalizedSearch.length === 0
+      || activity.title.toLowerCase().includes(normalizedSearch)
+      || activity.description.toLowerCase().includes(normalizedSearch)
+      || activity.category.toLowerCase().includes(normalizedSearch)
+      || activity.type.toLowerCase().includes(normalizedSearch);
+
+    const matchesCategory = categoryFilter === defaultCategory || activity.category === categoryFilter;
+    const matchesType = typeFilter === defaultType || activity.type === typeFilter;
+    const matchesYear = yearFilter === defaultYear || getActivityYear(activity.date) === yearFilter;
+
+    return matchesSearch && matchesCategory && matchesType && matchesYear;
+  });
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setCategoryFilter(defaultCategory);
+    setTypeFilter(defaultType);
+    setYearFilter(defaultYear);
   };
 
   return (
@@ -404,7 +434,10 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                 </DropdownMenu>
               </div>
 
-              <button className="w-full px-4 py-2 text-sm text-purple-600 hover:text-purple-700 font-medium">
+              <button
+                onClick={handleClearFilters}
+                className="w-full px-4 py-2 text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
                 Clear Filters
               </button>
 
@@ -436,13 +469,13 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
             <div className="bg-white rounded-xl shadow-sm border border-gray-100">
               <div className="p-4 sm:p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-purple-700">All CPD Activities</h3>
-                <p className="text-sm text-gray-600">Showing {activities.length} records</p>
+                <p className="text-sm text-gray-600">Showing {filteredActivities.length} records</p>
               </div>
 
               {/* Mobile Card View */}
               <div className="lg:hidden">
                 <div className="divide-y divide-gray-200">
-                  {activities.map((activity) => (
+                  {filteredActivities.map((activity) => (
                     <div key={activity.id} className="p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1 min-w-0">
@@ -520,7 +553,7 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {activities.map((activity) => (
+                    {filteredActivities.map((activity) => (
                       <tr key={activity.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
                           <div>

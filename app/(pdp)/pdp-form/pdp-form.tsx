@@ -88,7 +88,7 @@ export default function PDPForm() {
     'Periodontics',
     'Oral Surgery',
     'Aesthetic Dentistry',
-    'Pediatric Dentistry',
+    'Paediatric Dentistry',
     'Restorative Dentistry',
     'Digital Dentistry'
   ];
@@ -103,7 +103,7 @@ export default function PDPForm() {
     'Modern Prosthodontics Course',
     'Orthodontic Biomechanics',
     'Periodontal Surgery Advanced',
-    'Pediatric Behavior Management',
+    'Paediatric Behavior Management',
     'CAD/CAM Technology in Dentistry',
     'Cone Beam CT Interpretation'
   ];
@@ -439,13 +439,13 @@ export default function PDPForm() {
                           <DropdownMenuItem 
                             onClick={() => {
                               const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Specialize in pediatric dentistry" : obj
+                                i === index ? "Specialize in paediatric dentistry" : obj
                               );
                               setFormData({ ...formData, careerObjectives: newObjectives });
                             }}
-                            className={objective === "Specialize in pediatric dentistry" ? "bg-purple-50 text-purple-700" : ""}
+                            className={objective === "Specialize in paediatric dentistry" ? "bg-purple-50 text-purple-700" : ""}
                           >
-                            Specialize in pediatric dentistry
+                            Specialize in paediatric dentistry
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => {

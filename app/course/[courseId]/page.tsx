@@ -26,9 +26,15 @@ import {
   FileText
 } from "lucide-react"
 import { useApp } from "@/lib/app-context"
+import { authApi } from "@/lib/api/http"
 
 type Section = "about" | "learn" | "assess" | "evaluate"
 type EvaluateSubPage = "resources" | "feedback" | "completed"
+
+interface Answer {
+  questionId: number
+  selectedOption: number | null
+}
 
 // ─── Data ──────────────────────────────────────────────────────────
 
@@ -266,9 +272,10 @@ const feedbackCriteria = [
 export default function CoursePlayerPage() {
   const params = useParams()
   const router = useRouter()
-  const { courses } = useApp()
   const courseId = params.courseId as string
-  const course = courses.find((c) => c.id === courseId)
+  const [course, setCourse] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   // Navigation
   const [activeSection, setActiveSection] = useState<Section>("about")
@@ -281,24 +288,73 @@ export default function CoursePlayerPage() {
   const [consentChecked, setConsentChecked] = useState(false)
 
   // Assess
+  const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [answers, setAnswers] = useState<Answer[]>([])
+  const [showResult, setShowResult] = useState(false)
+  const [showAlert, setShowAlert] = useState(false)
+
+  // Evaluate
+  const [evaluateSubPage, setEvaluateSubPage] = useState<EvaluateSubPage>("resources")
+
+  // Assess
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(quizQuestions.map(() => null))
   const [showResults, setShowResults] = useState(false)
   const [assessmentScore, setAssessmentScore] = useState(0)
 
-  // Evaluate
-  const [evaluateSub, setEvaluateSub] = useState<EvaluateSubPage>("resources")
+  // Evaluate additional state
   const [ratings, setRatings] = useState<number[]>(feedbackCriteria.map(() => 0))
   const [feedbackComment, setFeedbackComment] = useState("")
 
+  // Fetch course data from API
+  useEffect(() => {
+    const fetchCourse = async () => {
+      try {
+        const response = await authApi.get(`/wp-json/reactapi/v1/courses/?id=${courseId}`)
+        const data = response.data
+        if (data.success && data.data) {
+          setCourse(data.data)
+        } else {
+          setError("Course not found")
+        }
+      } catch (err) {
+        setError("Failed to load course")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (courseId) {
+      fetchCourse()
+    }
+  }, [courseId])
 
   useEffect(() => {
     setMobileMenuOpen(false)
-  }, [activeSection, learnPage, evaluateSub])
-  
-  if (!course) {
+  }, [activeSection, learnPage, evaluateSubPage])
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Course not found</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading course...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !course) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 mb-4">{error || "Course not found"}</p>
+          <button 
+            onClick={() => router.push('/dashboard')}
+            className="text-purple-600 hover:text-purple-700 underline"
+          >
+            Back to Dashboard
+          </button>
+        </div>
       </div>
     )
   }
@@ -333,7 +389,7 @@ export default function CoursePlayerPage() {
   const scorePercent = ((assessmentScore / quizQuestions.length) * 100).toFixed(1)
 
   const handleSubmitFeedback = () => {
-    setEvaluateSub("completed")
+    setEvaluateSubPage("completed")
   }
 
 
@@ -366,7 +422,7 @@ export default function CoursePlayerPage() {
                 key={item.key}
                 onClick={() => {
                   setActiveSection(item.key)
-                  if (item.key === "evaluate") setEvaluateSub("resources")
+                  if (item.key === "evaluate") setEvaluateSubPage("resources")
                 }}
                 className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm transition-colors ${
                   activeSection === item.key
@@ -736,7 +792,7 @@ export default function CoursePlayerPage() {
             <button
               onClick={() => {
                 setActiveSection("evaluate")
-                setEvaluateSub("resources")
+                setEvaluateSubPage("resources")
               }}
               className="px-5 py-2.5 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center gap-2 text-sm"
             >
@@ -821,8 +877,8 @@ export default function CoursePlayerPage() {
   }
 
   const renderEvaluate = () => {
-    if (evaluateSub === "resources") return renderResources()
-    if (evaluateSub === "feedback") return renderFeedback()
+    if (evaluateSubPage === "resources") return renderResources()
+    if (evaluateSubPage === "feedback") return renderFeedback()
     return renderCompleted()
   }
 
@@ -854,7 +910,7 @@ export default function CoursePlayerPage() {
 
       <div className="flex justify-end mt-6">
         <button
-          onClick={() => setEvaluateSub("feedback")}
+          onClick={() => setEvaluateSubPage("feedback")}
           className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
         >
           Next
@@ -909,7 +965,7 @@ export default function CoursePlayerPage() {
 
       <div className="flex items-center justify-between mt-4 sm:mt-6 gap-3">
         <button
-          onClick={() => setEvaluateSub("resources")}
+          onClick={() => setEvaluateSubPage("resources")}
           className="px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium"
         >
           <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1014,22 +1070,25 @@ export default function CoursePlayerPage() {
   // ─── Layout ─────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Mobile Header */}
-      <div className="lg:hidden flex items-center justify-between bg-white border-b border-gray-200 px-4 py-3">
-        <button
-          onClick={() => router.push("/courses")}
-          className="flex items-center gap-2 text-gray-700 hover:text-purple-700 text-sm font-medium"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
             <button 
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              onClick={() => router.push('/course-detail?id=' + courseId)}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition"
             >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              <ArrowLeft size={16} />
+              <span>Back to Course</span>
             </button>
+            <h1 className="text-xl font-semibold text-gray-900">{course?.course?.title || "Course"}</h1>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Award size={16} />
+              <span>{course?.course?.duration || "Not specified"}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Mobile Menu Overlay */}

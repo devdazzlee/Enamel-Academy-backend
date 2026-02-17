@@ -1,0 +1,637 @@
+{
+  "info": {
+    "_postman_id": "1b60c6b4-8918-4e4f-9c7f-3dfd0a8fc18a",
+    "name": "cpd.enamelacademy.co.uk",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "10805675"
+  },
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/register?first_name=APi user test&last_name=APi user test&email=apiusertes111@gmail.com&password=APIuser&role=dentist",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "register"
+          ],
+          "query": [
+            {
+              "key": "first_name",
+              "value": "APi user test"
+            },
+            {
+              "key": "last_name",
+              "value": "APi user test"
+            },
+            {
+              "key": "email",
+              "value": "apiusertes111@gmail.com"
+            },
+            {
+              "key": "password",
+              "value": "APIuser"
+            },
+            {
+              "key": "role",
+              "value": "dentist"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/login?email=apiusertes111@gmail.com&password=newpassword@123",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "login"
+          ],
+          "query": [
+            {
+              "key": "email",
+              "value": "apiusertes111@gmail.com"
+            },
+            {
+              "key": "password",
+              "value": "newpassword@123"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Users Logins Detail",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/user",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "user"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update User Profile",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/user/update?first_name=update first name",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "user",
+            "update"
+          ],
+          "query": [
+            {
+              "key": "first_name",
+              "value": "update first name"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update User Password",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/user/change-password?current_password=%23X1caidz*oHJ$ISJ$RTml5%23Y&new_password=newpassword@123",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "user",
+            "change-password"
+          ],
+          "query": [
+            {
+              "key": "current_password",
+              "value": "#X1caidz*oHJ$ISJ$RTml5#Y",
+              "type": "text"
+            },
+            {
+              "key": "new_password",
+              "value": "newpassword@123",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Dashboard",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/dashboard",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "dashboard"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Dashboard stats",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/dashboard/stats",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "dashboard",
+            "stats"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Dashboard Continue-learning",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/dashboard/continue-learning",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "dashboard",
+            "continue-learning"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get courses by ID",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/dashboard/courses/14",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "dashboard",
+            "courses",
+            "14"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get course library",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/library",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "courses",
+            "library"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get course details for library by Course ID or slug",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/?id=561",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "courses",
+            ""
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "561"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get ongoing courses",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/ongoing",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "courses",
+            "ongoing"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get all course categories",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/categories",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "courses",
+            "categories"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get available filter",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/filters",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "courses",
+            "filters"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Enroll user in a course by userid",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/enroll/?id=561",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "courses",
+            "enroll",
+            ""
+          ],
+          "query": [
+            {
+              "key": "id",
+              "value": "561",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "User logout",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/logout",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "wp-json",
+            "reactapi",
+            "v1",
+            "logout"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseURL",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}

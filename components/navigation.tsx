@@ -1,10 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { EnamelLogo } from "./enamel-logo"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/lib/stores/auth-store"
+import { userService } from "@/lib/api/user"
+import { Spinner } from "@/components/ui/spinner"
 import {
   LayoutGrid,
   CreditCard,
@@ -30,6 +33,7 @@ import {
   Search,
   Menu,
   X,
+  LogOut,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -56,7 +60,43 @@ interface NavigationProps {
 
 export function Navigation({ activeItem }: NavigationProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const logout = useAuthStore((s) => s.logout)
+  const [displayName, setDisplayName] = useState("")
+
+  useEffect(() => {
+    let alive = true
+
+    const run = async () => {
+      try {
+        const me = await userService.me()
+        if (!alive) return
+        setDisplayName(`${me.firstName ?? ""} ${me.lastName ?? ""}`.trim())
+      } catch {
+        if (!alive) return
+        setDisplayName("")
+      }
+    }
+
+    void run()
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+    } finally {
+      setIsLoggingOut(false)
+      setIsMobileMenuOpen(false)
+      router.push("/login")
+    }
+  }
 
   return (
     <header className="bg-white border-b border-[#e5e7eb] sticky top-0 z-50">
@@ -109,7 +149,7 @@ export function Navigation({ activeItem }: NavigationProps) {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 px-3 py-2 text-sm text-[#6b7280] hover:text-[#1a1a1a] rounded-lg hover:bg-[#f5f5f5] transition-colors">
                   <User className="h-4 w-4" />
-                  <span>meta xoft</span>
+                  <span>{displayName}</span>
                   <ChevronDown className="h-3 w-3" />
                 </button>
               </DropdownMenuTrigger>
@@ -127,10 +167,11 @@ export function Navigation({ activeItem }: NavigationProps) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/login" className="flex items-center gap-2">
-                    Log out
-                  </Link>
+                <DropdownMenuItem onSelect={(e) => {
+                  e.preventDefault()
+                  void handleLogout()
+                }}>
+                  {isLoggingOut ? "Signing out..." : "Log out"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -179,13 +220,23 @@ export function Navigation({ activeItem }: NavigationProps) {
                   <Settings className="h-5 w-5" />
                   <span>Settings</span>
                 </Link>
-                <Link
-                  href="/login"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 text-sm text-[#6b7280] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] rounded-lg transition-colors"
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="w-full text-left flex items-center gap-3 px-4 py-3 text-sm text-[#6b7280] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] rounded-lg transition-colors"
                 >
-                  Log out
-                </Link>
+                  {isLoggingOut ? (
+                    <>
+                      <Spinner />
+                      Signing out...
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="h-4 w-4" />
+                      Log out
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

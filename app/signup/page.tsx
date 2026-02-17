@@ -3,7 +3,12 @@
 import React from "react"
 
 import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
+import { Spinner } from "@/components/ui/spinner"
+import { useRouter } from "next/navigation"
 import { EnamelLogo } from "@/components/enamel-logo"
 import {
   Select,
@@ -13,7 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+import { useAuthStore } from "@/lib/stores/auth-store"
+
 export default function SignupPage() {
+  const router = useRouter()
+  const { register, isLoading } = useAuthStore()
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -24,13 +33,38 @@ export default function SignupPage() {
     iAmA: "",
   })
 
+  const [error, setError] = useState("")
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle signup logic
+    setError("")
+
+    if (!formData.password || formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.")
+      return
+    }
+
+    if (!formData.iAmA) {
+      setError("Please select your profession.")
+      return
+    }
+
+    try {
+      await register({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        role: formData.iAmA,
+      })
+      router.push("/dashboard")
+    } catch {
+      setError("Signup failed. Please try again.")
+    }
   }
 
   return (
@@ -42,6 +76,11 @@ export default function SignupPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
             <div>
               <label className="block text-sm text-muted-foreground mb-2">First Name :</label>
@@ -127,9 +166,17 @@ export default function SignupPage() {
           <div>
             <button
               type="submit"
-              className="px-16 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              className="w-full bg-[#8b5cf6] hover:bg-[#7c3aed] text-white py-3 rounded-lg font-medium transition-colors"
+              disabled={isLoading}
             >
-              Sign up
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Spinner />
+                  Creating Account...
+                </div>
+              ) : (
+                "Create Account"
+              )}
             </button>
           </div>
 

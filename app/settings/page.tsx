@@ -1,11 +1,38 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Key, HelpCircle, Users, Info, Contact } from "lucide-react";
 import Link from "next/link";
 
+import { userService, type ApiUser } from "@/lib/api/user";
+
 export default function SettingsPage() {
+  const [user, setUser] = useState<ApiUser | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      try {
+        const me = await userService.me();
+        if (!alive) return;
+        setUser(me);
+      } catch {
+        if (!alive) return;
+        setUser(null);
+      }
+    };
+
+    void run();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#e8e8e8] flex flex-col">
       <Navigation />
@@ -15,8 +42,8 @@ export default function SettingsPage() {
         <div className="bg-gradient-to-r from-[#8b5cf6] to-[#a855f7] rounded-2xl p-6 mb-8 flex justify-between items-center">
           <h1 className="text-2xl font-semibold text-white">Settings</h1>
           <div className="text-right text-white">
-            <p className="font-semibold">meta xoft</p>
-            <p className="text-sm text-white/80">metaxoft5@gmail.com</p>
+            <p className="font-semibold">{`${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim()}</p>
+            <p className="text-sm text-white/80">{user?.email ?? ""}</p>
           </div>
         </div>
 

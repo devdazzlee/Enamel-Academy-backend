@@ -1,11 +1,28 @@
 import React from "react"
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
-import { AppProvider } from '@/lib/app-context'
-import './globals.css'
+import "./globals.css"
+import type { Metadata } from "next"
+import localFont from "next/font/local"
+import { AuthHydrator } from "@/components/auth-hydrator"
+import "@/lib/debug-api" // Import to expose debug helpers
+import { AppProvider } from "@/lib/app-context"
+import { Analytics } from "@vercel/analytics/next"
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const rubik = localFont({
+  variable: "--font-rubik",
+  display: "swap",
+  src: [
+    { path: "../fonts/rubik-light.ttf", weight: "300", style: "normal" },
+    { path: "../fonts/rubik-lightitalic.ttf", weight: "300", style: "italic" },
+    { path: "../fonts/rubik-regular.ttf", weight: "400", style: "normal" },
+    { path: "../fonts/rubik-italic.ttf", weight: "400", style: "italic" },
+    { path: "../fonts/rubik-medium.ttf", weight: "500", style: "normal" },
+    { path: "../fonts/rubik-mediumitalic.ttf", weight: "500", style: "italic" },
+    { path: "../fonts/rubik-bold.ttf", weight: "700", style: "normal" },
+    { path: "../fonts/rubik-bolditalic.ttf", weight: "700", style: "italic" },
+    { path: "../fonts/rubik-black.ttf", weight: "900", style: "normal" },
+    { path: "../fonts/rubik-blackitalic.ttf", weight: "900", style: "italic" },
+  ],
+})
 
 export const metadata: Metadata = {
   title: 'Enamel Academy',
@@ -20,8 +37,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${rubik.variable} ${rubik.className} antialiased`}>
         <AppProvider>
+          <AuthHydrator />
           {children}
         </AppProvider>
         <Analytics />

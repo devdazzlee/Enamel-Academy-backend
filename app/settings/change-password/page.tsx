@@ -5,6 +5,9 @@ import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { ArrowLeft, Eye, EyeOff, Check, Lock, Key, Shield } from "lucide-react";
 import Link from "next/link";
+import { Spinner } from "@/components/ui/spinner";
+
+import { userService } from "@/lib/api/user";
 
 export default function ChangePasswordPage() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -14,12 +17,40 @@ export default function ChangePasswordPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword === confirmPassword) {
+    setError("");
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await userService.changePassword({
+        currentPassword,
+        newPassword,
+      });
       setIsSuccess(true);
       setTimeout(() => setIsSuccess(false), 3000);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      // Extract the actual error message from the API response
+      if (err?.response?.data?.message) {
+        setError(err.response.data.message);
+      } else if (err?.message) {
+        setError(err.message);
+      } else {
+        setError("Failed to change password. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -56,6 +87,12 @@ export default function ChangePasswordPage() {
               <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 sm:gap-3">
                 <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                 <p className="text-green-800 text-sm sm:text-base">Password successfully changed!</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm sm:text-base">
+                {error}
               </div>
             )}
 
@@ -164,9 +201,17 @@ export default function ChangePasswordPage() {
               {/* Submit Button */}
               <button
                 type="submit"
+                disabled={isLoading}
                 className="w-full py-2.5 sm:py-3 bg-[#8b5cf6] text-white rounded-lg font-medium hover:bg-[#7c3aed] transition-colors text-sm sm:text-base"
               >
-                Change Password
+                {isLoading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Spinner />
+                    Changing Password...
+                  </div>
+                ) : (
+                  "Change Password"
+                )}
               </button>
             </form>
           </div>

@@ -1,0 +1,344 @@
+import { authApi } from "@/lib/api/http";
+import { API_PATHS } from "@/lib/api/endpoints";
+
+export type LibraryCourse = {
+  id: string | number;
+  title?: string;
+  instructor?: string;
+  duration?: string;
+  lessons?: number;
+  image?: string;
+  rating?: number;
+  reviews_count?: number;
+  students_count?: number;
+  price?: {
+    type?: string;
+    amount?: number;
+    currency?: string;
+    display?: string;
+  };
+  user_progress?: {
+    percentage?: number;
+    completed?: number;
+    total?: number;
+    status?: string;
+  };
+};
+
+export type ApiCourse = {
+  id: string | number;
+  title?: string;
+  slug?: string;
+  thumbnail?: string;
+  image?: string;
+  excerpt?: string;
+  description?: string;
+  duration?: string;
+  category?: string;
+  price?: string | number;
+  progress?: number;
+  status?: string;
+  enrolled?: boolean;
+  lessons?: number;
+  rating?: number;
+  instructor?: string;
+  level?: string;
+  students_count?: number;
+};
+
+export type ApiCategory = {
+  id: string | number;
+  name: string;
+  slug?: string;
+  count?: number;
+};
+
+export type ApiFilter = {
+  id: string | number;
+  name: string;
+  type?: string;
+  options?: string[];
+};
+
+export type CourseFilters = {
+  plan?: Array<{ value: string; label: string }>;
+  status?: Array<{ value: string; label: string }>;
+  format?: Array<{ value: string; label: string }>;
+  length?: Array<{ value: string; label: string }>;
+  difficulty?: Array<{ value: string; label: string }>;
+  sort?: Array<{ value: string; label: string }>;
+};
+
+const toNumber = (v: unknown): number | undefined => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return undefined;
+};
+
+const normalizeLibrary = (raw: unknown): LibraryCourse[] => {
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, unknown>;
+  const data = obj.data;
+
+  const list =
+    Array.isArray(data)
+      ? data
+      : data && typeof data === "object" && Array.isArray((data as Record<string, unknown>).courses)
+        ? ((data as Record<string, unknown>).courses as unknown[])
+        : Array.isArray(obj.courses)
+          ? (obj.courses as unknown[])
+          : [];
+
+  const result: LibraryCourse[] = [];
+
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const c = item as Record<string, unknown>;
+    const id = (c.id as string | number | undefined) ?? (c.course_id as string | number | undefined);
+    if (id === undefined || id === null) continue;
+
+    const course: LibraryCourse = { id };
+
+    const title = (c.title as string | undefined) ?? (c.course_title as string | undefined);
+    if (typeof title === "string" && title.length > 0) course.title = title;
+
+    const instructor = (c.instructor as string | undefined) ?? (c.author as string | undefined);
+    if (typeof instructor === "string" && instructor.length > 0) course.instructor = instructor;
+
+    const duration = c.duration as string | undefined;
+    if (typeof duration === "string" && duration.length > 0) course.duration = duration;
+
+    const lessons = toNumber(c.lessons) ?? toNumber(c.lesson_count);
+    if (typeof lessons === "number") course.lessons = lessons;
+
+    const image =
+      (c.image as string | undefined) ??
+      (c.thumbnail as string | undefined) ??
+      (c.featured_image as string | undefined);
+    if (typeof image === "string" && image.length > 0) course.image = image;
+
+    // Add rich data fields
+    const rating = c.rating as number | undefined;
+    if (typeof rating === "number") course.rating = rating;
+
+    const reviewsCount = c.reviews_count as number | undefined;
+    if (typeof reviewsCount === "number") course.reviews_count = reviewsCount;
+
+    const studentsCount = c.students_count as number | undefined;
+    if (typeof studentsCount === "number") course.students_count = studentsCount;
+
+    const price = c.price as Record<string, unknown>;
+    if (price && typeof price === "object") {
+      course.price = {
+        type: price.type as string | undefined,
+        amount: price.amount as number | undefined,
+        currency: price.currency as string | undefined,
+        display: price.display as string | undefined,
+      };
+    }
+
+    const userProgress = c.user_progress as Record<string, unknown>;
+    if (userProgress && typeof userProgress === "object") {
+      course.user_progress = {
+        percentage: userProgress.percentage as number | undefined,
+        completed: userProgress.completed as number | undefined,
+        total: userProgress.total as number | undefined,
+        status: userProgress.status as string | undefined,
+      };
+    }
+
+    result.push(course);
+  }
+
+  return result;
+};
+
+const stripHtml = (html: string): string => {
+  if (!html) return "";
+  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+};
+
+const normalizeCourses = (raw: unknown): ApiCourse[] => {
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, unknown>;
+  // API returns { success: true, data: { courses: [...] } }
+  const data = obj.data as Record<string, unknown>;
+  if (!data || typeof data !== "object") return [];
+  
+  // Check if it's a single course or array of courses
+  const courses = data.courses as unknown[];
+  if (!Array.isArray(courses)) {
+    // Handle single course case (for details endpoint)
+    const course = data.course as Record<string, unknown>;
+    if (!course || typeof course !== "object") return [];
+
+    const id = (course.id as string | number | undefined) ?? (course.course_id as string | number | undefined);
+    if (id === undefined || id === null) return [];
+
+    const result: ApiCourse = { id };
+    const title = (course.title as string | undefined) ?? (course.course_title as string | undefined);
+    if (typeof title === "string" && title.length > 0) result.title = title;
+    const slug = (course.slug as string | undefined);
+    if (typeof slug === "string" && slug.length > 0) result.slug = slug;
+    const thumbnail = (course.thumbnail as string | undefined) ?? (course.banner_image as string | undefined);
+    if (typeof thumbnail === "string" && thumbnail.length > 0) result.thumbnail = thumbnail;
+    const excerpt = (course.excerpt as string | undefined);
+    if (typeof excerpt === "string" && excerpt.length > 0) result.excerpt = excerpt;
+    const description = stripHtml((course.description as string | undefined) ?? "");
+    if (typeof description === "string" && description.length > 0) result.description = description;
+    const duration = (course.duration as string | undefined);
+    if (typeof duration === "string" && duration.length > 0) result.duration = duration;
+    const category = (course.difficulty as string | undefined);
+    if (typeof category === "string" && category.length > 0) result.category = category;
+    const progress = ((course.user_progress as Record<string, unknown>)?.percentage as number | undefined);
+    if (typeof progress === "number") result.progress = progress;
+    const enrolled = (course.is_enrolled as boolean | undefined);
+    if (typeof enrolled === "boolean") result.enrolled = enrolled;
+    const lessons = (course.total_topics as number | undefined);
+    if (typeof lessons === "number") result.lessons = lessons;
+    const rating = (course.rating as number | undefined);
+    if (typeof rating === "number") result.rating = rating;
+    const instructor = ((course.instructor as Record<string, unknown>)?.name as string | undefined);
+    if (typeof instructor === "string" && instructor.length > 0) result.instructor = instructor;
+    const level = (course.difficulty as string | undefined);
+    if (typeof level === "string" && level.length > 0) result.level = level;
+    const studentsCount = (course.students_count as number | undefined);
+    if (typeof studentsCount === "number") result.students_count = studentsCount;
+
+    return [result];
+  }
+
+  // Handle array of courses (for list endpoint)
+  const result: ApiCourse[] = [];
+  for (const item of courses) {
+    if (!item || typeof item !== "object") continue;
+    const course = item as Record<string, unknown>;
+
+    const id = (course.id as string | number | undefined) ?? (course.course_id as string | number | undefined);
+    if (id === undefined || id === null) continue;
+
+    const apiCourse: ApiCourse = { id };
+    const title = (course.title as string | undefined) ?? (course.course_title as string | undefined);
+    if (typeof title === "string" && title.length > 0) apiCourse.title = title;
+    const slug = (course.slug as string | undefined);
+    if (typeof slug === "string" && slug.length > 0) apiCourse.slug = slug;
+    const thumbnail = (course.thumbnail as string | undefined) ?? (course.banner_image as string | undefined);
+    if (typeof thumbnail === "string" && thumbnail.length > 0) apiCourse.thumbnail = thumbnail;
+    const excerpt = (course.excerpt as string | undefined);
+    if (typeof excerpt === "string" && excerpt.length > 0) apiCourse.excerpt = excerpt;
+    const description = stripHtml((course.description as string | undefined) ?? "");
+    if (typeof description === "string" && description.length > 0) apiCourse.description = description;
+    const duration = (course.duration as string | undefined);
+    if (typeof duration === "string" && duration.length > 0) apiCourse.duration = duration;
+    const category = (course.difficulty as string | undefined);
+    if (typeof category === "string" && category.length > 0) apiCourse.category = category;
+    const progress = ((course.user_progress as Record<string, unknown>)?.percentage as number | undefined);
+    if (typeof progress === "number") apiCourse.progress = progress;
+    const enrolled = (course.is_enrolled as boolean | undefined);
+    if (typeof enrolled === "boolean") apiCourse.enrolled = enrolled;
+    const lessons = (course.total_topics as number | undefined);
+    if (typeof lessons === "number") apiCourse.lessons = lessons;
+    const rating = (course.rating as number | undefined);
+    if (typeof rating === "number") apiCourse.rating = rating;
+    const instructor = ((course.instructor as Record<string, unknown>)?.name as string | undefined);
+    if (typeof instructor === "string" && instructor.length > 0) apiCourse.instructor = instructor;
+    const level = (course.difficulty as string | undefined);
+    if (typeof level === "string" && level.length > 0) apiCourse.level = level;
+    const studentsCount = (course.students_count as number | undefined);
+    if (typeof studentsCount === "number") apiCourse.students_count = studentsCount;
+
+    result.push(apiCourse);
+  }
+
+  return result;
+};
+
+export const coursesService = {
+  async library(filters?: Record<string, string>): Promise<LibraryCourse[]> {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+    }
+    
+    const url = params.toString() 
+      ? `${API_PATHS.courses.library}?${params}`
+      : API_PATHS.courses.library;
+      
+    const response = await authApi.get(url);
+    return normalizeLibrary(response.data);
+  },
+
+  async list(): Promise<ApiCourse[]> {
+    const response = await authApi.get(API_PATHS.courses.list);
+    return normalizeCourses(response.data);
+  },
+
+  async details(idOrSlug: string): Promise<ApiCourse | null> {
+  const response = await authApi.get(API_PATHS.courses.details, {
+    params: { id: idOrSlug },
+  });
+  const normalized = normalizeCourses(response.data);
+  return normalized[0] ?? null;
+},
+
+  async ongoing(): Promise<ApiCourse[]> {
+    const response = await authApi.get(API_PATHS.courses.ongoing);
+    return normalizeCourses(response.data);
+  },
+
+  async categories(): Promise<ApiCategory[]> {
+    const response = await authApi.get(API_PATHS.courses.categories);
+    const raw = response.data;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((cat: unknown) => {
+      if (!cat || typeof cat !== "object") return null;
+      const obj = cat as Record<string, unknown>;
+      return {
+        id: (obj.id as string | number | undefined) ?? obj.name,
+        name: (obj.name as string | undefined) ?? "",
+        slug: (obj.slug as string | undefined) ?? undefined,
+        count: (obj.count as number | undefined) ?? undefined,
+      };
+    }).filter(Boolean) as ApiCategory[];
+  },
+
+  async filters(): Promise<CourseFilters> {
+    const response = await authApi.get(API_PATHS.courses.filters);
+    const raw = response.data;
+    if (!raw || typeof raw !== "object") return {};
+    
+    const obj = raw as Record<string, unknown>;
+    const data = obj.data as Record<string, unknown>;
+    if (!data || typeof data !== "object") return {};
+
+    const result: CourseFilters = {};
+    
+    // Process each filter type from the API response
+    const filterTypes = ['plan', 'status', 'format', 'length', 'difficulty', 'sort'] as const;
+    for (const filterType of filterTypes) {
+      const filterData = data[filterType];
+      if (Array.isArray(filterData)) {
+        result[filterType] = filterData.map((item: unknown) => {
+          if (typeof item === "object" && item !== null) {
+            const filterItem = item as Record<string, unknown>;
+            return {
+              value: (filterItem.value as string) ?? "",
+              label: (filterItem.label as string) ?? ""
+            };
+          }
+          return { value: "", label: "" };
+        }).filter(item => item.value && item.label);
+      }
+    }
+
+    return result;
+  },
+
+  async enroll(courseId: string | number): Promise<void> {
+    await authApi.post(`${API_PATHS.courses.enroll}`, null, {
+      params: { id: courseId },
+    });
+  },
+};

@@ -94,7 +94,7 @@ export default function PDPDetailView() {
     'Periodontics',
     'Oral Surgery',
     'Aesthetic Dentistry',
-    'Pediatric Dentistry',
+    'Paediatric Dentistry',
     'Restorative Dentistry',
     'Digital Dentistry',
     'Oral Pathology',
@@ -335,10 +335,10 @@ export default function PDPDetailView() {
                                 Become a leader in dental practice management
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Specialize in pediatric dentistry")}
-                                className={objective === "Specialize in pediatric dentistry" ? "bg-purple-50 text-purple-700" : ""}
+                                onClick={() => updateCareerObjective(index, "Specialize in paediatric dentistry")}
+                                className={objective === "Specialize in paediatric dentistry" ? "bg-purple-50 text-purple-700" : ""}
                               >
-                                Specialize in pediatric dentistry
+                                Specialize in paediatric dentistry
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => updateCareerObjective(index, "Excel in cosmetic dentistry")}
@@ -609,7 +609,7 @@ export default function PDPDetailView() {
                                 <SelectItem value="Modern Prosthodontics Course">Modern Prosthodontics Course</SelectItem>
                                 <SelectItem value="Orthodontic Biomechanics">Orthodontic Biomechanics</SelectItem>
                                 <SelectItem value="Periodontal Surgery Advanced">Periodontal Surgery Advanced</SelectItem>
-                                <SelectItem value="Pediatric Behavior Management">Pediatric Behavior Management</SelectItem>
+                                <SelectItem value="Paediatric Behavior Management">Paediatric Behavior Management</SelectItem>
                                 <SelectItem value="CAD/CAM Technology in Dentistry">CAD/CAM Technology in Dentistry</SelectItem>
                                 <SelectItem value="Cone Beam CT Interpretation">Cone Beam CT Interpretation</SelectItem>
                               </SelectContent>

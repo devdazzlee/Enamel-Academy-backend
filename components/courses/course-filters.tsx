@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Filter } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -10,42 +10,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const filterOptions = {
-  "Suggested For": [
-    "Cleaner", "Clinical Dental Technician", "Decontamination Lead", "Dental Hygienist",
-    "Dental Nurse", "Dental Technician", "Dental Therapist", "Dentist",
-    "Infection Control Lead", "Orthodontic Therapist", "Practice Manager", "Receptionist",
-    "Regulator", "Support Staff", "Trainee Dental Nurse", "Trainee Dentist", "Treatment Co-Ordinator"
-  ],
-  "Plan": ["Essentials", "Pro"],
-  "Status": ["Not started", "Continue Learning", "Complete", "Bookmarked", "Purchased"],
-  "Category": [
-    "Anaesthesia & Pain Control", "Anxiety & Sedation", "Digital Dentistry", "Endodontics",
-    "Facial Aesthetics", "Implants", "Oral & Maxillofacial Surgery", "Oral Medicine & Oral Pathology",
-    "Orthodontics", "Paedodontics", "Periodontics", "Prescription Medication Management",
-    "Prosthodontics", "Restorative", "Sleep Apnoea & Appliance Therapy", "Smoking Cessation",
-    "Special Patient Care", "Sustainable Dentistry", "Clinical Governance", "Complaints Handling",
-    "COVID-19", "CQC", "Disinfection & Decontamination", "Equality, Diversity & Inclusion",
-    "First Aid", "Health & Safety", "Legal & Ethical", "Medical Emergencies",
-    "Oral Cancer: Early Detection", "Personal Development", "Practice Management",
-    "Radiography & Radiation Protection", "Safeguarding", "Staff & HR", "Staff Development"
-  ],
-  "Format": [
-    "Article", "Audio", "Blended Learning", "Book", "Clinical", "Conference", "Course", "e-Learning", 
-    "Event", "Hands On", "ILM", "Journal", "Live", "Live Webinar", "Online", "On-demand", "On-demand Webinar",
-    "Podcast", "Practical", "Recorded Webinar", "Seminar", "Theatre", "Video", "Virtual", "Webinar", "Workshop"
-  ],
-  "Length": [
-    "0-15 mins", "15-30 mins", "30-60 mins", "1-2 hours", "2-3 hours", "3-4 hours", "4+ hours"
-  ],
-  "Grouping": [
-    "Alphabetical", "Newest First", "Oldest First", "Most Popular", "Highest Rated", "Lowest Price", "Highest Price"
-  ]
-}
+import { coursesService, type ApiCategory, type CourseFilters } from "@/lib/api/courses"
+import { rolesService, type DentalRole } from "@/lib/api/roles"
 
 export function CourseFilters({ onFiltersChange }: { onFiltersChange: (filters: Record<string, string[]>) => void }) {
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({})
+  const [categories, setCategories] = useState<ApiCategory[]>([])
+  const [filters, setFilters] = useState<CourseFilters>({})
+  const [roles, setRoles] = useState<DentalRole[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    const run = async () => {
+      setIsLoading(true)
+      try {
+        const [cats, fltrs, rls] = await Promise.all([coursesService.categories(), coursesService.filters(), rolesService.roles()])
+        if (!alive) return
+        setCategories(cats)
+        setFilters(fltrs)
+        setRoles(rls)
+      } catch {
+        if (!alive) return
+        setCategories([])
+        setFilters({})
+        setRoles([])
+      } finally {
+        if (!alive) return
+        setIsLoading(false)
+      }
+    }
+    void run()
+    return () => { alive = false }
+  }, [])
 
   const handleFilterChange = (filter: string, value: string) => {
     const newFilters = { ...selectedFilters }
@@ -64,6 +63,14 @@ export function CourseFilters({ onFiltersChange }: { onFiltersChange: (filters: 
     onFiltersChange(newFilters)
   }
 
+  const getFilterValueFromLabel = (filterType: string, label: string): string => {
+    const filterMap = filters[filterType as keyof CourseFilters];
+    if (!filterMap || !Array.isArray(filterMap)) return label;
+    
+    const filterItem = filterMap.find(item => item.label === label);
+    return filterItem?.value || label;
+  }
+
   const clearAllFilters = () => {
     setSelectedFilters({})
     onFiltersChange({})
@@ -78,6 +85,18 @@ export function CourseFilters({ onFiltersChange }: { onFiltersChange: (filters: 
     if (values.length === 0) return filter
     if (values.length === 1) return values[0]
     return `${values.length} selected`
+  }
+
+  const filterOptions = {
+    Category: categories.map(c => ({ label: c.name, count: c.count || 0 })),
+    Role: roles.map(r => ({ label: r.name, count: 0 })),
+    // Map API filters to the format expected by the component
+    Plan: filters.plan?.map(p => ({ label: p.label, count: 0 })) || [],
+    Status: filters.status?.map(s => ({ label: s.label, count: 0 })) || [],
+    Format: filters.format?.map(f => ({ label: f.label, count: 0 })) || [],
+    Length: filters.length?.map(l => ({ label: l.label, count: 0 })) || [],
+    Difficulty: filters.difficulty?.map(d => ({ label: d.label, count: 0 })) || [],
+    Sort: filters.sort?.map(s => ({ label: s.label, count: 0 })) || [],
   }
 
   return (
@@ -101,32 +120,52 @@ export function CourseFilters({ onFiltersChange }: { onFiltersChange: (filters: 
           </button>
         )}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
-        {Object.keys(filterOptions).map((filter) => (
-          <div key={filter}>
-            <Select
-              value={selectedFilters[filter]?.[0] || ""}
-              onValueChange={(value) => handleFilterChange(filter, value)}
-            >
-              <SelectTrigger className="w-full bg-white border border-gray-200">
-                <SelectValue placeholder={filter} />
-              </SelectTrigger>
-              <SelectContent className="bg-white border border-gray-200 max-h-60">
-                {filterOptions[filter as keyof typeof filterOptions].map((option) => (
-                  <SelectItem key={option} value={option}>
-                    <div className="flex items-center justify-between w-full">
-                      <span className="truncate">{option}</span>
-                      <span className="text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded ml-2 flex-shrink-0">
-                        62
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ))}
-      </div>
+      
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Skeleton key={index} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+          {Object.keys(filterOptions).map((filter) => (
+            <div key={filter}>
+              <Select
+                value={selectedFilters[filter]?.[0] || ""}
+                onValueChange={(value) => handleFilterChange(filter, value)}
+              >
+                <SelectTrigger className="w-full bg-white border border-gray-200">
+                  <SelectValue placeholder={filter} />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200 max-h-60">
+                  {(filterOptions[filter as keyof typeof filterOptions] || []).map((option) => {
+                    // For API-driven filters, get the actual value to send to backend
+                    const optionLabel = typeof option === 'string' ? option : option.label;
+                    const optionCount = typeof option === 'string' ? 0 : option.count;
+                    const actualValue = ['Plan', 'Status', 'Format', 'Length', 'Difficulty', 'Sort'].includes(filter) 
+                      ? getFilterValueFromLabel(filter, optionLabel) 
+                      : optionLabel;
+                    
+                    return (
+                      <SelectItem key={actualValue} value={actualValue}>
+                        <div className="flex items-center justify-between w-full">
+                          <span className="truncate">{optionLabel}</span>
+                          {optionCount > 0 && (
+                            <span className="text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded ml-2 flex-shrink-0">
+                              {optionCount}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

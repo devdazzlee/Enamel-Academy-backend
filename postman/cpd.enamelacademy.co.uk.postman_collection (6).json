@@ -46,7 +46,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Login",
@@ -76,7 +94,47 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Capture JWT token from login response",
+              "try {",
+              "  const body = pm.response.json();",
+              "  const token = body.token || (body.data && (body.data.token || body.data.jwt)) || body.jwt;",
+              "  if (token) {",
+              "    pm.environment.set(\"token\", token);",
+              "    pm.globals.set(\"token\", token);",
+              "    pm.test(\"Saved token\", () => pm.expect(token).to.be.a(\"string\"));",
+              "  } else {",
+              "    pm.test(\"Token not found in login response\", () => { throw new Error(\"Missing token in response\"); });",
+              "  }",
+              "} catch (e) {",
+              "  pm.test(\"Login response parse error\", () => { throw e; });",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Get Users Logins Detail",
@@ -86,19 +144,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/user",
           "host": [
@@ -112,7 +164,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Update User Profile",
@@ -122,19 +192,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "PUT",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/user/update?first_name=update first name",
           "host": [
@@ -155,7 +219,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Update User Password",
@@ -165,19 +247,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/user/change-password?current_password=%23X1caidz*oHJ$ISJ$RTml5%23Y&new_password=newpassword@123",
           "host": [
@@ -204,7 +280,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Dashboard",
@@ -214,19 +308,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/dashboard",
           "host": [
@@ -240,7 +328,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Dashboard stats",
@@ -250,19 +356,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/dashboard/stats",
           "host": [
@@ -277,7 +377,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Dashboard Continue-learning",
@@ -287,19 +405,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/dashboard/continue-learning",
           "host": [
@@ -314,7 +426,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Get courses by ID",
@@ -324,19 +454,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/dashboard/courses/14",
           "host": [
@@ -352,7 +476,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Get course library",
@@ -362,19 +504,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/library",
           "host": [
@@ -389,7 +525,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Get course details for library by Course ID or slug",
@@ -399,19 +553,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/?id=561",
           "host": [
@@ -432,7 +580,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Get ongoing courses",
@@ -442,19 +608,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/ongoing",
           "host": [
@@ -469,7 +629,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Get all course categories",
@@ -479,19 +657,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/categories",
           "host": [
@@ -506,7 +678,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Get available filter",
@@ -516,19 +706,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/filters",
           "host": [
@@ -543,7 +727,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Enroll user in a course by userid",
@@ -553,21 +755,15 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njk2OTIxODQsImV4cCI6MTc3MDI5Njk4NCwibmJmIjoxNzY5NjkyMTg0LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.vPLBYQoJ5Oabh3t7BXd0gdXUNVDxayHBZDMqudF0VNg",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
-          "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/enroll/?id=561",
+          "raw": "{{baseURL}}/wp-json/reactapi/v1/courses/enroll/561",
           "host": [
             "{{baseURL}}"
           ],
@@ -577,18 +773,29 @@
             "v1",
             "courses",
             "enroll",
-            ""
-          ],
-          "query": [
-            {
-              "key": "id",
-              "value": "561",
-              "type": "text"
-            }
+            "561"
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "User logout",
@@ -598,19 +805,13 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1wvY3BkLmVuYW1lbGFjYWRlbXkuY28udWsiLCJpYXQiOjE3Njg0ODMyNzcsImV4cCI6MTc2OTA4ODA3NywibmJmIjoxNzY4NDgzMjc3LCJkYXRhIjp7InVzZXJfaWQiOjMsInVzZXJuYW1lIjoiYXBpdXNlcnRlcyJ9fQ.hUyPW8RIYOWC86QPhPr3N5_f1gQL95KI90RsxiarOw8",
+              "value": "{{token}}",
               "type": "string"
             }
           ]
         },
         "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "",
-            "type": "text"
-          }
-        ],
+        "header": [],
         "url": {
           "raw": "{{baseURL}}/wp-json/reactapi/v1/logout",
           "host": [
@@ -624,7 +825,25 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// LOG_RESPONSE",
+              "const name = pm.info.requestName;",
+              "const status = pm.response.code;",
+              "const body = pm.response.text();",
+              "const max = 1200;",
+              "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+              "console.log(`=== ${name} [${status}] ===`);",
+              "console.log(out);"
+            ]
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -633,5 +852,15 @@
       "value": "",
       "type": "default"
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

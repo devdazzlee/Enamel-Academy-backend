@@ -19,6 +19,10 @@ export type UpdateUserPayload = {
   title?: string;
   firstName?: string;
   lastName?: string;
+  email?: string;
+  displayName?: string;
+  dentalSpecialty?: string;
+  dentalClinic?: string;
 };
 
 export type ChangePasswordPayload = {
@@ -56,22 +60,22 @@ export const userService = {
   },
 
   async update(payload: UpdateUserPayload): Promise<ApiUser> {
-    const response = await authApi.put(API_PATHS.user.update, null, {
-      params: {
-        title: payload.title,
-        first_name: payload.firstName,
-        last_name: payload.lastName,
-      },
+    const response = await authApi.put(API_PATHS.user.update, {
+      title: payload.title,
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      email: payload.email,
+      display_name: payload.displayName,
+      dental_specialty: payload.dentalSpecialty,
+      dental_clinic: payload.dentalClinic,
     });
     return normalizeUser(response.data);
   },
 
   async changePassword(payload: ChangePasswordPayload): Promise<void> {
-    await authApi.post(API_PATHS.user.changePassword, null, {
-      params: {
-        current_password: payload.currentPassword,
-        new_password: payload.newPassword,
-      },
+    await authApi.post(API_PATHS.user.changePassword, {
+      current_password: payload.currentPassword,
+      new_password: payload.newPassword,
     });
   },
 };

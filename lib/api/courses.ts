@@ -69,6 +69,35 @@ export type CourseFilters = {
   sort?: Array<{ value: string; label: string }>;
 };
 
+export type CourseReflectionPayload = {
+  learning_outcomes: string;
+  apply_learning: string;
+  next_steps: string;
+  takeaways: string;
+};
+
+export type CourseFeedbackPayload = {
+  ratings: {
+    overall: number;
+    content_quality: number;
+    instructor_effectiveness: number;
+    difficulty_level: number;
+    time_commitment: number;
+    materials_quality: number;
+    support: number;
+    relevance: number;
+  };
+  comment: string;
+};
+
+export type EnrollResult = {
+  success: boolean;
+  message?: string;
+  enrolledAt?: string;
+  courseId?: string | number;
+  raw: unknown;
+};
+
 const toNumber = (v: unknown): number | undefined => {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
@@ -276,12 +305,20 @@ export const coursesService = {
   },
 
   async details(idOrSlug: string): Promise<ApiCourse | null> {
-  const response = await authApi.get(API_PATHS.courses.details, {
-    params: { id: idOrSlug },
-  });
-  const normalized = normalizeCourses(response.data);
-  return normalized[0] ?? null;
-},
+    const response = await authApi.get(API_PATHS.courses.details, {
+      params: { id: idOrSlug },
+    });
+    const normalized = normalizeCourses(response.data);
+    return normalized[0] ?? null;
+  },
+
+  async detailsBySlug(slug: string): Promise<ApiCourse | null> {
+    const response = await authApi.get(API_PATHS.courses.details, {
+      params: { slug },
+    });
+    const normalized = normalizeCourses(response.data);
+    return normalized[0] ?? null;
+  },
 
   async ongoing(): Promise<ApiCourse[]> {
     const response = await authApi.get(API_PATHS.courses.ongoing);
@@ -290,7 +327,12 @@ export const coursesService = {
 
   async categories(): Promise<ApiCategory[]> {
     const response = await authApi.get(API_PATHS.courses.categories);
-    const raw = response.data;
+    const payload = response.data as Record<string, unknown> | unknown[];
+    const raw = Array.isArray(payload)
+      ? payload
+      : payload && typeof payload === "object" && Array.isArray((payload as Record<string, unknown>).data)
+        ? ((payload as Record<string, unknown>).data as unknown[])
+        : [];
     if (!Array.isArray(raw)) return [];
     return raw.map((cat: unknown) => {
       if (!cat || typeof cat !== "object") return null;
@@ -299,7 +341,7 @@ export const coursesService = {
         id: (obj.id as string | number | undefined) ?? obj.name,
         name: (obj.name as string | undefined) ?? "",
         slug: (obj.slug as string | undefined) ?? undefined,
-        count: (obj.count as number | undefined) ?? undefined,
+        count: toNumber(obj.count),
       };
     }).filter(Boolean) as ApiCategory[];
   },
@@ -336,9 +378,58 @@ export const coursesService = {
     return result;
   },
 
-  async enroll(courseId: string | number): Promise<void> {
-    await authApi.post(`${API_PATHS.courses.enroll}`, null, {
-      params: { id: courseId },
-    });
+  async enroll(courseId: string | number): Promise<EnrollResult> {
+    const normalizeEnroll = (raw: unknown): EnrollResult => {
+      const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+      const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+      const message = (typeof root.message === "string" ? root.message : undefined)
+        ?? (typeof data.message === "string" ? data.message : undefined);
+      const explicitSuccess = typeof root.success === "boolean" ? root.success : undefined;
+      const inferredSuccess = Boolean(data.enrolled_at ?? data.enrolledAt ?? data.course_id ?? data.courseId);
+      return {
+        success: explicitSuccess ?? inferredSuccess,
+        message,
+        enrolledAt: (data.enrolled_at as string | undefined) ?? (data.enrolledAt as string | undefined),
+        courseId: (data.course_id as string | number | undefined) ?? (data.courseId as string | number | undefined),
+        raw,
+      };
+    };
+
+    try {
+      const response = await authApi.post(API_PATHS.courses.enroll(courseId));
+      return normalizeEnroll(response.data);
+    } catch (error) {
+      // Backward compatibility for legacy backend variants that still expect ?id=
+      const fallback = `${API_PATHS.courses.enroll("")}?id=${encodeURIComponent(String(courseId))}`;
+      const fallbackResponse = await authApi.post(fallback).catch(() => {
+        throw error;
+      });
+      return normalizeEnroll(fallbackResponse.data);
+    }
+  },
+
+  async saveReflection(courseId: string | number, payload: CourseReflectionPayload): Promise<unknown> {
+    const response = await authApi.post(API_PATHS.courses.reflection(courseId), payload);
+    return response.data;
+  },
+
+  async getReflection(courseId: string | number): Promise<unknown> {
+    const response = await authApi.get(API_PATHS.courses.reflection(courseId));
+    return response.data;
+  },
+
+  async getAllReflections(courseId: string | number): Promise<unknown> {
+    const response = await authApi.get(API_PATHS.courses.reflections(courseId));
+    return response.data;
+  },
+
+  async saveFeedback(courseId: string | number, payload: CourseFeedbackPayload): Promise<unknown> {
+    const response = await authApi.post(API_PATHS.courses.feedback(courseId), payload);
+    return response.data;
+  },
+
+  async getFeedback(courseId: string | number): Promise<unknown> {
+    const response = await authApi.get(API_PATHS.courses.feedback(courseId));
+    return response.data;
   },
 };

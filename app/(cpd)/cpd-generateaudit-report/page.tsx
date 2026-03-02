@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, FileText, CheckCircle, Download, AlertCircle } from 'lucide-react';
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
@@ -11,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cpdService } from "@/lib/api/cpd";
 
 export default function GenerateAuditReport() {
   const router = useRouter();
@@ -23,68 +25,160 @@ export default function GenerateAuditReport() {
     outcomes: true,
     verification: true
   });
-
-  const complianceData = {
-    hoursCompleted: 58,
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [generateError, setGenerateError] = useState("");
+  const [generateSuccess, setGenerateSuccess] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedRole, setSelectedRole] = useState("dentist");
+  const [complianceData, setComplianceData] = useState({
+    hoursCompleted: 0,
     totalHours: 100,
-    percentage: 57,
-    cycleStart: '01/08/2021',
-    cycleEnd: '31/07/2026',
-    hoursRemaining: 108,
-    totalRecords: 47,
-    verified: 28,
-    selfDeclared: 19,
-    evidencePercentage: 95
-  };
+    percentage: 0,
+    cycleStart: 'N/A',
+    cycleEnd: 'N/A',
+    hoursRemaining: 100,
+    totalRecords: 0,
+    verified: 0,
+    selfDeclared: 0,
+    evidencePercentage: 0
+  });
+  const [categoryHours, setCategoryHours] = useState<Array<{ name: string; hours: number; percentage: number }>>([]);
+  const [mandatoryTraining, setMandatoryTraining] = useState<Array<{ name: string; status: string; date: string; statusColor: string }>>([]);
 
-  const categoryHours = [
-    { name: 'Clinical', hours: 78, percentage: 55 },
-    { name: 'Management & Leadership', hours: 28, percentage: 20 },
-    { name: 'Communication', hours: 18, percentage: 13 },
-    { name: 'Professionalism', hours: 18, percentage: 13 }
-  ];
+  const auditReadiness = useMemo(() => {
+    const checks = [
+      { label: 'Sufficient CPD hours recorded', passed: complianceData.hoursCompleted >= complianceData.totalHours },
+      { label: 'Learning outcomes documented', passed: complianceData.totalRecords > 0 },
+      { label: 'Supporting evidence attached', passed: complianceData.evidencePercentage >= 70 },
+      { label: 'Verified records available', passed: complianceData.verified > 0 },
+    ];
+    return checks.filter((c) => c.passed).map((c) => c.label);
+  }, [complianceData]);
 
-  const mandatoryTraining = [
-    { name: 'Basic Life Support (BLS)', status: 'Valid', date: '2026-08-15', statusColor: 'text-green-600 bg-green-100' },
-    { name: 'Radiography & Radiation Protection', status: 'Expiring Soon', date: '2026-03-10', statusColor: 'text-amber-600 bg-amber-100' },
-    { name: 'Safeguarding Children & Vulnerable Adults', status: 'Expired', date: '2026-01-05', statusColor: 'text-red-600 bg-red-100' },
-    { name: 'Cross Infection Control', status: 'Valid', date: '2026-11-20', statusColor: 'text-green-600 bg-green-100' }
-  ];
+  useEffect(() => {
+    let alive = true;
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+    const getNum = (v: unknown, fallback = 0) =>
+      typeof v === "number" ? v : (typeof v === "string" && !Number.isNaN(Number(v)) ? Number(v) : fallback);
 
-  const auditReadiness = [
-    'Sufficient CPD hours recorded',
-    'Mix of clinical and non-clinical CPD',
-    'Learning outcomes documented',
-    'Reflective statements included',
-    'Supporting evidence attached (94% coverage)'
-  ];
+    const run = async () => {
+      setIsLoading(true);
+      setLoadError("");
+      try {
+        const [summaryRaw, analyticsRaw, requirementsRaw] = await Promise.all([
+          cpdService.summary(),
+          cpdService.analytics(),
+          cpdService.requirements(selectedRole),
+        ]);
+        if (!alive) return;
 
-  const handleGenerateReport = () => {
-    // Create report data based on selected options
-    const reportData = {
-      format: reportFormat,
-      dateRange: dateRange,
-      includeOptions: includeOptions,
-      complianceData: complianceData,
-      categoryHours: categoryHours,
-      mandatoryTraining: mandatoryTraining,
-      auditReadiness: auditReadiness,
-      generatedAt: new Date().toISOString(),
-      generatedBy: 'Dr. Sarah Johnson' // In a real app, this would come from user context
+        const summaryRoot = (summaryRaw && typeof summaryRaw === "object" ? summaryRaw : {}) as Record<string, unknown>;
+        const summaryData = (summaryRoot.data && typeof summaryRoot.data === "object" ? summaryRoot.data : summaryRoot) as Record<string, unknown>;
+        const analyticsRoot = (analyticsRaw && typeof analyticsRaw === "object" ? analyticsRaw : {}) as Record<string, unknown>;
+        const analyticsData = (analyticsRoot.data && typeof analyticsRoot.data === "object" ? analyticsRoot.data : analyticsRoot) as Record<string, unknown>;
+        const requirementsRoot = (requirementsRaw && typeof requirementsRaw === "object" ? requirementsRaw : {}) as Record<string, unknown>;
+        const requirementsData = (requirementsRoot.data && typeof requirementsRoot.data === "object" ? requirementsRoot.data : requirementsRoot) as Record<string, unknown>;
+
+        const hoursCompleted = getNum(summaryData.hours_completed ?? summaryData.completed_hours, 0);
+        const totalHours = getNum(summaryData.total_required_hours ?? summaryData.total_hours, 100);
+        const percentage = totalHours > 0 ? Math.round((hoursCompleted / totalHours) * 100) : 0;
+        const totalRecords = getNum(summaryData.total_records ?? summaryData.activities_count, 0);
+        const verified = getNum(summaryData.verified_records ?? summaryData.verified_count, 0);
+        const evidencePercentage = getNum(summaryData.evidence_coverage ?? summaryData.evidence_percentage, 0);
+        setComplianceData({
+          hoursCompleted,
+          totalHours,
+          percentage,
+          cycleStart: getText(summaryData.cycle_start, 'N/A'),
+          cycleEnd: getText(summaryData.cycle_end, 'N/A'),
+          hoursRemaining: Math.max(totalHours - hoursCompleted, 0),
+          totalRecords,
+          verified,
+          selfDeclared: Math.max(totalRecords - verified, 0),
+          evidencePercentage,
+        });
+
+        const categories = Array.isArray(analyticsData.category_hours)
+          ? analyticsData.category_hours
+          : Array.isArray(analyticsData.categories)
+            ? analyticsData.categories
+            : [];
+        const categoryRows = (categories as unknown[]).map((item) => {
+          const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+          return {
+            name: getText(row.name ?? row.category, "General"),
+            hours: getNum(row.hours, 0),
+            percentage: getNum(row.percentage, 0),
+          };
+        });
+        setCategoryHours(categoryRows);
+
+        const requirements = Array.isArray(requirementsData.mandatory_training)
+          ? requirementsData.mandatory_training
+          : Array.isArray(requirementsData.requirements)
+            ? requirementsData.requirements
+            : [];
+        const mappedReq = (requirements as unknown[]).map((item) => {
+          const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+          const status = getText(row.status, "Unknown");
+          const statusColor = status.toLowerCase().includes("valid")
+            ? "text-green-600 bg-green-100"
+            : status.toLowerCase().includes("expir")
+              ? "text-amber-600 bg-amber-100"
+              : "text-red-600 bg-red-100";
+          return {
+            name: getText(row.name ?? row.title, "Training item"),
+            status,
+            date: getText(row.date ?? row.expiry_date, "N/A"),
+            statusColor,
+          };
+        });
+        setMandatoryTraining(mappedReq);
+      } catch {
+        if (!alive) return;
+        setLoadError("Unable to load CPD audit data right now.");
+      } finally {
+        if (alive) setIsLoading(false);
+      }
     };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, [selectedRole]);
 
-    // Log the report data (in a real app, this would be sent to backend)
-    console.log('Generating audit report with data:', reportData);
-
-    // Show success message
-    alert(`Audit report generated successfully!\n\nFormat: ${reportFormat}\nDate Range: ${dateRange}\n\nIn a production environment, this would download the report file.`);
-
-    // In a real implementation, you would:
-    // 1. Send data to backend API
-    // 2. Generate PDF/Excel/ZIP file based on format
-    // 3. Download file to user's device
-    // 4. Show loading state during generation
-    // 5. Handle errors gracefully
+  const handleGenerateReport = async () => {
+    setGenerateError("");
+    setGenerateSuccess("");
+    setIsGenerating(true);
+    const formatMap: Record<string, string> = {
+      comprehensive: "pdf",
+      summary: "summary",
+      spreadsheet: "excel",
+      evidence: "evidence_zip",
+    };
+    const dateMap: Record<string, string> = {
+      "Full 5-Year Cycle": "full_cycle",
+      "Last Year": "custom",
+      "Custom Range": "custom",
+    };
+    try {
+      await cpdService.generateAuditReport({
+        format: formatMap[reportFormat] ?? "pdf",
+        date_range: dateMap[dateRange] ?? "full_cycle",
+        include_certificates: includeOptions.certificates,
+        include_evidence: includeOptions.evidence,
+        include_reflections: includeOptions.reflections,
+        include_outcomes: includeOptions.outcomes,
+        include_verification: includeOptions.verification,
+      });
+      setGenerateSuccess("Audit report request submitted successfully.");
+    } catch {
+      setGenerateError("Failed to generate report. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -126,6 +220,27 @@ export default function GenerateAuditReport() {
         </div>
 
         {/* Main Content */}
+        {isLoading && (
+          <div className="mt-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
+            <Spinner />
+            Loading audit data...
+          </div>
+        )}
+        {loadError && (
+          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            {loadError}
+          </div>
+        )}
+        {generateSuccess && (
+          <div className="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            {generateSuccess}
+          </div>
+        )}
+        {generateError && (
+          <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {generateError}
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
           {/* Left Column - Compliance Summary */}
           <div className="lg:col-span-2 space-y-6">
@@ -263,6 +378,18 @@ export default function GenerateAuditReport() {
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
               <h3 className="text-base sm:text-lg font-semibold text-purple-700 mb-2">Export Options</h3>
               <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">Configure your audit report</p>
+              <div className="mb-4">
+                <label className="mb-2 block text-xs sm:text-sm font-medium text-gray-700">Role</label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs sm:text-sm"
+                >
+                  <option value="dentist">dentist</option>
+                  <option value="dental_nurse">dental_nurse</option>
+                  <option value="dental_care_professional">dental_care_professional</option>
+                </select>
+              </div>
 
               {/* Report Format */}
               <div className="mb-4 sm:mb-6">
@@ -396,10 +523,11 @@ export default function GenerateAuditReport() {
               {/* Generate Button */}
               <button 
                 onClick={handleGenerateReport}
-                className="w-full py-2.5 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors text-sm sm:text-base max-w-xs mx-auto"
+                disabled={isGenerating || isLoading}
+                className="w-full py-2.5 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors text-sm sm:text-base max-w-xs mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download size={16} className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Generate Report</span>
+                <span>{isGenerating ? "Generating..." : "Generate Report"}</span>
               </button>
             </div>
 

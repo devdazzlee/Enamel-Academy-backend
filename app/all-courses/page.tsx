@@ -12,11 +12,13 @@ export default function AllCoursesPage() {
   const router = useRouter()
   const [courses, setCourses] = useState<ApiCourse[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
 
   useEffect(() => {
     let alive = true
     const run = async () => {
       setIsLoading(true)
+      setHasError(false)
       try {
         const data = await coursesService.list()
         if (!alive) return
@@ -24,6 +26,7 @@ export default function AllCoursesPage() {
       } catch {
         if (!alive) return
         setCourses([])
+        setHasError(true)
       } finally {
         if (!alive) return
         setIsLoading(false)
@@ -57,7 +60,7 @@ export default function AllCoursesPage() {
           </div>
         ) : courses.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            No courses found.
+            {hasError ? "Unable to load courses. Please try again." : "No courses found."}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -74,15 +77,15 @@ export default function AllCoursesPage() {
                   <h3 className="font-medium text-foreground text-xs sm:text-sm mb-2 line-clamp-2">
                     {course.title ?? "Untitled Course"}
                   </h3>
-                  <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-2 sm:mb-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-2 sm:mb-3">
                     {course.duration && (
-                      <span className="flex items-center gap-0.5 sm:gap-1">
+                      <span className="flex items-center gap-0.5 sm:gap-1 min-w-0">
                         <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                        {course.duration}
+                        <span className="truncate">{course.duration}</span>
                       </span>
                     )}
                     {course.lessons && (
-                      <span className="flex items-center gap-0.5 sm:gap-1">
+                      <span className="flex items-center gap-0.5 sm:gap-1 min-w-0">
                         <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         {course.lessons} lessons
                       </span>

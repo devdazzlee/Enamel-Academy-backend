@@ -16,17 +16,39 @@ export type Permission = {
 };
 
 const normalizeRoles = (raw: unknown): DentalRole[] => {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item: unknown) => {
-    if (!item || typeof item !== "object") return null;
-    const obj = item as Record<string, unknown>;
-    return {
-      id: (obj.id as string | number | undefined) ?? obj.name,
-      name: (obj.name as string | undefined) ?? "",
-      slug: (obj.slug as string | undefined) ?? undefined,
-      description: (obj.description as string | undefined) ?? undefined,
-    };
-  }).filter(Boolean) as DentalRole[];
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, unknown>;
+
+  // Handles API shape: { success: true, data: { dentist: "Dentist", ... } }
+  const container = (obj.data ?? raw) as unknown;
+  if (!container) return [];
+
+  if (Array.isArray(container)) {
+    return container
+      .map((item: unknown) => {
+        if (!item || typeof item !== "object") return null;
+        const roleObj = item as Record<string, unknown>;
+        return {
+          id: (roleObj.id as string | number | undefined) ?? roleObj.slug ?? roleObj.name,
+          name: (roleObj.name as string | undefined) ?? "",
+          slug: (roleObj.slug as string | undefined) ?? undefined,
+          description: (roleObj.description as string | undefined) ?? undefined,
+        };
+      })
+      .filter(Boolean) as DentalRole[];
+  }
+
+  if (typeof container === "object") {
+    return Object.entries(container as Record<string, unknown>)
+      .map(([key, value]) => ({
+        id: key,
+        slug: key,
+        name: typeof value === "string" ? value : key,
+      }))
+      .filter((role) => role.name.length > 0);
+  }
+
+  return [];
 };
 
 const normalizePermissions = (raw: unknown): Permission[] => {

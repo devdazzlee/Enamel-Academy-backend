@@ -10,11 +10,13 @@ export function OngoingCourses() {
   const router = useRouter()
   const [courses, setCourses] = useState<ApiCourse[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
 
   useEffect(() => {
     let alive = true
     const run = async () => {
       setIsLoading(true)
+      setHasError(false)
       try {
         const data = await coursesService.ongoing()
         if (!alive) return
@@ -22,6 +24,7 @@ export function OngoingCourses() {
       } catch {
         if (!alive) return
         setCourses([])
+        setHasError(true)
       } finally {
         if (!alive) return
         setIsLoading(false)
@@ -68,7 +71,11 @@ export function OngoingCourses() {
           <span className="text-muted-foreground">On-Going Courses</span>
         </h2>
         <div className="text-center py-10 text-muted-foreground">
-          <p className="text-sm">You do not have any ongoing courses yet.</p>
+          {hasError ? (
+            <p className="text-sm">Unable to load ongoing courses right now.</p>
+          ) : (
+            <p className="text-sm">You do not have any ongoing courses yet.</p>
+          )}
         </div>
       </section>
     )

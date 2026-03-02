@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Eye, EyeOff } from "lucide-react"
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select"
 
 import { useAuthStore } from "@/lib/stores/auth-store"
+import { rolesService } from "@/lib/api/roles"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -34,6 +35,41 @@ export default function SignupPage() {
   })
 
   const [error, setError] = useState("")
+  const [roleOptions, setRoleOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [rolesLoading, setRolesLoading] = useState(true)
+  const [rolesError, setRolesError] = useState("")
+
+  useEffect(() => {
+    let alive = true
+    const run = async () => {
+      setRolesLoading(true)
+      setRolesError("")
+      try {
+        const roles = await rolesService.roles()
+        if (!alive) return
+        const mapped = roles
+          .map((r) => {
+            const label = r.name || ""
+            const value = (r.slug && r.slug.length > 0)
+              ? r.slug
+              : label.toLowerCase().replace(/\s+/g, "_")
+            return { value, label }
+          })
+          .filter((r) => r.value && r.label)
+        setRoleOptions(mapped)
+      } catch {
+        if (!alive) return
+        setRoleOptions([])
+        setRolesError("Unable to load profession list. Please refresh and try again.")
+      } finally {
+        if (alive) setRolesLoading(false)
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -79,6 +115,11 @@ export default function SignupPage() {
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
               {error}
+            </div>
+          )}
+          {rolesError && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+              {rolesError}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -152,12 +193,12 @@ export default function SignupPage() {
               <label className="block text-sm text-muted-foreground mb-2">I am a :</label>
               <Select value={formData.iAmA} onValueChange={(value) => setFormData({ ...formData, iAmA: value })}>
                 <SelectTrigger className="w-full rounded-lg md:rounded-full bg-white">
-                  <SelectValue placeholder="Select your profession" />
+                  <SelectValue placeholder={rolesLoading ? "Loading professions..." : "Select your profession"} />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-200">
-                  <SelectItem value="dentist">Dentist</SelectItem>
-                  <SelectItem value="dental-nurse">Dental Nurse</SelectItem>
-                  <SelectItem value="dental-care-professional">Dental Care Professional</SelectItem>
+                  {roleOptions.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -167,7 +208,7 @@ export default function SignupPage() {
             <button
               type="submit"
               className="w-full bg-[#8b5cf6] hover:bg-[#7c3aed] text-white py-3 rounded-lg font-medium transition-colors"
-              disabled={isLoading}
+              disabled={isLoading || rolesLoading || roleOptions.length === 0}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center gap-2">

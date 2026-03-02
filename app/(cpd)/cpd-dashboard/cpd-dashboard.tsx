@@ -1,49 +1,257 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Clock, TrendingUp, CheckCircle, AlertCircle, BookOpen, PlusCircle, FileText, TrendingDown, File, Award } from 'lucide-react';
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { useRouter } from 'next/navigation';
+import { Spinner } from "@/components/ui/spinner";
+import { cpdService } from "@/lib/api/cpd";
+import { pdpService } from "@/lib/api/pdp";
+import { certificatesService } from "@/lib/api/certificates";
+
+type CpdSummaryView = {
+  hoursCompleted: number;
+  totalHours: number;
+  hoursRemaining: number;
+  cycleStart: string;
+  cycleEnd: string;
+  verifiedHours: number;
+  selfDeclaredHours: number;
+  evidencePercentage: number;
+};
+
+type CategoryView = {
+  name: string;
+  hours: number;
+  total: number;
+};
+
+type MandatoryTrainingView = {
+  name: string;
+  status: string;
+  expires: string;
+  subtitle: string;
+  statusColor: string;
+};
+
+type RecentActivityView = {
+  title: string;
+  date: string;
+  hours: number;
+  category: string;
+  type: string;
+  icon: 'award' | 'file';
+};
+
+type PdpProgressView = {
+  title: string;
+  completed: number;
+  total: number;
+  percentage: number;
+};
 
 export default function CPDDashboard() {
-  const [selectedRole, setSelectedRole] = useState('Dentist CPD');
   const router = useRouter();
-
-  const cpdData = {
-    hoursCompleted: 58,
+  const [summary, setSummary] = useState<CpdSummaryView>({
+    hoursCompleted: 0,
     totalHours: 100,
-    hoursRemaining: 42,
-    cycleStart: '01/08/2021',
-    cycleEnd: '31/07/2026',
-    verifiedHours: 89,
-    selfDeclaredHours: 53,
-    evidencePercentage: 94,
-    categories: [
-      { name: 'Clinical', hours: 28, total: 100, color: 'bg-purple-600' },
-      { name: 'Management & Leadership', hours: 10, total: 30, color: 'bg-purple-600' },
-      { name: 'Communication', hours: 13, total: 25, color: 'bg-purple-600' },
-      { name: 'Professionalism', hours: 6, total: 20, color: 'bg-purple-600' }
-    ],
-    mandatoryTraining: [
-      { name: 'Basic Life Support (BLS)', status: 'Valid', expires: '2026-08-15', daysAgo: 198, statusColor: 'bg-green-100 text-green-700' },
-      { name: 'Radiography & Radiation Protection', status: 'Expiring Soon', expires: '2026-03-10', daysAgo: 40, statusColor: 'bg-amber-100 text-amber-700' },
-      { name: 'Safeguarding Children & Vulnerable Adults', status: 'Expired', expires: '2026-01-05', daysAgo: 24, statusColor: 'bg-red-100 text-red-700' },
-      { name: 'Cross Infection Control', status: 'Valid', expires: '2026-11-20', daysAgo: 295, statusColor: 'bg-green-100 text-green-700' }
-    ],
-    recentActivities: [
-      { title: 'Advanced Endodontics: Root Canal Techniques', date: '15 Jan 2026', hours: 3, category: 'Clinical', type: 'Platform Course', icon: 'award' },
-      { title: 'Practice Management Masterclass', date: '10 Jan 2026', hours: 2, category: 'Management & Leadership', type: 'External', icon: 'file' },
-      { title: 'Dental Implant Workshop - London', date: '20 Dec 2025', hours: 6, category: 'Clinical', type: 'External', icon: 'file' },
-      { title: 'Medical Emergencies in Dental Practice', date: '05 Dec 2025', hours: 4, category: 'Clinical', type: 'Platform Course', icon: 'award' }
-    ],
-    pdpProgress: {
-      title: 'Advanced Implantology Specialization',
-      completed: 3,
-      total: 5,
-      percentage: 65
-    }
-  };
+    hoursRemaining: 100,
+    cycleStart: 'N/A',
+    cycleEnd: 'N/A',
+    verifiedHours: 0,
+    selfDeclaredHours: 0,
+    evidencePercentage: 0,
+  });
+  const [categories, setCategories] = useState<CategoryView[]>([]);
+  const [mandatoryTraining, setMandatoryTraining] = useState<MandatoryTrainingView[]>([]);
+  const [recentActivities, setRecentActivities] = useState<RecentActivityView[]>([]);
+  const [pdpProgress, setPdpProgress] = useState<PdpProgressView>({
+    title: 'No active PDP',
+    completed: 0,
+    total: 0,
+    percentage: 0,
+  });
+  const [evidenceStats, setEvidenceStats] = useState({ totalFiles: 0, certificates: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+
+    const getText = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback);
+    const getNum = (v: unknown, fallback = 0) =>
+      typeof v === 'number' ? v : (typeof v === 'string' && !Number.isNaN(Number(v)) ? Number(v) : fallback);
+    const asObj = (v: unknown) => ((v && typeof v === 'object') ? (v as Record<string, unknown>) : {});
+    const pickData = (raw: unknown) => {
+      const root = asObj(raw);
+      const data = root.data;
+      return (data && typeof data === 'object') ? (data as Record<string, unknown>) : root;
+    };
+    const formatDate = (value: unknown) => {
+      const text = getText(value, '');
+      if (!text) return 'N/A';
+      const d = new Date(text);
+      if (Number.isNaN(d.getTime())) return text;
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+    const expirySubtitle = (value: unknown) => {
+      const text = getText(value, '');
+      if (!text) return '';
+      const d = new Date(text);
+      if (Number.isNaN(d.getTime())) return '';
+      const diffDays = Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (diffDays >= 0) return `Expires in ${diffDays} day${diffDays === 1 ? '' : 's'}`;
+      const days = Math.abs(diffDays);
+      return `Expired ${days} day${days === 1 ? '' : 's'} ago`;
+    };
+
+    const run = async () => {
+      setIsLoading(true);
+      setLoadError('');
+      try {
+        const [summaryRaw, analyticsRaw, requirementsRaw, historyRaw, pdpStatsRaw, pdpListRaw, certsRaw] = await Promise.all([
+          cpdService.summary(),
+          cpdService.analytics(),
+          cpdService.requirements('dentist'),
+          cpdService.history({ limit: 4, offset: 0 }),
+          pdpService.stats(),
+          pdpService.list({ status: 'active', perPage: 1, page: 1 }),
+          certificatesService.getMyCertificates({ perPage: 200, page: 1 }),
+        ]);
+
+        if (!alive) return;
+
+        const summaryData = pickData(summaryRaw);
+        const completedHours = getNum(summaryData.hours_completed ?? summaryData.completed_hours ?? summaryData.total_hours_completed, 0);
+        const totalHours = getNum(summaryData.total_required_hours ?? summaryData.total_hours, 100);
+        const verifiedHours = getNum(summaryData.verified_hours ?? summaryData.verified_cpd_hours ?? summaryData.verified_records, 0);
+        const selfDeclaredHours = getNum(
+          summaryData.self_declared_hours ?? summaryData.self_declared,
+          Math.max(completedHours - verifiedHours, 0)
+        );
+        const evidencePercentage = getNum(summaryData.evidence_coverage ?? summaryData.evidence_percentage, 0);
+        setSummary({
+          hoursCompleted: completedHours,
+          totalHours,
+          hoursRemaining: Math.max(totalHours - completedHours, 0),
+          cycleStart: getText(summaryData.cycle_start, 'N/A'),
+          cycleEnd: getText(summaryData.cycle_end, 'N/A'),
+          verifiedHours,
+          selfDeclaredHours,
+          evidencePercentage,
+        });
+
+        const analyticsData = pickData(analyticsRaw);
+        const categoryRows = Array.isArray(analyticsData.category_hours)
+          ? analyticsData.category_hours
+          : Array.isArray(analyticsData.categories)
+            ? analyticsData.categories
+            : [];
+        setCategories((categoryRows as unknown[]).map((item) => {
+          const row = asObj(item);
+          const hours = getNum(row.hours, 0);
+          const total = getNum(row.total ?? row.target_hours ?? row.required_hours, 0);
+          return {
+            name: getText(row.name ?? row.category, 'General'),
+            hours,
+            total: total > 0 ? total : Math.max(hours, 1),
+          };
+        }));
+
+        const requirementsData = pickData(requirementsRaw);
+        const reqRows = Array.isArray(requirementsData.mandatory_training)
+          ? requirementsData.mandatory_training
+          : Array.isArray(requirementsData.requirements)
+            ? requirementsData.requirements
+            : [];
+        setMandatoryTraining((reqRows as unknown[]).map((item) => {
+          const row = asObj(item);
+          const status = getText(row.status, 'Unknown');
+          const expires = getText(row.expiry_date ?? row.date, 'N/A');
+          const lower = status.toLowerCase();
+          const statusColor = lower.includes('valid')
+            ? 'bg-green-100 text-green-700'
+            : lower.includes('expir')
+              ? 'bg-amber-100 text-amber-700'
+              : 'bg-red-100 text-red-700';
+          return {
+            name: getText(row.name ?? row.title, 'Training item'),
+            status,
+            expires,
+            subtitle: expirySubtitle(expires),
+            statusColor,
+          };
+        }));
+
+        const historyData = pickData(historyRaw);
+        const historyRows = Array.isArray(historyData.history)
+          ? historyData.history
+          : Array.isArray(historyData.activities)
+            ? historyData.activities
+            : Array.isArray(historyData.items)
+              ? historyData.items
+              : [];
+        const recent = (historyRows as unknown[]).slice(0, 4).map((item) => {
+          const row = asObj(item);
+          const type = getText(row.activity_type ?? row.type, 'External');
+          return {
+            title: getText(row.title ?? row.activity_name, 'Untitled activity'),
+            date: formatDate(row.date_completed ?? row.date ?? row.completed_at),
+            hours: getNum(row.hours ?? row.duration_hours, 0),
+            category: getText(row.gdc_category ?? row.category, 'General'),
+            type,
+            icon: type.toLowerCase().includes('platform') ? 'award' : 'file',
+          } as RecentActivityView;
+        });
+        setRecentActivities(recent);
+        const evidenceFiles = (historyRows as unknown[]).reduce((sum, item) => {
+          const row = asObj(item);
+          return sum + getNum(row.evidence_files_count ?? row.files, 0);
+        }, 0);
+
+        const pdpStatsData = pickData(pdpStatsRaw);
+        const currentPdp = Array.isArray(pdpListRaw.items) ? asObj(pdpListRaw.items[0]) : {};
+        const pdpTotal = getNum(pdpStatsData.total_goals ?? pdpStatsData.goals_total ?? pdpStatsData.total, 0);
+        const pdpCompleted = getNum(pdpStatsData.completed_goals ?? pdpStatsData.goals_completed ?? pdpStatsData.completed, 0);
+        const pdpPercentage = pdpTotal > 0 ? Math.round((pdpCompleted / pdpTotal) * 100) : 0;
+        setPdpProgress({
+          title: getText(pdpStatsData.current_pdp_title ?? currentPdp.title, 'No active PDP'),
+          completed: pdpCompleted,
+          total: pdpTotal,
+          percentage: pdpPercentage,
+        });
+
+        const certsData = pickData(certsRaw);
+        const certRows = Array.isArray(certsData.certificates)
+          ? certsData.certificates
+          : Array.isArray(certsData.items)
+            ? certsData.items
+            : [];
+        const certCount = getNum(certsData.total, Array.isArray(certRows) ? certRows.length : 0);
+        setEvidenceStats({
+          totalFiles: evidenceFiles + certCount,
+          certificates: certCount,
+        });
+      } catch {
+        if (!alive) return;
+        setLoadError('Unable to load CPD dashboard data right now.');
+      } finally {
+        if (alive) setIsLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const completionPercentage = useMemo(
+    () => (summary.totalHours > 0 ? Math.round((summary.hoursCompleted / summary.totalHours) * 100) : 0),
+    [summary.hoursCompleted, summary.totalHours]
+  );
+  const complianceOnTrack = completionPercentage >= 80;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -76,6 +284,17 @@ export default function CPDDashboard() {
               </div>
             </div>
           </div>
+          {isLoading && (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
+              <Spinner />
+              Loading CPD dashboard data...
+            </div>
+          )}
+          {loadError && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              {loadError}
+            </div>
+          )}
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
@@ -88,26 +307,26 @@ export default function CPDDashboard() {
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900">CPD Hours</h3>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
-                  Current 5-year cycle ({cpdData.cycleStart} - {cpdData.cycleEnd})
+                  Current 5-year cycle ({summary.cycleStart} - {summary.cycleEnd})
                 </p>
                 <div className="flex items-end space-x-2 mb-3 sm:mb-4">
-                  <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-purple-600">{cpdData.hoursCompleted}</div>
-                  <div className="text-lg sm:text-xl text-gray-500 pb-2">/ {cpdData.totalHours} hours</div>
+                  <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-purple-600">{summary.hoursCompleted}</div>
+                  <div className="text-lg sm:text-xl text-gray-500 pb-2">/ {summary.totalHours} hours</div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 mb-3 sm:mb-4">
                   <div 
                     className="bg-purple-600 h-2 sm:h-3 rounded-full transition-all duration-500"
-                    style={{ width: `${(cpdData.hoursCompleted / cpdData.totalHours) * 100}%` }}
+                    style={{ width: `${completionPercentage}%` }}
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs sm:text-sm gap-2">
                   <div>
                     <span className="text-gray-600">Completed</span>
-                    <span className="ml-2 font-semibold text-purple-600">{(cpdData.hoursCompleted / cpdData.totalHours * 100).toFixed(0)}%</span>
+                    <span className="ml-2 font-semibold text-purple-600">{completionPercentage}%</span>
                   </div>
                   <div>
                     <span className="text-gray-600">Hours remaining</span>
-                    <span className="ml-2 font-semibold text-gray-900">{cpdData.hoursRemaining} hours</span>
+                    <span className="ml-2 font-semibold text-gray-900">{summary.hoursRemaining} hours</span>
                   </div>
                 </div>
               </div>
@@ -117,7 +336,7 @@ export default function CPDDashboard() {
                 <h3 className="text-base sm:text-lg font-semibold text-purple-700 mb-2">Mandatory Training Status</h3>
                 <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">Essential requirements for dental practice</p>
                 <div className="space-y-2 sm:space-y-3">
-                  {cpdData.mandatoryTraining.map((training, index) => (
+                  {mandatoryTraining.map((training, index) => (
                     <div key={index} className="p-3 sm:p-4 bg-gray-50 rounded-lg">
                       <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
                         <div className="flex-1 min-w-0">
@@ -129,7 +348,7 @@ export default function CPDDashboard() {
                               </svg>
                               <span>Expires: {training.expires}</span>
                             </span>
-                            <span>Expired {training.daysAgo} days ago</span>
+                            {training.subtitle && <span>{training.subtitle}</span>}
                           </div>
                         </div>
                         <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium flex-shrink-0 ${training.statusColor}`}>
@@ -138,6 +357,9 @@ export default function CPDDashboard() {
                       </div>
                     </div>
                   ))}
+                  {!mandatoryTraining.length && (
+                    <p className="text-xs sm:text-sm text-gray-500">No mandatory training records returned by API.</p>
+                  )}
                 </div>
               </div>
 
@@ -153,7 +375,7 @@ export default function CPDDashboard() {
                   </button>
                 </div>
                 <div className="space-y-2 sm:space-y-3">
-                  {cpdData.recentActivities.map((activity, index) => (
+                  {recentActivities.map((activity, index) => (
                     <div key={index} className="flex items-start space-x-3 sm:space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
                       <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
                         {activity.icon === 'award' ? (
@@ -187,6 +409,9 @@ export default function CPDDashboard() {
                       </div>
                     </div>
                   ))}
+                  {!recentActivities.length && (
+                    <p className="text-xs sm:text-sm text-gray-500">No recent CPD activity returned by API.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -232,22 +457,26 @@ export default function CPDDashboard() {
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">GDC Enhanced CPD Framework</p>
                 <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg mb-3 sm:mb-4">
-                  <CheckCircle className="text-green-600" size={16} />
-                  <span className="font-semibold text-green-700 text-sm sm:text-base">On Track</span>
-                  <span className="ml-auto text-xs sm:text-sm text-green-600 font-medium">Annual target met</span>
+                  {complianceOnTrack ? <CheckCircle className="text-green-600" size={16} /> : <AlertCircle className="text-amber-600" size={16} />}
+                  <span className={`font-semibold text-sm sm:text-base ${complianceOnTrack ? 'text-green-700' : 'text-amber-700'}`}>
+                    {complianceOnTrack ? 'On Track' : 'Needs Attention'}
+                  </span>
+                  <span className={`ml-auto text-xs sm:text-sm font-medium ${complianceOnTrack ? 'text-green-600' : 'text-amber-600'}`}>
+                    {complianceOnTrack ? 'Annual target met' : 'Keep progressing'}
+                  </span>
                 </div>
                 <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Verified CPD</span>
-                    <span className="font-semibold text-gray-900">{cpdData.verifiedHours} hours</span>
+                    <span className="font-semibold text-gray-900">{summary.verifiedHours} hours</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Self-declared</span>
-                    <span className="font-semibold text-gray-900">{cpdData.selfDeclaredHours} hours</span>
+                    <span className="font-semibold text-gray-900">{summary.selfDeclaredHours} hours</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Records with evidence</span>
-                    <span className="font-semibold text-gray-900">{cpdData.evidencePercentage}%</span>
+                    <span className="font-semibold text-gray-900">{summary.evidencePercentage}%</span>
                   </div>
                 </div>
               </div>
@@ -257,7 +486,7 @@ export default function CPDDashboard() {
                 <h3 className="text-base sm:text-lg font-semibold text-purple-700 mb-2">Category Breakdown</h3>
                 <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">Hours by GDC category</p>
                 <div className="space-y-3 sm:space-y-4">
-                  {cpdData.categories.map((category, index) => (
+                  {categories.map((category, index) => (
                     <div key={index}>
                       <div className="flex justify-between text-xs sm:text-sm mb-2">
                         <span className="text-gray-700">{category.name}</span>
@@ -265,12 +494,15 @@ export default function CPDDashboard() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
                         <div 
-                          className={`${category.color} h-1.5 sm:h-2 rounded-full transition-all duration-500`}
+                          className="bg-purple-600 h-1.5 sm:h-2 rounded-full transition-all duration-500"
                           style={{ width: `${(category.hours / category.total) * 100}%` }}
                         />
                       </div>
                     </div>
                   ))}
+                  {!categories.length && (
+                    <p className="text-xs sm:text-sm text-gray-500">No category breakdown returned by API.</p>
+                  )}
                 </div>
               </div>
 
@@ -280,17 +512,17 @@ export default function CPDDashboard() {
                 <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">Development plan goals</p>
                 <div className="mb-3 sm:mb-4">
                   <h4 className="font-semibold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Current PDP</h4>
-                  <p className="text-xs sm:text-sm text-gray-700">{cpdData.pdpProgress.title}</p>
+                  <p className="text-xs sm:text-sm text-gray-700">{pdpProgress.title}</p>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 mb-2 sm:mb-3">
                   <div 
                     className="bg-purple-600 h-2 sm:h-3 rounded-full transition-all duration-500"
-                    style={{ width: `${cpdData.pdpProgress.percentage}%` }}
+                    style={{ width: `${pdpProgress.percentage}%` }}
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs sm:text-sm gap-1">
-                  <span className="text-gray-600">{cpdData.pdpProgress.completed} of {cpdData.pdpProgress.total} goals completed</span>
-                  <span className="font-semibold text-purple-600">{cpdData.pdpProgress.percentage}%</span>
+                  <span className="text-gray-600">{pdpProgress.completed} of {pdpProgress.total} goals completed</span>
+                  <span className="font-semibold text-purple-600">{pdpProgress.percentage}%</span>
                 </div>
                 <button 
                   onClick={() => router.push('/pdp')}
@@ -310,14 +542,14 @@ export default function CPDDashboard() {
                       <File className="text-gray-600" size={16} />
                       <span className="text-xs sm:text-sm font-medium text-gray-700">Total files</span>
                     </div>
-                    <span className="text-base sm:text-lg font-bold text-gray-900">47</span>
+                    <span className="text-base sm:text-lg font-bold text-gray-900">{evidenceStats.totalFiles}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <Award className="text-gray-600" size={16} />
                       <span className="text-xs sm:text-sm font-medium text-gray-700">Certificates</span>
                     </div>
-                    <span className="text-base sm:text-lg font-bold text-gray-900">23</span>
+                    <span className="text-base sm:text-lg font-bold text-gray-900">{evidenceStats.certificates}</span>
                   </div>
                 </div>
                 <button 
@@ -336,22 +568,6 @@ export default function CPDDashboard() {
       <Footer />
     
     </div>
-  );
-}
-
-function NavLink({ icon, label, active = false }: { icon: React.ReactNode; label: string; active?: boolean }): React.ReactElement {
-  return (
-    <a
-      href="#"
-      className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-        active
-          ? 'bg-purple-50 text-purple-700 font-medium'
-          : 'text-gray-600 hover:text-purple-600 hover:bg-gray-50'
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-    </a>
   );
 }
 

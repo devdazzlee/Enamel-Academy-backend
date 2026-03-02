@@ -173,7 +173,7 @@ export default function ProfilePage() {
               placeholder="First name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || isSaving}
               className="bg-white border-0 rounded-xl h-12 text-[#6b7280]"
             />
           </div>
@@ -186,7 +186,7 @@ export default function ProfilePage() {
               placeholder="Last name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || isSaving}
               className="bg-white border-0 rounded-xl h-12 text-[#6b7280]"
             />
           </div>

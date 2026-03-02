@@ -44,6 +44,7 @@ export function WelcomeBanner() {
     { value: String(statsData?.totalCourses ?? 0), label: "Total Courses" },
     { value: String(statsData?.ongoingCourses ?? 0), label: "Ongoing Courses" },
     { value: String(statsData?.completedCourses ?? 0), label: "Completed Courses" },
+    { value: statsData?.totalTimeSpent ?? "0h 0m", label: "Total Time Spent" },
   ]
 
   const displayName = [user?.title, user?.firstName, user?.lastName]
@@ -64,7 +65,7 @@ export function WelcomeBanner() {
               Explore new courses and complete your on-going courses.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
             {stats.map((_, i) => (
               <div key={i} className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3 sm:px-6 sm:py-4 text-center animate-pulse">
                 <div className="h-6 bg-white/30 rounded w-12 mx-auto mb-1"></div>
@@ -81,14 +82,14 @@ export function WelcomeBanner() {
     <div className="bg-gradient-to-r from-[#8b5cf6] via-[#8b5cf6] to-[#a855f7] rounded-2xl p-4 sm:p-6 mb-8">
       <div className="flex flex-col gap-4 sm:gap-6">
         <div className="text-white">
-          <h1 className="text-xl sm:text-2xl font-bold mb-1">
+          <h1 className="text-xl sm:text-2xl font-bold mb-1 break-words">
             Welcome back{displayName ? `, ${displayName}` : ""}!
           </h1>
           <p className="text-white/80 text-sm sm:text-base">
             Explore new courses and complete your on-going courses.
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
           {stats.map((stat) => (
             <div
               key={stat.label}

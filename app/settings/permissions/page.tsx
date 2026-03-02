@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { rolesService, type Permission } from "@/lib/api/roles";
 
 type ToggleRow = {
   id: string;
@@ -116,6 +117,10 @@ function IconLock(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export default function ManagePermissionsPage() {
+  const [selectedRole, setSelectedRole] = useState("dentist");
+  const [rolePermissions, setRolePermissions] = useState<Permission[]>([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [permissionsError, setPermissionsError] = useState("");
   const emailRows: ToggleRow[] = useMemo(
     () => [
       {
@@ -191,6 +196,29 @@ export default function ManagePermissionsPage() {
   function setToggle(id: string, next: boolean) {
     setToggles((p) => ({ ...p, [id]: next }));
   }
+
+  React.useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      setPermissionsLoading(true);
+      setPermissionsError("");
+      try {
+        const perms = await rolesService.permissions(selectedRole);
+        if (!alive) return;
+        setRolePermissions(perms);
+      } catch {
+        if (!alive) return;
+        setRolePermissions([]);
+        setPermissionsError("Unable to load permissions for this role.");
+      } finally {
+        if (alive) setPermissionsLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, [selectedRole]);
 
   return (
     <div className="min-h-screen bg-[#e8e8e8] font-sans text-[#1a1a1a] flex flex-col">
@@ -282,6 +310,44 @@ export default function ManagePermissionsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="mt-4 sm:mt-6 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white">
+            <div className="flex items-center gap-3 border-b border-[#e5e7eb] bg-white px-4 sm:px-6 py-3 sm:py-4">
+              <div className="font-semibold text-[#1a1a1a] text-sm sm:text-base">Role Permissions (API)</div>
+            </div>
+            <div className="px-4 sm:px-6 py-4">
+              <label htmlFor="role-picker" className="mb-2 block text-sm text-[#6b7280]">
+                Select role
+              </label>
+              <select
+                id="role-picker"
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="w-full rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/30"
+              >
+                <option value="dentist">dentist</option>
+                <option value="dental_nurse">dental_nurse</option>
+                <option value="dental_care_professional">dental_care_professional</option>
+              </select>
+              {permissionsLoading && <p className="mt-3 text-sm text-[#6b7280]">Loading permissions...</p>}
+              {permissionsError && <p className="mt-3 text-sm text-red-600">{permissionsError}</p>}
+              {!permissionsLoading && !permissionsError && (
+                <div className="mt-3 space-y-2">
+                  {rolePermissions.length === 0 && <p className="text-sm text-[#6b7280]">No permissions returned.</p>}
+                  {rolePermissions.map((perm) => (
+                    <div key={`${perm.id}-${perm.name}`} className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] px-3 py-2 text-sm">
+                      <span className="font-medium text-[#1a1a1a]">{perm.name}</span>
+                      {(perm.resource || perm.action) && (
+                        <span className="ml-2 text-[#6b7280]">
+                          ({perm.resource || "resource"}:{perm.action || "action"})
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

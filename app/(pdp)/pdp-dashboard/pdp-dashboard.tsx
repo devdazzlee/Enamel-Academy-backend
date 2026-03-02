@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, 
@@ -13,38 +13,96 @@ import {
   ChevronRight,
   CheckCircle
 } from 'lucide-react';
+import { Spinner } from "@/components/ui/spinner";
+import { pdpService } from "@/lib/api/pdp";
 
 // Main Dashboard Component
 export default function PDPDashboard() {
   const router = useRouter();
-  const [selectedPlan, setSelectedPlan] = useState('2025');
+  const [selectedPlan, setSelectedPlan] = useState('');
+  const [plans, setPlans] = useState<Array<{
+    id: string;
+    title: string;
+    status: string;
+    dateRange: string;
+    lastUpdated: string;
+    progress: number;
+  }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [stats, setStats] = useState<{ total: number; active: number; completed: number }>({ total: 0, active: 0, completed: 0 });
+  const [rowActionLoading, setRowActionLoading] = useState<string>("");
+  const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
 
-  const plans = [
-    {
-      id: '2025',
-      title: '2025 Annual Plan',
-      status: 'In Progress',
-      dateRange: 'January 1, 2025 - December 31, 2025',
-      lastUpdated: 'January 15, 2025',
-      progress: 35
-    },
-    {
-      id: '2024',
-      title: '2024 Annual Plan',
-      status: 'Completed',
-      dateRange: 'January 1, 2024 - December 31, 2024',
-      lastUpdated: 'December 15, 2024',
-      progress: 100
-    },
-    {
-      id: '2023',
-      title: '2023 Annual Plan',
-      status: 'Completed',
-      dateRange: 'January 1, 2023 - December 31, 2023',
-      lastUpdated: 'December 15, 2023',
-      progress: 100
-    }
-  ];
+  useEffect(() => {
+    let alive = true;
+
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+    const getNum = (v: unknown, fallback = 0) =>
+      typeof v === "number" ? v : (typeof v === "string" && !Number.isNaN(Number(v)) ? Number(v) : fallback);
+
+    const statusLabel = (status: string) => {
+      const normalized = status.toLowerCase();
+      if (normalized === "completed") return "Completed";
+      if (normalized === "active" || normalized === "in progress") return "In Progress";
+      if (normalized === "draft") return "Not Started";
+      return status || "Not Started";
+    };
+
+    const run = async () => {
+      setIsLoading(true);
+      setLoadError("");
+      try {
+        const [res, statsRaw] = await Promise.all([
+          pdpService.list({ perPage: 50, page: 1 }),
+          pdpService.stats(),
+        ]);
+        if (!alive) return;
+        const mapped = (res.items ?? []).map((item, index) => {
+          const obj = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+          const id = String(obj.id ?? obj.pdp_id ?? obj.post_id ?? `pdp-${index}`);
+          const year = getText(obj.year, "");
+          const name = getText(obj.name, "") || `${year || "Current"} Annual Plan`;
+          const startDate = getText(obj.start_date, "");
+          const endDate = getText(obj.end_date, "");
+          const lastUpdatedRaw = getText(obj.updated_at, "") || getText(obj.last_updated, "") || getText(obj.modified, "");
+          const formattedUpdated = lastUpdatedRaw
+            ? new Date(lastUpdatedRaw).toLocaleDateString()
+            : "Not available";
+          return {
+            id,
+            title: name,
+            status: statusLabel(getText(obj.status, "draft")),
+            dateRange: startDate && endDate ? `${startDate} - ${endDate}` : "Date range not set",
+            lastUpdated: formattedUpdated,
+            progress: Math.max(0, Math.min(100, getNum(obj.progress_percentage, 0))),
+          };
+        });
+        setPlans(mapped);
+        if (mapped.length > 0) setSelectedPlan(mapped[0].id);
+        const statsObj = (statsRaw && typeof statsRaw === "object" ? statsRaw : {}) as Record<string, unknown>;
+        const statsData = (statsObj.data && typeof statsObj.data === "object" ? statsObj.data : statsObj) as Record<string, unknown>;
+        setStats({
+          total: getNum(statsData.total ?? statsData.total_pdps, mapped.length),
+          active: getNum(statsData.active ?? statsData.active_pdps, mapped.filter((p) => p.status === "In Progress").length),
+          completed: getNum(statsData.completed ?? statsData.completed_pdps, mapped.filter((p) => p.status === "Completed").length),
+        });
+      } catch {
+        if (!alive) return;
+        setPlans([]);
+        setLoadError("Unable to load PDP plans right now.");
+      } finally {
+        if (!alive) return;
+        setIsLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const pdpSections = [
     {
@@ -52,7 +110,6 @@ export default function PDPDashboard() {
       icon: <Target size={24} />,
       title: 'Career Objectives',
       description: 'Define your professional goals and career aspirations',
-      status: 'Completed',
       color: 'purple'
     },
     {
@@ -60,7 +117,6 @@ export default function PDPDashboard() {
       icon: <TrendingUp size={24} />,
       title: 'Skills Assessment',
       description: 'Identify current skills and areas for development',
-      status: 'Completed',
       color: 'purple'
     },
     {
@@ -68,7 +124,6 @@ export default function PDPDashboard() {
       icon: <FileText size={24} />,
       title: 'Learning Plan',
       description: 'Select courses and learning activities to achieve your goals',
-      status: 'In Progress',
       color: 'purple'
     },
     {
@@ -76,7 +131,6 @@ export default function PDPDashboard() {
       icon: <Calendar size={24} />,
       title: 'Timeline & Milestones',
       description: 'Set deadlines and track your progress',
-      status: 'In Progress',
       color: 'purple'
     },
     {
@@ -84,12 +138,18 @@ export default function PDPDashboard() {
       icon: <Eye size={24} />,
       title: 'Review & Reflection',
       description: 'Evaluate your progress and adjust your plan',
-      status: 'Not Started',
       color: 'purple'
     }
   ];
 
   const currentPlan = plans.find(p => p.id === selectedPlan);
+  const getSectionStatus = (step: number): string => {
+    const progress = currentPlan?.progress ?? 0;
+    const thresholds = [20, 40, 60, 80, 100];
+    if (progress >= thresholds[step - 1]) return "Completed";
+    if (progress > (step - 1) * 20) return "In Progress";
+    return "Not Started";
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -104,9 +164,97 @@ export default function PDPDashboard() {
     }
   };
 
+  const refreshList = async () => {
+    setIsLoading(true);
+    setLoadError("");
+    try {
+      const res = await pdpService.list({ perPage: 50, page: 1 });
+      const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+      const getNum = (v: unknown, fallback = 0) =>
+        typeof v === "number" ? v : (typeof v === "string" && !Number.isNaN(Number(v)) ? Number(v) : fallback);
+      const statusLabel = (status: string) => {
+        const normalized = status.toLowerCase();
+        if (normalized === "completed") return "Completed";
+        if (normalized === "active" || normalized === "in progress") return "In Progress";
+        if (normalized === "draft") return "Not Started";
+        return status || "Not Started";
+      };
+      const mapped = (res.items ?? []).map((item, index) => {
+        const obj = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+        const id = String(obj.id ?? obj.pdp_id ?? obj.post_id ?? `pdp-${index}`);
+        return {
+          id,
+          title: getText(obj.name, "PDP Plan"),
+          status: statusLabel(getText(obj.status, "draft")),
+          dateRange: getText(obj.start_date) && getText(obj.end_date) ? `${getText(obj.start_date)} - ${getText(obj.end_date)}` : "Date range not set",
+          lastUpdated: getText(obj.updated_at, "Not available"),
+          progress: Math.max(0, Math.min(100, getNum(obj.progress_percentage, 0))),
+        };
+      });
+      setPlans(mapped);
+      if (mapped.length > 0) setSelectedPlan(mapped[0].id);
+    } catch {
+      setLoadError("Unable to refresh PDP plans right now.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (planId: string, nextStatus: "active" | "completed" | "draft") => {
+    setActionError("");
+    setActionMessage("");
+    setRowActionLoading(`status-${planId}`);
+    try {
+      await pdpService.updateStatus(planId, nextStatus);
+      setActionMessage(`PDP status updated to ${nextStatus}.`);
+      await refreshList();
+    } catch {
+      setActionError("Failed to update PDP status.");
+    } finally {
+      setRowActionLoading("");
+    }
+  };
+
+  const handleDelete = async (planId: string) => {
+    if (!window.confirm("Delete this PDP permanently?")) return;
+    setActionError("");
+    setActionMessage("");
+    setRowActionLoading(`delete-${planId}`);
+    try {
+      await pdpService.remove(planId);
+      setActionMessage("PDP deleted successfully.");
+      await refreshList();
+    } catch {
+      setActionError("Failed to delete PDP.");
+    } finally {
+      setRowActionLoading("");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-6">
       <div className="max-w-6xl mx-auto">
+        {isLoading && (
+          <div className="mb-4 sm:mb-6 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 flex items-center gap-2">
+            <Spinner />
+            Loading PDP plans...
+          </div>
+        )}
+        {loadError && (
+          <div className="mb-4 sm:mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+            {loadError}
+          </div>
+        )}
+        {actionError && (
+          <div className="mb-4 sm:mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {actionError}
+          </div>
+        )}
+        {actionMessage && (
+          <div className="mb-4 sm:mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+            {actionMessage}
+          </div>
+        )}
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-purple-700">My Personal Development Plan</h1>
@@ -114,6 +262,21 @@ export default function PDPDashboard() {
             <Plus size={20} />
             New PDP
           </button>
+        </div>
+
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">Total PDPs</p>
+            <p className="text-xl font-bold text-gray-900">{stats.total}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">Active PDPs</p>
+            <p className="text-xl font-bold text-blue-700">{stats.active}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-xs text-gray-500">Completed PDPs</p>
+            <p className="text-xl font-bold text-green-700">{stats.completed}</p>
+          </div>
         </div>
 
         {/* Current Plan Card */}
@@ -155,12 +318,14 @@ export default function PDPDashboard() {
         {/* PDP Sections */}
         <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">PDP Sections</h2>
         <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-          {pdpSections.map((section, index) => (
+          {pdpSections.map((section, index) => {
+            const sectionStatus = getSectionStatus(section.step);
+            return (
             <div 
               key={index}
               onClick={() => router.push(`/pdp?view=detail&id=${selectedPlan}&step=${section.step}`)}
               className={`bg-white rounded-lg shadow-sm p-4 sm:p-6 border-2 hover:border-purple-300 transition cursor-pointer ${
-                section.status === 'In Progress' ? 'border-purple-200' : 'border-gray-200'
+                sectionStatus === 'In Progress' ? 'border-purple-200' : 'border-gray-200'
               }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -171,8 +336,8 @@ export default function PDPDashboard() {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-1">
                       <span className="text-xs sm:text-sm text-gray-500">Step {section.step}</span>
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(section.status)}`}>
-                        {section.status}
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(sectionStatus)}`}>
+                        {sectionStatus}
                       </span>
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-gray-900">{section.title}</h3>
@@ -180,7 +345,7 @@ export default function PDPDashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 self-end sm:self-auto">
-                  {section.status === 'Completed' && (
+                  {sectionStatus === 'Completed' && (
                     <button onClick={(e) => { e.stopPropagation(); router.push(`/pdp?view=form&id=${selectedPlan}&step=${section.step}`) }} className="text-purple-600 hover:text-purple-700 font-medium text-xs sm:text-sm">
                       Edit
                     </button>
@@ -189,7 +354,7 @@ export default function PDPDashboard() {
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
 
         {/* My PDPs Table */}
@@ -220,12 +385,31 @@ export default function PDPDashboard() {
                   </div>
                 </div>
                 <div className="flex justify-end">
+                  <div className="flex gap-2">
+                    <button
+                      disabled={rowActionLoading === `status-${plan.id}`}
+                      onClick={() => handleUpdateStatus(plan.id, plan.status === "Completed" ? "active" : "completed")}
+                      className="text-blue-600 hover:text-blue-700 font-medium text-xs disabled:opacity-50"
+                    >
+                      {plan.status === "Completed" ? "Mark Active" : "Mark Complete"}
+                    </button>
                   <button onClick={() => router.push(`/pdp?view=detail&id=${plan.id}`)} className="text-purple-600 hover:text-purple-700 font-medium text-xs">
                     View
                   </button>
+                    <button
+                      disabled={rowActionLoading === `delete-${plan.id}`}
+                      onClick={() => handleDelete(plan.id)}
+                      className="text-red-600 hover:text-red-700 font-medium text-xs disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
+            {!isLoading && plans.length === 0 && (
+              <div className="p-4 text-center text-sm text-gray-500">No PDP plans found.</div>
+            )}
           </div>
 
           {/* Desktop Table View */}
@@ -259,12 +443,35 @@ export default function PDPDashboard() {
                     </div>
                   </td>
                   <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
+                    <div className="flex justify-end gap-3">
+                      <button
+                        disabled={rowActionLoading === `status-${plan.id}`}
+                        onClick={() => handleUpdateStatus(plan.id, plan.status === "Completed" ? "active" : "completed")}
+                        className="text-blue-600 hover:text-blue-700 font-medium text-xs sm:text-sm disabled:opacity-50"
+                      >
+                        {plan.status === "Completed" ? "Mark Active" : "Mark Complete"}
+                      </button>
                     <button onClick={() => router.push(`/pdp?view=detail&id=${plan.id}`)} className="text-purple-600 hover:text-purple-700 font-medium text-xs sm:text-sm">
                       View
                     </button>
+                      <button
+                        disabled={rowActionLoading === `delete-${plan.id}`}
+                        onClick={() => handleDelete(plan.id)}
+                        className="text-red-600 hover:text-red-700 font-medium text-xs sm:text-sm disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {!isLoading && plans.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-6 text-center text-sm text-gray-500">
+                    No PDP plans found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

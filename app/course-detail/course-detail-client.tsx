@@ -24,6 +24,7 @@ import {
 
 import { coursesService, type ApiCourse, type LibraryCourse } from "@/lib/api/courses"
 import { dashboardService, type ContinueLearningCourse, type RecommendedCourse } from "@/lib/api/dashboard"
+import { pdpService } from "@/lib/api/pdp"
 import { authApi } from "@/lib/api/http";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -82,6 +83,8 @@ export function CourseDetailClient() {
   const searchParams = useSearchParams()
   const courseIdOrSlug = searchParams.get('id') ?? ''
   const [course, setCourse] = useState<ApiCourse | LibraryCourse | null>(null)
+  const [isEnrolled, setIsEnrolled] = useState(false)
+  const [enrollConfirmedByAction, setEnrollConfirmedByAction] = useState(false)
   const [dashboardCourse, setDashboardCourse] = useState<ContinueLearningCourse | RecommendedCourse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +93,12 @@ export function CourseDetailClient() {
   const [isEnrolling, setIsEnrolling] = useState(false)
   const [enrollError, setEnrollError] = useState('')
   const [enrollSuccess, setEnrollSuccess] = useState(false)
+  const [isStartingCourse, setIsStartingCourse] = useState(false)
+  const [isAddingToPdp, setIsAddingToPdp] = useState(false)
+  const [addToPdpError, setAddToPdpError] = useState('')
+  const [addToPdpSuccess, setAddToPdpSuccess] = useState('')
+  const [addedPdpId, setAddedPdpId] = useState<string>('')
+  const [isOpeningLinkedPdp, setIsOpeningLinkedPdp] = useState(false)
 
   useEffect(() => {
     if (!courseIdOrSlug) return
@@ -97,9 +106,14 @@ export function CourseDetailClient() {
     const run = async () => {
       setLoading(true)
       try {
-        const data = await coursesService.details(courseIdOrSlug)
+        const isNumericId = /^\d+$/.test(courseIdOrSlug)
+        const data = isNumericId
+          ? await coursesService.details(courseIdOrSlug)
+          : await coursesService.detailsBySlug(courseIdOrSlug)
         if (!alive) return
+        setEnrollConfirmedByAction(false)
         setCourse(data)
+        setIsEnrolled(Boolean((data as any)?.enrolled ?? (data as any)?.is_enrolled))
         setDashboardCourse(null)
         if (data?.id !== undefined && data?.id !== null) {
           try {
@@ -111,7 +125,9 @@ export function CourseDetailClient() {
         }
         // Store the full API response to access curriculum and related courses
         // Use the same endpoint to get the full response structure
-        const response = await authApi.get(`/wp-json/reactapi/v1/courses/?id=${courseIdOrSlug}`)
+        const response = await authApi.get("/wp-json/reactapi/v1/courses/", {
+          params: isNumericId ? { id: courseIdOrSlug } : { slug: courseIdOrSlug },
+        })
         if (response.data?.success && alive) {
           setCourseData(response.data.data)
         }
@@ -128,6 +144,8 @@ export function CourseDetailClient() {
   }, [courseIdOrSlug])
 
   const handleStartCourse = () => {
+    if (!course?.id || isStartingCourse) return
+    setIsStartingCourse(true)
     if (course?.id) {
       router.push(`/course/${course.id}`)
     }
@@ -139,18 +157,124 @@ export function CourseDetailClient() {
     setEnrollSuccess(false)
     setIsEnrolling(true)
     try {
-      await coursesService.enroll(course.id)
+      const enrollResult = await coursesService.enroll(course.id)
+      if (!enrollResult.success) {
+        setEnrollError(enrollResult.message || "Enrollment failed. Please try again.")
+        return
+      }
+
+      // Enroll endpoint is the source of truth for this action.
+      setEnrollConfirmedByAction(true)
+      setIsEnrolled(true)
+      setCourse((prev) => (prev ? ({ ...prev, enrolled: true } as ApiCourse | LibraryCourse) : prev))
       setEnrollSuccess(true)
-      setTimeout(() => setEnrollSuccess(false), 3000)
-    } catch {
-      setEnrollError('Failed to enroll. Please try again.')
+      setTimeout(() => setEnrollSuccess(false), 2500)
+
+      // Non-blocking refresh so UI can absorb any extra server-side fields.
+      void coursesService.details(String(course.id))
+        .then((refreshedCourse) => {
+          if (refreshedCourse) {
+            setCourse(refreshedCourse as ApiCourse | LibraryCourse)
+            // Do not downgrade a confirmed-enrolled state based on stale detail response.
+            setIsEnrolled((prev) => prev || Boolean((refreshedCourse as any)?.enrolled ?? (refreshedCourse as any)?.is_enrolled))
+          }
+        })
+        .catch(() => {
+          // Ignore refresh failure; enroll call already succeeded.
+        })
+    } catch (error) {
+      const errObj = (error && typeof error === "object" ? error : {}) as Record<string, unknown>
+      const response = (errObj.response && typeof errObj.response === "object"
+        ? errObj.response
+        : {}) as Record<string, unknown>
+      const data = (response.data && typeof response.data === "object"
+        ? response.data
+        : {}) as Record<string, unknown>
+      const apiMessage = (typeof data.message === "string" && data.message.trim()) || (typeof data.error === "string" && data.error.trim())
+      setEnrollError(apiMessage || 'Failed to enroll. Please try again.')
     } finally {
       setIsEnrolling(false)
     }
   }
 
-  const handleAddToPDP = () => {
-    router.push('/pdp');
+  const handleAddToPDP = async () => {
+    if (!course?.id) return
+    setAddToPdpError('')
+    setAddToPdpSuccess('')
+    setAddedPdpId('')
+    setIsAddingToPdp(true)
+
+    const getObj = (raw: unknown): Record<string, unknown> => (
+      raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {}
+    )
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback)
+    const parseHours = (value: string | undefined): number => {
+      if (!value) return 0
+      const lower = value.toLowerCase()
+      const hourMatch = lower.match(/(\d+(\.\d+)?)\s*h/)
+      if (hourMatch) return Number.parseFloat(hourMatch[1]) || 0
+      const minuteMatch = lower.match(/(\d+)\s*m/)
+      if (minuteMatch) return Number.parseInt(minuteMatch[1], 10) / 60
+      const numeric = Number.parseFloat(lower)
+      return Number.isFinite(numeric) ? numeric : 0
+    }
+    const pickData = (raw: unknown): Record<string, unknown> => {
+      const root = getObj(raw)
+      const data = root.data
+      return data && typeof data === "object" ? (data as Record<string, unknown>) : root
+    }
+
+    try {
+      // 1) Use active PDP if available; otherwise create one so user action always does something concrete.
+      const pdpList = await pdpService.list({ status: "active", perPage: 20, page: 1 })
+      const existing = Array.isArray(pdpList.items) ? pdpList.items[0] : null
+      let pdpId = ""
+      if (existing && typeof existing === "object") {
+        const obj = existing as Record<string, unknown>
+        const id = obj.id
+        if (typeof id === "string" || typeof id === "number") pdpId = String(id)
+      }
+      if (!pdpId) {
+        const created = await pdpService.create({
+          name: `PDP - ${(course.title ?? "Course").toString()}`,
+          description: "Auto-created from course detail Add to PDP action",
+          status: "active",
+          year: String(new Date().getFullYear()),
+        })
+        const createdData = pickData(created)
+        pdpId = String(createdData.id ?? "")
+      }
+      if (!pdpId) throw new Error("Unable to find or create a PDP plan.")
+
+      // 2) Use service-layer transactional flow: add learning activity + link course.
+      const parsedHours = parseHours((course as ApiCourse).duration)
+      const safeHours = parsedHours > 0 ? parsedHours : 1
+      const safeDurationLabel =
+        ((course as ApiCourse).duration && String((course as ApiCourse).duration).trim())
+        || `${safeHours} hour${safeHours === 1 ? "" : "s"}`
+      await pdpService.addCourseToPdp(pdpId, {
+        courseId: course.id,
+        courseTitle: (course.title ?? `Course ${course.id}`).toString(),
+        durationHours: safeHours,
+        durationLabel: safeDurationLabel,
+        status: "planned",
+      })
+
+      setAddedPdpId(pdpId)
+      setAddToPdpSuccess("Course added to PDP successfully.")
+    } catch (error) {
+      const errObj = getObj(error)
+      const response = getObj(errObj.response)
+      const responseData = getObj(response.data)
+      const message =
+        getText(responseData.message)
+        || getText(responseData.error)
+        || getText(errObj.message)
+        || "Failed to add course to PDP. Please try again."
+      setAddToPdpError(message)
+    } finally {
+      setIsAddingToPdp(false)
+    }
   };
 
   if (loading) {
@@ -193,8 +317,8 @@ export function CourseDetailClient() {
   }
 
   // Calculate total duration from curriculum topics
-  const calculateTotalDuration = () => {
-    if (!courseData?.curriculum) return "Data not available";
+  const calculateTotalDuration = (): string | null => {
+    if (!courseData?.curriculum) return null;
     
     let totalMinutes = 0;
     courseData.curriculum.forEach((lesson: CurriculumSection) => {
@@ -210,9 +334,7 @@ export function CourseDetailClient() {
       }
     });
     
-    if (totalMinutes === 0) {
-      return courseData.course?.duration || "Data not available";
-    }
+    if (totalMinutes === 0) return courseData.course?.duration ?? null;
     
     if (totalMinutes < 60) {
       return `${totalMinutes} minutes`;
@@ -223,26 +345,26 @@ export function CourseDetailClient() {
     }
   };
 
+  const durationLabel = calculateTotalDuration()
   const courseStats = [
-    { icon: <Clock />, value: calculateTotalDuration(), label: "Duration" },
-    { icon: <BookOpen />, value: courseData?.curriculum?.length ? `${courseData.curriculum.length} Lessons` : "Data not available", label: "Content" },
-    { icon: <Users />, value: course.students_count ? String(course.students_count) : "Data not available", label: "Students" },
-    { icon: <Award />, value: courseData?.course?.cpd_points ? `${courseData.course.cpd_points} CPD` : "Data not available", label: "Points" }
-  ];
-
-  const courseIncludes = [
-    `${calculateTotalDuration()} on-demand video`,
-    courseData?.course?.features?.includes("Lifetime Access") ? "Lifetime access" : "Data not available",
-    courseData?.course?.cpd_points ? `${courseData.course.cpd_points} CPD points` : "Data not available",
-    courseData?.course?.features?.includes("Certificate of Completion") ? "Certificate of completion" : "Data not available",
-    "Data not available"
-  ];
+    durationLabel ? { icon: <Clock />, value: durationLabel, label: "Duration" } : null,
+    courseData?.curriculum?.length ? { icon: <BookOpen />, value: `${courseData.curriculum.length} Lessons`, label: "Content" } : null,
+    course.students_count ? { icon: <Users />, value: String(course.students_count), label: "Students" } : null,
+    courseData?.course?.cpd_points ? { icon: <Award />, value: `${courseData.course.cpd_points} CPD`, label: "Points" } : null,
+  ].filter(Boolean) as Array<{ icon: React.ReactNode; value: string; label: string }>
 
   const learningObjectives = courseData?.course?.learning_objectives ?? [];
   const requirements = courseData?.course?.requirements ?? [];
   const curriculum = courseData?.curriculum ?? [];
   const relatedCourses = courseData?.related_courses ?? [];
   const instructor = courseData?.instructor ?? null;
+  const courseIncludes = [
+    durationLabel ? `${durationLabel} on-demand video` : null,
+    courseData?.course?.features?.includes("Lifetime Access") ? "Lifetime access" : null,
+    courseData?.course?.cpd_points ? `${courseData.course.cpd_points} CPD points` : null,
+    courseData?.course?.features?.includes("Certificate of Completion") ? "Certificate of completion" : null,
+    "Access on mobile and desktop",
+  ].filter(Boolean) as string[];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -272,8 +394,8 @@ export function CourseDetailClient() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
                 <div className="p-4 sm:p-6 md:p-8 text-white">
-                  <h1 className="text-xl sm:text-2xl md:text-4xl font-bold mb-1 sm:mb-2">{course.title ?? "Untitled Course"}</h1>
-                  <p className="text-sm sm:text-base md:text-lg text-gray-200">{(course as any).excerpt ?? ""}</p>
+                  <h1 className="text-xl sm:text-2xl md:text-4xl font-bold mb-1 sm:mb-2 break-words line-clamp-3">{course.title ?? "Untitled Course"}</h1>
+                  <p className="text-sm sm:text-base md:text-lg text-gray-200 break-words line-clamp-3">{(course as any).excerpt ?? ""}</p>
                 </div>
               </div>
             </div>
@@ -298,22 +420,30 @@ export function CourseDetailClient() {
                 {(course as any).excerpt ?? (course as any).description ?? "No description available."}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+                {(course as any).level && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <BarChart size={16} />
-                  <span>Level: {(course as any).level ?? "Data not available"}</span>
+                    <span>Level: {(course as any).level}</span>
                 </div>
+                )}
+                {(courseData?.course as any)?.language && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <Globe size={16} />
-                  <span>Language: {(courseData?.course as any)?.language ?? "Data not available"}</span>
+                    <span>Language: {(courseData?.course as any).language}</span>
                 </div>
+                )}
+                {(courseData?.course as any)?.updated_date && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <Calendar size={16} />
-                  <span>Updated: {(courseData?.course as any)?.updated_date ? new Date((courseData?.course as any).updated_date).toLocaleDateString() : "Data not available"}</span>
+                    <span>Updated: {new Date((courseData?.course as any).updated_date).toLocaleDateString()}</span>
                 </div>
+                )}
+                {courseData?.course?.cpd_points && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <Target size={16} />
-                  <span>CPD Points: {courseData?.course?.cpd_points ?? "Data not available"}</span>
+                    <span>CPD Points: {courseData.course.cpd_points}</span>
                 </div>
+                )}
               </div>
             </div>
 
@@ -321,34 +451,42 @@ export function CourseDetailClient() {
             <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 border border-gray-200">
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">This course includes:</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {durationLabel && (
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
                     <Monitor size={16} className="sm:hidden" />
                     <Monitor size={20} className="hidden sm:block" />
                   </div>
-                  <span className="text-sm sm:text-base text-gray-700">{course.duration ? `${course.duration} on-demand video` : "Data not available"}</span>
+                  <span className="text-sm sm:text-base text-gray-700">{durationLabel} on-demand video</span>
                 </div>
+                )}
+                {courseData?.course?.features?.includes("Lifetime Access") && (
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
                     <Repeat size={16} className="sm:hidden" />
                     <Repeat size={20} className="hidden sm:block" />
                   </div>
-                  <span className="text-sm sm:text-base text-gray-700">{courseData?.course?.features?.includes("Lifetime Access") ? "Lifetime access" : "Data not available"}</span>
+                  <span className="text-sm sm:text-base text-gray-700">Lifetime access</span>
                 </div>
+                )}
+                {courseData?.course?.cpd_points && (
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
                     <Award size={16} className="sm:hidden" />
                     <Award size={20} className="hidden sm:block" />
                   </div>
-                  <span className="text-sm sm:text-base text-gray-700">{courseData?.course?.cpd_points ? `${courseData.course.cpd_points} CPD points` : "Data not available"}</span>
+                  <span className="text-sm sm:text-base text-gray-700">{courseData.course.cpd_points} CPD points</span>
                 </div>
+                )}
+                {courseData?.course?.features?.includes("Certificate of Completion") && (
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
                     <FileText size={16} className="sm:hidden" />
                     <FileText size={20} className="hidden sm:block" />
                   </div>
-                  <span className="text-sm sm:text-base text-gray-700">{courseData?.course?.features?.includes("Certificate of Completion") ? "Certificate of completion" : "Data not available"}</span>
+                  <span className="text-sm sm:text-base text-gray-700">Certificate of completion</span>
                 </div>
+                )}
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
                     <Smartphone size={16} className="sm:hidden" />
@@ -374,9 +512,7 @@ export function CourseDetailClient() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm sm:text-base text-gray-500">Data not available</p>
-              )}
+              ) : <p className="text-sm sm:text-base text-gray-500">No learning objectives returned by API.</p>}
             </div>
 
           {/* Course Curriculum */}
@@ -424,9 +560,7 @@ export function CourseDetailClient() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm sm:text-base text-gray-500">Data not available</p>
-              )}
+              ) : <p className="text-sm sm:text-base text-gray-500">No curriculum returned by API.</p>}
             </div>
 
           {/* Requirements */}
@@ -444,9 +578,7 @@ export function CourseDetailClient() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm sm:text-base text-gray-500">Data not available</p>
-              )}
+              ) : <p className="text-sm sm:text-base text-gray-500">No requirements returned by API.</p>}
             </div>
 
             {/* Instructor */}
@@ -460,9 +592,9 @@ export function CourseDetailClient() {
                     className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover flex-shrink-0"
                   />
                   <div className="flex-1">
-                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1">{instructor.name}</h3>
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1 break-words">{instructor.name}</h3>
                     <p className="text-sm sm:text-base text-gray-600 mb-2">{instructor.expertise}</p>
-                    <p className="text-sm sm:text-base text-gray-700 mb-3">{instructor.bio}</p>
+                    <p className="text-sm sm:text-base text-gray-700 mb-3 break-words">{instructor.bio}</p>
                     <div className="flex flex-wrap gap-4 text-sm">
                       <div className="flex items-center gap-1">
                         <Award size={14} />
@@ -498,16 +630,20 @@ export function CourseDetailClient() {
                           className="w-full h-32 sm:h-40 object-cover"
                         />
                         <div className="p-3 sm:p-4">
-                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base mb-1 line-clamp-2">{relatedCourse.title ?? "Untitled Course"}</h3>
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base mb-1 line-clamp-2">{relatedCourse.title ?? "Course"}</h3>
+                          {typeof relatedCourse.rating === "number" && (
                           <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 mb-2">
                             <Award size={12} />
-                            <span>{relatedCourse.rating ?? "N/A"}</span>
+                              <span>{relatedCourse.rating}</span>
                             {relatedCourse.reviews_count && <span>({relatedCourse.reviews_count})</span>}
                           </div>
+                          )}
+                          {typeof relatedCourse.students_count === "number" && (
                           <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 mb-2">
                             <Users size={12} />
-                            <span>{relatedCourse.students_count ?? "N/A"} students</span>
+                              <span>{relatedCourse.students_count} students</span>
                           </div>
+                          )}
                           <div className="text-xs sm:text-sm font-medium text-purple-600">
                             {relatedCourse.price?.display || "Free"}
                           </div>
@@ -523,32 +659,42 @@ export function CourseDetailClient() {
           {/* Sidebar - Right Side (stacks on mobile, shows before main content options) */}
           <div className="lg:col-span-1 order-first lg:order-last">
             <div className="lg:sticky lg:top-6 space-y-3 sm:space-y-4">
-              {typeof (dashboardCourse as any).progress === "number" && (
+              {typeof (dashboardCourse as any)?.progress === "number" && (
                 <div className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200">
                   <div className="flex items-center justify-between text-sm sm:text-base mb-2">
                     <span className="text-gray-700 font-medium">Your progress</span>
-                    <span className="text-gray-900 font-semibold">{(dashboardCourse as any).progress}%</span>
+                    <span className="text-gray-900 font-semibold">{(dashboardCourse as any)?.progress}%</span>
                   </div>
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-purple-600 rounded-full"
-                      style={{ width: `${(dashboardCourse as any).progress ?? 0}%` }}
+                      style={{ width: `${(dashboardCourse as any)?.progress ?? 0}%` }}
                     />
                   </div>
-                  {(dashboardCourse as any).lastAccessed && (
-                    <p className="text-xs text-gray-500 mt-2">Last accessed: {(dashboardCourse as any).lastAccessed}</p>
+                  {(dashboardCourse as any)?.lastAccessed && (
+                    <p className="text-xs text-gray-500 mt-2">Last accessed: {(dashboardCourse as any)?.lastAccessed}</p>
                   )}
                 </div>
               )}
               {/* Enroll/Start CTA */}
-              {(course as any).enrolled ? (
+              {isEnrolled || enrollConfirmedByAction ? (
                 <button 
                   onClick={handleStartCourse}
-                  className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm sm:text-base"
+                  disabled={isStartingCourse}
+                  className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50"
                 >
-                  <Play size={18} className="sm:hidden" />
-                  <Play size={20} className="hidden sm:block" />
-                  Start Course
+                  {isStartingCourse ? (
+                    <>
+                      <Spinner />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <Play size={18} className="sm:hidden" />
+                      <Play size={20} className="hidden sm:block" />
+                      Start Course
+                    </>
+                  )}
                 </button>
               ) : (
                 <button 
@@ -584,10 +730,34 @@ export function CourseDetailClient() {
               
               <button 
                 onClick={handleAddToPDP}
-                className="w-full px-4 sm:px-6 py-3 sm:py-4 border-2 border-purple-600 text-purple-600 rounded-lg font-semibold hover:bg-purple-50 transition text-sm sm:text-base"
+                disabled={isAddingToPdp}
+                className="w-full px-4 sm:px-6 py-3 sm:py-4 border-2 border-purple-600 text-purple-600 rounded-lg font-semibold hover:bg-purple-50 transition text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add to PDP
+                {isAddingToPdp ? "Adding to PDP..." : "Add to PDP"}
               </button>
+              {addToPdpSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                  {addToPdpSuccess}
+                </div>
+              )}
+              {addToPdpError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                  {addToPdpError}
+                </div>
+              )}
+              {addedPdpId && (
+                <button
+                  onClick={() => {
+                    if (isOpeningLinkedPdp) return
+                    setIsOpeningLinkedPdp(true)
+                    router.push(`/pdp?view=detail&id=${addedPdpId}`)
+                  }}
+                  disabled={isOpeningLinkedPdp}
+                  className="w-full px-4 sm:px-6 py-2.5 border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition text-sm disabled:opacity-50"
+                >
+                  {isOpeningLinkedPdp ? "Opening PDP..." : "View Linked PDP"}
+                </button>
+              )}
 
               {/* Course Includes */}
               <div className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200">

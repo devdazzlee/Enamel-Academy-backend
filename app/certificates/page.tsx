@@ -1,15 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { CertificateModal } from "@/components/certificate-modal"
 import { Search, ChevronDown, Download, Calendar, Clock, Award, Filter, FileText, Eye, ChevronRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Spinner } from "@/components/ui/spinner"
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { certificatesService } from "@/lib/api/certificates";
 
 const columnFilters = [
   { label: "Date", active: true },
@@ -21,128 +23,23 @@ const columnFilters = [
   { label: "Categories", active: false },
 ]
 
-const certificatesData = [
-  {
-    id: "CERT-001",
-    title: "Medical Emergencies in Dental Practice",
-    category: "Clinical",
-    type: "Core CPD",
-    date: "2025-01-15",
-    completionDate: "2025-01-15",
-    timeTaken: "2h 30m",
-    cpdHours: 2.5,
-    status: "Completed",
-    format: "Online",
-    certificateUrl: "#",
-    score: 95,
-    instructor: "Dr. James Carter"
-  },
-  {
-    id: "CERT-002", 
-    title: "Radiography & Radiation Protection",
-    category: "Clinical",
-    type: "Core CPD",
-    date: "2025-01-10",
-    completionDate: "2025-01-10",
-    timeTaken: "3h 15m",
-    cpdHours: 3.25,
-    status: "Completed",
-    format: "Online",
-    certificateUrl: "#",
-    score: 88,
-    instructor: "Dr. Emily Roberts"
-  },
-  {
-    id: "CERT-003",
-    title: "Infection Control in Dental Practice",
-    category: "Compliance",
-    type: "Mandatory",
-    date: "2025-01-08",
-    completionDate: "2025-01-08",
-    timeTaken: "1h 45m",
-    cpdHours: 1.75,
-    status: "Completed",
-    format: "Online",
-    certificateUrl: "#",
-    score: 92,
-    instructor: "Dr. Sarah Johnson"
-  },
-  {
-    id: "CERT-004",
-    title: "Dental Materials and Selection",
-    category: "Clinical",
-    type: "Core CPD",
-    date: "2025-01-05",
-    completionDate: "2025-01-05",
-    timeTaken: "2h 00m",
-    cpdHours: 2.0,
-    status: "Completed",
-    format: "Workshop",
-    certificateUrl: "#",
-    score: 85,
-    instructor: "Dr. Michael Chen"
-  },
-  {
-    id: "CERT-005",
-    title: "Professional Ethics and Dental Practice",
-    category: "Professional Development",
-    type: "Core CPD",
-    date: "2024-12-28",
-    completionDate: "2024-12-28",
-    timeTaken: "1h 30m",
-    cpdHours: 1.5,
-    status: "Completed",
-    format: "Online",
-    certificateUrl: "#",
-    score: 90,
-    instructor: "Dr. Lisa Anderson"
-  },
-  {
-    id: "CERT-006",
-    title: "Advanced Restorative Techniques",
-    category: "Clinical",
-    type: "Advanced",
-    date: "2024-12-20",
-    completionDate: "2024-12-20",
-    timeTaken: "4h 00m",
-    cpdHours: 4.0,
-    status: "Completed",
-    format: "Hands-on",
-    certificateUrl: "#",
-    score: 93,
-    instructor: "Dr. Robert Williams"
-  },
-  {
-    id: "CERT-007",
-    title: "Patient Communication Skills",
-    category: "Professional Development",
-    type: "Core CPD",
-    date: "2024-12-15",
-    completionDate: "2024-12-15",
-    timeTaken: "2h 00m",
-    cpdHours: 2.0,
-    status: "Completed",
-    format: "Online",
-    certificateUrl: "#",
-    score: 87,
-    instructor: "Dr. Jennifer Davis"
-  },
-  {
-    id: "CERT-008",
-    title: "Dental Practice Management",
-    category: "Professional Development",
-    type: "Business",
-    date: "2024-12-10",
-    completionDate: "2024-12-10",
-    timeTaken: "3h 30m",
-    cpdHours: 3.5,
-    status: "Completed",
-    format: "Online",
-    certificateUrl: "#",
-    score: 89,
-    instructor: "Dr. Mark Thompson"
-  }
-]
+type CertificateRow = {
+  id: string;
+  title: string;
+  category: string;
+  type: string;
+  date: string;
+  completionDate: string;
+  timeTaken: string;
+  cpdHours: number;
+  status: string;
+  format: string;
+  certificateUrl: string;
+  score: number;
+  instructor: string;
+  courseId: number | null;
+  userId: number | null;
+};
 
 export default function CertificatesPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -150,8 +47,93 @@ export default function CertificatesPage() {
   const [activeFilters, setActiveFilters] = useState(columnFilters)
   const [sortBy, setSortBy] = useState("date")
   const [sortOrder, setSortOrder] = useState("desc")
-  const [selectedCertificate, setSelectedCertificate] = useState<typeof certificatesData[0] | null>(null)
+  const [certificatesData, setCertificatesData] = useState<CertificateRow[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
+  const [selectedCertificate, setSelectedCertificate] = useState<CertificateRow | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [viewingCertId, setViewingCertId] = useState<string | null>(null)
+  const [downloadingCertId, setDownloadingCertId] = useState<string | null>(null)
+  const [verifyingCertId, setVerifyingCertId] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState("")
+  const [actionError, setActionError] = useState("")
+
+  useEffect(() => {
+    let alive = true
+
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback)
+    const getNum = (v: unknown, fallback = 0) =>
+      typeof v === "number" ? v : (typeof v === "string" && !Number.isNaN(Number(v)) ? Number(v) : fallback)
+    const toDuration = (minutes: number) => {
+      if (minutes <= 0) return "N/A"
+      const h = Math.floor(minutes / 60)
+      const m = minutes % 60
+      if (h && m) return `${h}h ${m}m`
+      if (h) return `${h}h`
+      return `${m}m`
+    }
+
+    const run = async () => {
+      setIsLoading(true)
+      setLoadError("")
+      try {
+        const raw = await certificatesService.getMyCertificates()
+        if (!alive) return
+        const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+        const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>
+        const list = Array.isArray(data.certificates)
+          ? data.certificates
+          : Array.isArray(data.items)
+            ? data.items
+            : Array.isArray(data.results)
+              ? data.results
+              : Array.isArray(raw)
+                ? raw
+                : []
+
+        const mapped: CertificateRow[] = (list as unknown[]).map((item, index) => {
+          const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>
+          const cpdHours = getNum(row.cpd_hours ?? row.cpdHours, 0)
+          const minutes = getNum(row.time_taken_minutes ?? row.minutes, 0)
+          const completionDate = getText(row.completion_date ?? row.completed_at ?? row.date, "")
+          return {
+            id: getText(row.id, `CERT-${index + 1}`),
+            title: getText(row.title, "Untitled certificate"),
+            category: getText(row.category, "General"),
+            type: getText(row.type, "CPD"),
+            date: completionDate || new Date().toISOString().slice(0, 10),
+            completionDate: completionDate || new Date().toISOString().slice(0, 10),
+            timeTaken: getText(row.time_taken, toDuration(minutes)),
+            cpdHours,
+            status: getText(row.status, "Completed"),
+            format: getText(row.format, "Online"),
+            certificateUrl: getText(row.certificate_url, "#"),
+            score: getNum(row.score ?? row.assessment_score, 0),
+            instructor: getText(row.instructor, "Not specified"),
+            courseId: getNum(row.course_id ?? row.courseId ?? row.related_course_id, 0) || null,
+            userId: getNum(row.user_id ?? row.userId, 0) || null,
+          }
+        })
+        setCertificatesData(mapped)
+      } catch {
+        if (!alive) return
+        setCertificatesData([])
+        setLoadError("Unable to load certificates right now.")
+      } finally {
+        if (alive) setIsLoading(false)
+      }
+    }
+
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(certificatesData.map((cert) => cert.category).filter(Boolean))),
+    [certificatesData]
+  )
 
   const toggleFilter = (label: string) => {
     setActiveFilters(prev => 
@@ -196,7 +178,9 @@ export default function CertificatesPage() {
 
   const totalCpdHours = certificatesData.reduce((sum, cert) => sum + cert.cpdHours, 0)
   const completedCourses = certificatesData.length
-  const averageScore = Math.round(certificatesData.reduce((sum, cert) => sum + cert.score, 0) / certificatesData.length)
+  const averageScore = certificatesData.length > 0
+    ? Math.round(certificatesData.reduce((sum, cert) => sum + cert.score, 0) / certificatesData.length)
+    : 0
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -264,17 +248,118 @@ export default function CertificatesPage() {
     }
   }
 
-  const handleViewCertificate = (certId: string) => {
+  const getRemotePreviewUrl = (payload: unknown): string => {
+    const root = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>
+    const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>
+    const possible = [
+      data.preview_url,
+      data.previewUrl,
+      data.certificate_url,
+      data.certificateUrl,
+      root.preview_url,
+      root.previewUrl,
+      root.certificate_url,
+      root.certificateUrl,
+      data.url,
+      root.url,
+    ]
+    const found = possible.find((v) => typeof v === "string" && v.trim().length > 0)
+    return typeof found === "string" ? found : ""
+  }
+
+  const handleViewCertificate = async (certId: string) => {
+    setActionMessage("")
+    setActionError("")
+    setViewingCertId(certId)
+    let shouldOpenModal = false
     const certificate = certificatesData.find(cert => cert.id === certId)
     if (certificate) {
+      try {
+        if (certificate.courseId) {
+          const [availabilityRes, previewRes, detailRes] = await Promise.all([
+            certificatesService.checkAvailability(certificate.courseId),
+            certificatesService.preview(certificate.courseId),
+            certificatesService.getCourseCertificate(certificate.courseId),
+          ])
+          const availableRoot = (availabilityRes && typeof availabilityRes === "object" ? availabilityRes : {}) as Record<string, unknown>
+          const availableData = (availableRoot.data && typeof availableRoot.data === "object" ? availableRoot.data : availableRoot) as Record<string, unknown>
+          const isAvailable = Boolean(
+            availableData.available ??
+            availableData.is_available ??
+            availableRoot.available ??
+            availableRoot.is_available ??
+            true
+          )
+          if (!isAvailable) {
+            setActionError("Certificate is not available yet for this course.")
+            return
+          }
+          const previewUrl = getRemotePreviewUrl(previewRes) || getRemotePreviewUrl(detailRes)
+          setSelectedCertificate({
+            ...certificate,
+            certificateUrl: previewUrl || certificate.certificateUrl,
+          })
+          setActionMessage("Certificate details loaded from API.")
+          shouldOpenModal = true
+        } else {
+          setSelectedCertificate(certificate)
+          shouldOpenModal = true
+        }
+      } catch {
       setSelectedCertificate(certificate)
-      setIsModalOpen(true)
+        shouldOpenModal = true
+        setActionError("Could not fetch certificate preview details from API. Showing available data.")
+      } finally {
+        if (shouldOpenModal) setIsModalOpen(true)
+        setViewingCertId(null)
+      }
+    } else {
+      setViewingCertId(null)
     }
   }
 
   const handleDownloadCertificate = async (certId: string, title: string) => {
+    setActionMessage("")
+    setActionError("")
+    setDownloadingCertId(certId)
     const certificate = certificatesData.find(cert => cert.id === certId)
-    if (!certificate) return
+    if (!certificate) {
+      setDownloadingCertId(null)
+      return
+    }
+
+    try {
+      if (certificate.courseId) {
+        const [availabilityRes, detailRes] = await Promise.all([
+          certificatesService.checkAvailability(certificate.courseId),
+          certificatesService.getCourseCertificate(certificate.courseId),
+        ])
+        const availableRoot = (availabilityRes && typeof availabilityRes === "object" ? availabilityRes : {}) as Record<string, unknown>
+        const availableData = (availableRoot.data && typeof availableRoot.data === "object" ? availableRoot.data : availableRoot) as Record<string, unknown>
+        const isAvailable = Boolean(
+          availableData.available ??
+          availableData.is_available ??
+          availableRoot.available ??
+          availableRoot.is_available ??
+          true
+        )
+        if (!isAvailable) {
+          setActionError("Certificate is not available yet for this course.")
+          return
+        }
+
+        const remoteUrl = getRemotePreviewUrl(detailRes)
+        if (remoteUrl) {
+          window.open(remoteUrl, "_blank", "noopener,noreferrer")
+          setActionMessage("Certificate download opened from API.")
+          return
+        }
+      }
+    } catch {
+      setActionError("Could not fetch certificate file from API. Falling back to generated PDF.")
+    } finally {
+      setDownloadingCertId(null)
+    }
 
     // Create a temporary certificate element for download
     const tempDiv = document.createElement('div')
@@ -301,8 +386,8 @@ export default function CertificatesPage() {
       
       <div style="border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; padding: 32px 0; margin-bottom: 32px;">
         <p style="text-align: center; color: #6b7280; margin-bottom: 16px;">This is to certify that</p>
-        <h3 style="font-size: 32px; font-weight: bold; color: #111827; text-align: center; margin-bottom: 8px;">Dr. Sarah Johnson</h3>
-        <p style="text-align: center; color: #6b7280; margin-bottom: 24px;">GDC Registration: 123456</p>
+        <h3 style="font-size: 32px; font-weight: bold; color: #111827; text-align: center; margin-bottom: 8px;">Certificate Holder</h3>
+        <p style="text-align: center; color: #6b7280; margin-bottom: 24px;">GDC Registration: N/A</p>
         
         <p style="text-align: center; color: #6b7280; margin-bottom: 16px;">has successfully completed</p>
         <h4 style="font-size: 24px; font-weight: bold; color: #7c3aed; text-align: center; margin-bottom: 16px;">${certificate.title}</h4>
@@ -387,6 +472,29 @@ export default function CertificatesPage() {
     }
   }
 
+  const handleVerifyCertificate = async (certId: string) => {
+    setActionMessage("")
+    setActionError("")
+    setVerifyingCertId(certId)
+    const certificate = certificatesData.find((cert) => cert.id === certId)
+    if (!certificate || !certificate.courseId || !certificate.userId) {
+      setActionError("Certificate verification data is incomplete (course/user id missing).")
+      setVerifyingCertId(null)
+      return
+    }
+    try {
+      await certificatesService.verify({
+        course_id: certificate.courseId,
+        user_id: certificate.userId,
+      })
+      setActionMessage("Certificate verified successfully.")
+    } catch {
+      setActionError("Certificate verification failed. Please try again.")
+    } finally {
+      setVerifyingCertId(null)
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#e8e8e8]">
       <Navigation activeItem="CPD Certificates" />
@@ -426,6 +534,27 @@ export default function CertificatesPage() {
         </div>
 
         {/* Filters and Search */}
+        {isLoading && (
+          <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
+            <Spinner />
+            Loading certificates...
+          </div>
+        )}
+        {loadError && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            {loadError}
+          </div>
+        )}
+        {actionError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {actionError}
+          </div>
+        )}
+        {actionMessage && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            {actionMessage}
+          </div>
+        )}
         <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 mb-4 sm:mb-6">
           {/* Sidebar Filters */}
           <div className="w-full lg:w-56 flex-shrink-0">
@@ -450,24 +579,15 @@ export default function CertificatesPage() {
                     >
                       All Categories
                     </DropdownMenuItem>
+                    {categoryOptions.map((category) => (
                     <DropdownMenuItem 
-                      onClick={() => setSelectedCategory("clinical")}
+                        key={category}
+                        onClick={() => setSelectedCategory(category.toLowerCase().replace(/\s+/g, '-'))}
                       className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
                     >
-                      Clinical
+                        {category}
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setSelectedCategory("compliance")}
-                      className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
-                    >
-                      Compliance
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setSelectedCategory("professional")}
-                      className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
-                    >
-                      Professional Development
-                    </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -522,7 +642,7 @@ export default function CertificatesPage() {
                   placeholder="Search certificates by title, instructor, or ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-14 bg-white border border-[#e5e7eb] rounded-xl text-xs sm:text-sm sm:text-base text-[#1a1a1a] placeholder:text-[#9ca3af] focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/20 focus:border-[#8b5cf6] transition-colors"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-14 bg-white border border-[#e5e7eb] rounded-xl text-xs sm:text-base text-[#1a1a1a] placeholder:text-[#9ca3af] focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/20 focus:border-[#8b5cf6] transition-colors"
                 />
                 <button className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 bg-[#8b5cf6] rounded-lg flex items-center justify-center text-white hover:bg-[#7c3aed] transition-colors">
                   <Search className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -575,6 +695,7 @@ export default function CertificatesPage() {
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={() => handleViewCertificate(certificate.id)}
+                    disabled={viewingCertId === certificate.id}
                     className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors"
                     title="View Certificate"
                   >
@@ -582,10 +703,19 @@ export default function CertificatesPage() {
                   </button>
                   <button
                     onClick={() => handleDownloadCertificate(certificate.id, certificate.title)}
+                    disabled={downloadingCertId === certificate.id}
                     className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors"
                     title="Download Certificate"
                   >
                     <Download className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleVerifyCertificate(certificate.id)}
+                    disabled={verifyingCertId === certificate.id}
+                    className="px-2 py-1 text-[10px] font-medium text-[#8b5cf6] border border-[#8b5cf6]/30 hover:bg-[#8b5cf6]/10 rounded-md transition-colors"
+                    title="Verify Certificate"
+                  >
+                    {verifyingCertId === certificate.id ? "..." : "Verify"}
                   </button>
                 </div>
               </div>
@@ -714,6 +844,7 @@ export default function CertificatesPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleViewCertificate(certificate.id)}
+                          disabled={viewingCertId === certificate.id}
                           className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors"
                           title="View Certificate"
                         >
@@ -721,10 +852,19 @@ export default function CertificatesPage() {
                         </button>
                         <button
                           onClick={() => handleDownloadCertificate(certificate.id, certificate.title)}
+                          disabled={downloadingCertId === certificate.id}
                           className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors"
                           title="Download Certificate"
                         >
                           <Download className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleVerifyCertificate(certificate.id)}
+                          disabled={verifyingCertId === certificate.id}
+                          className="px-2 py-1 text-[10px] font-medium text-[#8b5cf6] border border-[#8b5cf6]/30 hover:bg-[#8b5cf6]/10 rounded-md transition-colors"
+                          title="Verify Certificate"
+                        >
+                          {verifyingCertId === certificate.id ? "..." : "Verify"}
                         </button>
                       </div>
                     </td>
@@ -733,15 +873,15 @@ export default function CertificatesPage() {
               </tbody>
             </table>
           </div>
-        </div>
-          
-        {filteredAndSortedData.length === 0 && (
-          <div className="bg-white rounded-xl border border-[#e5e7eb] text-center py-8 sm:py-12">
-            <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-[#9ca3af] mx-auto mb-3 sm:mb-4" />
-            <p className="text-[#9ca3af] text-base sm:text-lg">No certificates found</p>
-            <p className="text-[#9ca3af] text-xs sm:text-sm mt-2">Try adjusting your search or filters</p>
           </div>
-        )}
+          
+        {!isLoading && filteredAndSortedData.length === 0 && (
+          <div className="bg-white rounded-xl border border-[#e5e7eb] text-center py-8 sm:py-12">
+              <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-[#9ca3af] mx-auto mb-3 sm:mb-4" />
+              <p className="text-[#9ca3af] text-base sm:text-lg">No certificates found</p>
+              <p className="text-[#9ca3af] text-xs sm:text-sm mt-2">Try adjusting your search or filters</p>
+            </div>
+          )}
       </main>
 
       <Footer />

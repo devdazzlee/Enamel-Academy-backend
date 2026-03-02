@@ -3,17 +3,34 @@
 import React from "react"
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { EnamelLogo } from "@/components/enamel-logo"
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react"
+import { passwordResetService } from "@/lib/api/password-reset"
+import { Spinner } from "@/components/ui/spinner"
 
 export default function ForgotPasswordPage() {
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [submitted, setSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle forgot password logic
-    setSubmitted(true)
+    setError("")
+    setIsSubmitting(true)
+    try {
+      await passwordResetService.forgotPassword({ email: email.trim() })
+      setSubmitted(true)
+      setTimeout(() => {
+        router.push(`/otp-verify?email=${encodeURIComponent(email.trim())}`)
+      }, 600)
+    } catch {
+      setError("Unable to send OTP right now. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -26,6 +43,11 @@ export default function ForgotPasswordPage() {
 
         {!submitted ? (
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             <p className="text-[#6b7280] text-sm text-center mb-4">
               Enter your email address and we will send you a link to reset your password.
             </p>
@@ -47,9 +69,17 @@ export default function ForgotPasswordPage() {
             <div className="flex items-center justify-between pt-4">
               <button
                 type="submit"
-                className="px-12 py-3 bg-[#8b5cf6] text-white rounded-lg font-medium hover:bg-[#7c3aed] transition-colors"
+                disabled={isSubmitting}
+                className="px-12 py-3 bg-[#8b5cf6] text-white rounded-lg font-medium hover:bg-[#7c3aed] transition-colors disabled:opacity-50"
               >
-                Send Reset Link
+                {isSubmitting ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Spinner />
+                    Sending...
+                  </span>
+                ) : (
+                  "Send OTP"
+                )}
               </button>
               <Link
                 href="/login"

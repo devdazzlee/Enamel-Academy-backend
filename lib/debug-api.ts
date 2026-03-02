@@ -10,6 +10,12 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { authService } from "@/lib/api/auth";
 import { coursesService } from "@/lib/api/courses";
 import { rolesService } from "@/lib/api/roles";
+import { pdpService } from "@/lib/api/pdp";
+import { cpdService } from "@/lib/api/cpd";
+import { certificatesService } from "@/lib/api/certificates";
+import { assignmentService } from "@/lib/api/assignments";
+import { passwordResetService } from "@/lib/api/password-reset";
+import { API_PATHS } from "@/lib/api/endpoints";
 
 export const debugAuth = {
   /** Check if token is stored and injected */
@@ -88,6 +94,78 @@ export const debugAuth = {
       console.log(`[debug] GET /dental/permissions/${role} result:`, perms);
     } catch (e) {
       console.error(`[debug] GET /dental/permissions/${role} error:`, e);
+    }
+  },
+
+  async testPdpList() {
+    try {
+      const res = await pdpService.list({ perPage: 5, page: 1 });
+      console.log("[debug] GET /pdp result:", res);
+    } catch (e) {
+      console.error("[debug] GET /pdp error:", e);
+    }
+  },
+
+  async testCpdSummary() {
+    try {
+      const res = await cpdService.summary();
+      console.log("[debug] GET /cpd/summary result:", res);
+    } catch (e) {
+      console.error("[debug] GET /cpd/summary error:", e);
+    }
+  },
+
+  async testCertificates() {
+    try {
+      const res = await certificatesService.getMyCertificates({ page: 1, perPage: 10 });
+      console.log("[debug] GET /certificates/my-certificates result:", res);
+    } catch (e) {
+      console.error("[debug] GET /certificates/my-certificates error:", e);
+    }
+  },
+
+  async testAssignments(courseId: string | number) {
+    try {
+      const res = await assignmentService.courseAssignments(courseId);
+      console.log(`[debug] GET /courses/${courseId}/assignments result:`, res);
+    } catch (e) {
+      console.error(`[debug] GET /courses/${courseId}/assignments error:`, e);
+    }
+  },
+
+  async testForgotPassword(email: string) {
+    try {
+      const res = await passwordResetService.forgotPassword({ email });
+      console.log("[debug] POST /forgot-password result:", res);
+    } catch (e) {
+      console.error("[debug] POST /forgot-password error:", e);
+    }
+  },
+
+  async testCourseReflection(courseId: string | number) {
+    try {
+      const res = await coursesService.getReflection(courseId);
+      console.log(`[debug] GET /courses/${courseId}/reflection result:`, res);
+    } catch (e) {
+      console.error(`[debug] GET /courses/${courseId}/reflection error:`, e);
+    }
+  },
+
+  async testCourseFeedback(courseId: string | number) {
+    try {
+      const res = await coursesService.getFeedback(courseId);
+      console.log(`[debug] GET /courses/${courseId}/feedback result:`, res);
+    } catch (e) {
+      console.error(`[debug] GET /courses/${courseId}/feedback error:`, e);
+    }
+  },
+
+  async testTestApi() {
+    try {
+      const res = await authApi.get(API_PATHS.testApi);
+      console.log("[debug] GET /TESTApi result:", res.data);
+    } catch (e) {
+      console.error("[debug] GET /TESTApi error:", e);
     }
   },
 };

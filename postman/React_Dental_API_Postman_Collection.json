@@ -1,0 +1,2665 @@
+{
+  "info": {
+    "name": "React Dental API - Complete Collection",
+    "description": "Complete collection of all API endpoints for dental professionals including authentication, courses, CPD tracking, PDP, certificates, and audit reports",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "\ud83d\udd10 Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Smith\",\n    \"email\": \"dr.smith@dentalclinic.com\",\n    \"password\": \"SecurePass123!\",\n    \"title\": \"Dr\",\n    \"role\": \"dentist\",\n    \"dental_license_number\": \"DEN123456\",\n    \"dental_specialty\": \"Endodontics\",\n    \"dental_clinic\": \"Smith Dental Care\",\n    \"dental_experience_years\": \"8\",\n    \"dental_qualifications\": \"DDS, MOrth RCS\",\n    \"dental_registration_body\": \"General Dental Council\",\n    \"dental_registration_date\": \"2016-05-15\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "register"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"dr.smith@dentalclinic.com\",\n    \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Capture JWT token from login response",
+                  "try {",
+                  "  const body = pm.response.json();",
+                  "  const token = body.token || (body.data && (body.data.token || body.data.jwt)) || body.jwt;",
+                  "  if (token) {",
+                  "    pm.environment.set(\"token\", token);",
+                  "    pm.globals.set(\"token\", token);",
+                  "    pm.test(\"Saved token\", () => pm.expect(token).to.be.a(\"string\"));",
+                  "  } else {",
+                  "    pm.test(\"Token not found in login response\", () => { throw new Error(\"Missing token in response\"); });",
+                  "  }",
+                  "} catch (e) {",
+                  "  pm.test(\"Login response parse error\", () => { throw e; });",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "user"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Jonathan\",\n    \"last_name\": \"Smithson\",\n    \"title\": \"Prof\",\n    \"email\": \"prof.smithson@dentalclinic.com\",\n    \"display_name\": \"Prof. Jonathan Smithson\",\n    \"dental_specialty\": \"Orthodontics\",\n    \"dental_clinic\": \"Smithson Orthodontic Center\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/user/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "user",
+                "update"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"current_password\": \"SecurePass123!\",\n    \"new_password\": \"NewSecurePass456!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/user/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "user",
+                "change-password"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"{{jwtToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/validate-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "validate-token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udd11 Password Reset",
+      "item": [
+        {
+          "name": "Forgot Password - Request OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"dr.smith@dentalclinic.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "forgot-password"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"dr.smith@dentalclinic.com\",\n    \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "verify-otp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"reset_token\": \"a1b2c3d4e5f6g7h8i9j0...\",\n    \"new_password\": \"NewSecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "reset-password"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate Reset Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"reset_token\": \"a1b2c3d4e5f6g7h8i9j0...\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/validate-reset-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "validate-reset-token"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83e\uddb7 Dental Roles",
+      "item": [
+        {
+          "name": "Get All Dental Roles",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dental/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "dental",
+                "roles"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Role Permissions - Dentist",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dental/permissions/dentist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "dental",
+                "permissions",
+                "dentist"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Role Permissions - Dental Nurse",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dental/permissions/dental_nurse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "dental",
+                "permissions",
+                "dental_nurse"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Role Permissions - DCP",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dental/permissions/dental_care_professional",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "dental",
+                "permissions",
+                "dental_care_professional"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udcca Dashboard & Courses",
+      "item": [
+        {
+          "name": "Get User Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "dashboard"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "dashboard",
+                "stats"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Continue Learning",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/continue-learning",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "dashboard",
+                "continue-learning"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/courses/123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "dashboard",
+                "courses",
+                "123"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udcda Course Library",
+      "item": [
+        {
+          "name": "Get Course Library with Filters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/library?plan=free&category=endodontics&format=self-paced&length=medium&page=1&per_page=10&sort=popular",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "library"
+              ],
+              "query": [
+                {
+                  "key": "plan",
+                  "value": "free"
+                },
+                {
+                  "key": "category",
+                  "value": "endodontics"
+                },
+                {
+                  "key": "format",
+                  "value": "self-paced"
+                },
+                {
+                  "key": "length",
+                  "value": "medium"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "popular"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Ongoing Courses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/ongoing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "ongoing"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enroll in Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/enroll/123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "enroll",
+                "123"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "categories"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course Filters",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/filters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "filters"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses?id=123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "123"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course by Slug",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses?slug=advanced-endodontics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses"
+              ],
+              "query": [
+                {
+                  "key": "slug",
+                  "value": "advanced-endodontics"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udcdd Course Reflection & Feedback",
+      "item": [
+        {
+          "name": "Save Course Reflection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"learning_outcomes\": \"I learned advanced endodontic techniques including microscopic root canal treatment and CBCT interpretation for complex cases. The course covered both theoretical and practical aspects of modern endodontics.\",\n    \"apply_learning\": \"I will implement these techniques in my practice starting next week, beginning with simpler cases and progressing to more complex ones under supervision. I plan to use CBCT more routinely for treatment planning.\",\n    \"next_steps\": \"Plan to attend the advanced workshop next month and complete 5 supervised cases. Also considering mentorship program for complex cases.\",\n    \"takeaways\": \"CBCT is essential for complex cases; magnification improves outcomes significantly; newer rotary systems are more efficient than traditional methods.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/reflection",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "reflection"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course Reflection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/reflection",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "reflection"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Reflections",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/reflections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "reflections"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Course Feedback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"ratings\": {\n        \"overall\": 5,\n        \"content_quality\": 5,\n        \"instructor_effectiveness\": 4,\n        \"difficulty_level\": 3,\n        \"time_commitment\": 4,\n        \"materials_quality\": 5,\n        \"support\": 4,\n        \"relevance\": 5\n    },\n    \"comment\": \"Excellent course! The instructor was very knowledgeable and the practical sessions were extremely helpful. The course materials were comprehensive and well-organized. Would highly recommend to colleagues.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/feedback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "feedback"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course Feedback",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/feedback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "feedback"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udcdc Certificates",
+      "item": [
+        {
+          "name": "Get Course Certificate",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/course/123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "certificates",
+                "course",
+                "123"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Certificates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/my-certificates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "certificates",
+                "my-certificates"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check Certificate Availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/check/123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "certificates",
+                "check",
+                "123"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview Certificate",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/preview/123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "certificates",
+                "preview",
+                "123"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Certificate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_id\": 123,\n    \"course_id\": 456\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "certificates",
+                "verify"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udccb Assignments & Quizzes",
+      "item": [
+        {
+          "name": "Get Course Assignments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "assignments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course Quizzes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/quizzes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "quizzes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course Assessments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assessments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "assessments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Assignment Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assignment-stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "assignment-stats"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Quiz Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/quiz-stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "courses",
+                "123",
+                "quiz-stats"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Assignment Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/assignments/assignment_123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "assignments",
+                "assignment_123"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Quiz Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/quizzes/456",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "quizzes",
+                "456"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Quiz Attempts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/quizzes/456/attempts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "quizzes",
+                "456",
+                "attempts"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udcc8 CPD Tracking",
+      "item": [
+        {
+          "name": "Get CPD Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "summary"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CPD History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/history?year=2025&limit=20&offset=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2025"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CPD Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/analytics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "analytics"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CPD Requirements - Dentist",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/requirements/dentist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "requirements",
+                "dentist"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CPD Requirements - Dental Nurse",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/requirements/dental_nurse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "requirements",
+                "dental_nurse"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CPD Requirements - DCP",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/requirements/dental_care_professional",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "requirements",
+                "dental_care_professional"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udce4 External CPD & Audit Reports",
+      "item": [
+        {
+          "name": "Log External CPD - Multipart Form",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Advanced Implant Workshop",
+                  "type": "text"
+                },
+                {
+                  "key": "provider",
+                  "value": "British Dental Association",
+                  "type": "text"
+                },
+                {
+                  "key": "date_completed",
+                  "value": "2025-02-24",
+                  "type": "text"
+                },
+                {
+                  "key": "hours",
+                  "value": "7",
+                  "type": "text"
+                },
+                {
+                  "key": "gdc_category",
+                  "value": "Clinical",
+                  "type": "text"
+                },
+                {
+                  "key": "activity_type",
+                  "value": "workshop",
+                  "type": "text"
+                },
+                {
+                  "key": "learning_outcomes",
+                  "value": "Learned advanced implant placement techniques including guided surgery and immediate loading protocols. The course covered both theoretical and practical aspects of modern implantology.",
+                  "type": "text"
+                },
+                {
+                  "key": "reflection",
+                  "value": "This workshop has significantly improved my confidence in placing implants in complex cases. The hands-on sessions were particularly valuable and allowed me to practice new techniques under expert supervision.",
+                  "type": "text"
+                },
+                {
+                  "key": "apply_learning",
+                  "value": "I will implement guided surgery protocols in my next 5 implant cases, starting with single tooth replacements. I plan to use digital planning software more routinely and have already scheduled my first guided surgery case for next month.",
+                  "type": "text"
+                },
+                {
+                  "key": "evidence",
+                  "type": "file",
+                  "src": "/path/to/your/certificate.pdf"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/log-external",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "log-external"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Audit Report - PDF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"format\": \"pdf\",\n    \"date_range\": \"full_cycle\",\n    \"include_certificates\": true,\n    \"include_evidence\": true,\n    \"include_reflections\": true,\n    \"include_outcomes\": true,\n    \"include_verification\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/generate-audit-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "generate-audit-report"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Audit Report - Summary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"format\": \"summary\",\n    \"date_range\": \"full_cycle\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/generate-audit-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "generate-audit-report"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Audit Report - Excel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"format\": \"excel\",\n    \"date_range\": \"custom\",\n    \"start_date\": \"2024-01-01\",\n    \"end_date\": \"2024-12-31\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/generate-audit-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "generate-audit-report"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Audit Report - Evidence ZIP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"format\": \"evidence_zip\",\n    \"date_range\": \"full_cycle\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/generate-audit-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "cpd",
+                "generate-audit-report"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83e\uddea Test API",
+      "item": [
+        {
+          "name": "Test API Endpoint",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/TESTApi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wp-json",
+                "reactapi",
+                "v1",
+                "TESTApi"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// LOG_RESPONSE",
+                  "const name = pm.info.requestName;",
+                  "const status = pm.response.code;",
+                  "const body = pm.response.text();",
+                  "const max = 1200;",
+                  "const out = body.length > max ? body.slice(0, max) + \"...<truncated>\" : body;",
+                  "console.log(`=== ${name} [${status}] ===`);",
+                  "console.log(out);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://yourwebsite.com",
+      "type": "string",
+      "description": "Your WordPress site URL"
+    },
+    {
+      "key": "jwtToken",
+      "value": "YOUR_JWT_TOKEN_HERE",
+      "type": "string",
+      "description": "JWT token obtained from login response (copy from response.data.token)"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
+}

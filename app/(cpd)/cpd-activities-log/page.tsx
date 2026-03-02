@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Filter, Search, FileText, CheckCircle, Clock, Eye, BarChart3, ChevronDown, X, Calendar, Award, User } from 'lucide-react';
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { Spinner } from "@/components/ui/spinner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +12,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
+import { cpdService } from "@/lib/api/cpd";
+
+type Activity = {
+  id: string | number;
+  title: string;
+  description: string;
+  date: string;
+  hours: number;
+  category: string;
+  type: string;
+  status: string;
+  files: number;
+};
 
 export default function CPDActivitiesLog() {
   const router = useRouter();
@@ -21,130 +35,154 @@ export default function CPDActivitiesLog() {
   const [categoryFilter, setCategoryFilter] = useState(defaultCategory);
   const [typeFilter, setTypeFilter] = useState(defaultType);
   const [yearFilter, setYearFilter] = useState(defaultYear);
-  const [selectedActivity, setSelectedActivity] = useState<typeof activities[0] | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [apiCategoryOptions, setApiCategoryOptions] = useState<string[]>([]);
+  const [apiTypeOptions, setApiTypeOptions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  const activities = [
-    {
-      id: 1,
-      title: 'Advanced Endodontics: Root Canal Techniques',
-      description: 'Enhanced understanding of modern root canal preparation techniques',
-      date: '15 Jan 2026',
-      hours: 3,
-      category: 'Clinical',
-      type: 'Platform Course',
-      status: 'Verified',
-      files: 1
-    },
-    {
-      id: 2,
-      title: 'Practice Management Masterclass',
-      description: 'Improved practice efficiency strategies',
-      date: '10 Jan 2026',
-      hours: 2,
-      category: 'Management & Leadership',
-      type: 'External',
-      status: 'Verified',
-      files: 1
-    },
-    {
-      id: 3,
-      title: 'Dental Implant Workshop - London',
-      description: 'Hands-on experience with implant placement',
-      date: '20 Dec 2025',
-      hours: 6,
-      category: 'Clinical',
-      type: 'External',
-      status: 'Verified',
-      files: 3
-    },
-    {
-      id: 4,
-      title: 'Medical Emergencies in Dental Practice',
-      description: 'Updated emergency protocols and response procedures',
-      date: '05 Dec 2025',
-      hours: 4,
-      category: 'Clinical',
-      type: 'Platform Course',
-      status: 'Verified',
-      files: 1
-    },
-    {
-      id: 5,
-      title: 'Effective Communication with Anxious Patients',
-      description: 'New techniques for patient anxiety management',
-      date: '22 Nov 2025',
-      hours: 1.5,
-      category: 'Communication',
-      type: 'Platform Course',
-      status: 'Verified',
-      files: 1
-    },
-    {
-      id: 6,
-      title: 'Digital Dentistry Conference 2025',
-      description: 'Latest advances in CAD/CAM technology',
-      date: '10 Nov 2025',
-      hours: 8,
-      category: 'Clinical',
-      type: 'External',
-      status: 'Verified',
-      files: 3
-    },
-    {
-      id: 7,
-      title: 'GDC Standards and Professional Ethics',
-      description: 'Updated understanding of GDC standards',
-      date: '15 Oct 2025',
-      hours: 2,
-      category: 'Professionalism',
-      type: 'Platform Course',
-      status: 'Verified',
-      files: 1
-    },
-    {
-      id: 8,
-      title: 'Team Leadership in Dental Practice',
-      description: 'Leadership skills for managing dental teams',
-      date: '05 Oct 2025',
-      hours: 3,
-      category: 'Management & Leadership',
-      type: 'External',
-      status: 'Verified',
-      files: 1
-    },
-    {
-      id: 9,
-      title: 'Periodontal Disease Management',
-      description: 'Evidence-based periodontal treatment protocols',
-      date: '20 Sept 2025',
-      hours: 4,
-      category: 'Clinical',
-      type: 'Platform Course',
-      status: 'Verified',
-      files: 1
-    },
-    {
-      id: 10,
-      title: 'Dental Photography Workshop',
-      description: 'Clinical photography techniques for documentation',
-      date: '08 Sept 2025',
-      hours: 5,
-      category: 'Clinical',
-      type: 'External',
-      status: 'Verified',
-      files: 2
-    }
-  ];
+  useEffect(() => {
+    let alive = true;
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+    const getNum = (v: unknown, fallback = 0) =>
+      typeof v === "number" ? v : (typeof v === "string" && !Number.isNaN(Number(v)) ? Number(v) : fallback);
+    const toDate = (value: string) => {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value || "N/A";
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
 
-  const categoryBreakdown = [
-    { name: 'Clinical', hours: 30 },
-    { name: 'Management & Leadership', hours: 5 },
-    { name: 'Communication', hours: 1.5 },
-    { name: 'Professionalism', hours: 2 }
-  ];
+    const run = async () => {
+      setIsLoading(true);
+      setLoadError("");
+      try {
+        const [historyRaw, analyticsRaw, requirementsRaw] = await Promise.all([
+          cpdService.history({ limit: 200, offset: 0 }),
+          cpdService.analytics(),
+          cpdService.requirements("dentist"),
+        ]);
+        if (!alive) return;
 
-  const handleDownloadCertificate = (activity: typeof activities[0]) => {
+        const historyRoot = (historyRaw && typeof historyRaw === "object" ? historyRaw : {}) as Record<string, unknown>;
+        const data = (historyRoot.data && typeof historyRoot.data === "object" ? historyRoot.data : historyRoot) as Record<string, unknown>;
+        const list = Array.isArray(data.history)
+          ? data.history
+          : Array.isArray(data.activities)
+            ? data.activities
+            : Array.isArray(data.items)
+              ? data.items
+              : Array.isArray(historyRaw)
+                ? historyRaw
+                : [];
+        const mapped: Activity[] = (list as unknown[]).map((item, idx) => {
+          const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+          const dateRaw = getText(row.date_completed ?? row.date ?? row.completed_at, "");
+          return {
+            id: getText(row.id, String(idx + 1)),
+            title: getText(row.title ?? row.activity_name, "Untitled activity"),
+            description: getText(row.description ?? row.learning_outcomes, "No description provided."),
+            date: toDate(dateRaw),
+            hours: getNum(row.hours ?? row.duration_hours, 0),
+            category: getText(row.gdc_category ?? row.category, "General"),
+            type: getText(row.activity_type ?? row.type, "External"),
+            status: getText(row.status, "Verified"),
+            files: getNum(row.evidence_files_count ?? row.files, 0),
+          };
+        });
+        setActivities(mapped);
+
+        // Build filter options from dedicated API metadata + history fallback.
+        const analyticsRoot = (analyticsRaw && typeof analyticsRaw === "object" ? analyticsRaw : {}) as Record<string, unknown>;
+        const analyticsData = (analyticsRoot.data && typeof analyticsRoot.data === "object" ? analyticsRoot.data : analyticsRoot) as Record<string, unknown>;
+        const analyticsCategories = Array.isArray(analyticsData.category_hours)
+          ? analyticsData.category_hours
+          : Array.isArray(analyticsData.categories)
+            ? analyticsData.categories
+            : [];
+
+        const requirementsRoot = (requirementsRaw && typeof requirementsRaw === "object" ? requirementsRaw : {}) as Record<string, unknown>;
+        const requirementsData = (requirementsRoot.data && typeof requirementsRoot.data === "object" ? requirementsRoot.data : requirementsRoot) as Record<string, unknown>;
+        const requirementCategories = Array.isArray(requirementsData.categories)
+          ? requirementsData.categories
+          : Array.isArray(requirementsData.gdc_categories)
+            ? requirementsData.gdc_categories
+            : [];
+        const requirementTypes = Array.isArray(requirementsData.activity_types)
+          ? requirementsData.activity_types
+          : [];
+
+        const parsedApiCategories = Array.from(
+          new Set(
+            [
+              ...mapped.map((a) => a.category),
+              ...(analyticsCategories as unknown[]).map((item) => {
+                if (typeof item === "string") return item;
+                const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+                return getText(row.name ?? row.category, "");
+              }),
+              ...(requirementCategories as unknown[]).map((item) => {
+                if (typeof item === "string") return item;
+                const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+                return getText(row.name ?? row.title, "");
+              }),
+            ].filter(Boolean)
+          )
+        );
+        const parsedApiTypes = Array.from(
+          new Set(
+            [
+              ...mapped.map((a) => a.type),
+              ...(requirementTypes as unknown[]).map((item) => {
+                if (typeof item === "string") return item;
+                const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+                return getText(row.name ?? row.title ?? row.value, "");
+              }),
+            ].filter(Boolean)
+          )
+        );
+        setApiCategoryOptions(parsedApiCategories);
+        setApiTypeOptions(parsedApiTypes);
+      } catch {
+        if (!alive) return;
+        setActivities([]);
+        setApiCategoryOptions([]);
+        setApiTypeOptions([]);
+        setLoadError("Unable to load CPD activities right now.");
+      } finally {
+        if (alive) setIsLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const categoryBreakdown = useMemo(() => {
+    const grouped = activities.reduce<Record<string, number>>((acc, activity) => {
+      const key = activity.category || "General";
+      acc[key] = (acc[key] || 0) + (activity.hours || 0);
+      return acc;
+    }, {});
+    return Object.entries(grouped).map(([name, hours]) => ({ name, hours }));
+  }, [activities]);
+  const categoryOptions = useMemo(
+    () => apiCategoryOptions,
+    [apiCategoryOptions]
+  );
+  const typeOptions = useMemo(
+    () => apiTypeOptions,
+    [apiTypeOptions]
+  );
+  const yearOptions = useMemo(
+    () => Array.from(new Set(activities.map((a) => getActivityYear(a.date)).filter(Boolean))).sort((a, b) => Number(b) - Number(a)),
+    [activities]
+  );
+
+  const handleDownloadCertificate = (activity: Activity) => {
     // Create a simple certificate download
     const certificateContent = `
 CPD Certificate of Completion
@@ -156,7 +194,7 @@ Date: ${activity.date}
 Duration: ${activity.hours} CPD Hours
 Category: ${activity.category}
 Type: ${activity.type}
-Status: Verified
+Status: ${activity.status}
 
 This certificate confirms successful completion of the above CPD activity.
 Certificate ID: CPD-${activity.id}-${Date.now()}
@@ -174,7 +212,7 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
     window.URL.revokeObjectURL(url);
   };
 
-  const handleViewEvidenceFiles = (activity: typeof activities[0]) => {
+  const handleViewEvidenceFiles = (activity: Activity) => {
     // Simulate viewing evidence files - in a real app, this would open a file viewer
     const evidenceFiles = [
       { name: 'Certificate of Completion.pdf', type: 'PDF', size: '2.3 MB' },
@@ -187,7 +225,7 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
     ).join('\n')}\n\nIn a production environment, this would open a file viewer or download manager.`);
   };
 
-  const handleViewActivity = (activity: typeof activities[0]) => {
+  const handleViewActivity = (activity: Activity) => {
     setSelectedActivity(activity);
     setIsModalOpen(true);
   };
@@ -197,10 +235,10 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
     setSelectedActivity(null);
   };
 
-  const getActivityYear = (date: string) => {
+  function getActivityYear(date: string) {
     const match = date.match(/\b\d{4}\b/);
     return match ? match[0] : '';
-  };
+  }
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const filteredActivities = activities.filter((activity) => {
@@ -223,6 +261,13 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
     setTypeFilter(defaultType);
     setYearFilter(defaultYear);
   };
+
+  const totalRecords = activities.length;
+  const totalHours = activities.reduce((sum, item) => sum + item.hours, 0);
+  const verifiedHours = activities
+    .filter((item) => item.status.toLowerCase().includes("verified") || item.status.toLowerCase().includes("completed"))
+    .reduce((sum, item) => sum + item.hours, 0);
+  const withEvidence = activities.filter((item) => item.files > 0).length;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -263,26 +308,37 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
         </div>
 
         {/* Stats Cards */}
+        {isLoading && (
+          <div className="mt-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
+            <Spinner />
+            Loading CPD activity log...
+          </div>
+        )}
+        {loadError && (
+          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            {loadError}
+          </div>
+        )}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-6 sm:mt-8">
           <StatCard
             icon={<FileText className="text-purple-600" size={24} />}
             label="Total Records"
-            value="10"
+            value={String(totalRecords)}
           />
           <StatCard
             icon={<Clock className="text-purple-600" size={24} />}
             label="Total Hours"
-            value="38.5"
+            value={totalHours.toFixed(1)}
           />
           <StatCard
             icon={<CheckCircle className="text-green-600" size={24} />}
             label="Verified Hours"
-            value="14.5"
+            value={verifiedHours.toFixed(1)}
           />
           <StatCard
             icon={<FileText className="text-purple-600" size={24} />}
             label="With Evidence"
-            value="10"
+            value={String(withEvidence)}
           />
         </div>
 
@@ -321,37 +377,25 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                       <ChevronDown className="h-4 w-4 text-gray-400" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-full min-w-[200px]">
+                  <DropdownMenuContent className="z-50 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)]">
                     <DropdownMenuItem 
                       onClick={() => setCategoryFilter('All Categories')}
                       className={categoryFilter === 'All Categories' ? 'bg-purple-50 text-purple-700' : ''}
                     >
                       All Categories
                     </DropdownMenuItem>
+                    {categoryOptions.map((option) => (
                     <DropdownMenuItem 
-                      onClick={() => setCategoryFilter('Clinical')}
-                      className={categoryFilter === 'Clinical' ? 'bg-purple-50 text-purple-700' : ''}
+                        key={option}
+                        onClick={() => setCategoryFilter(option)}
+                        className={categoryFilter === option ? 'bg-purple-50 text-purple-700' : ''}
                     >
-                      Clinical
+                        {option}
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setCategoryFilter('Management & Leadership')}
-                      className={categoryFilter === 'Management & Leadership' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      Management & Leadership
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setCategoryFilter('Communication')}
-                      className={categoryFilter === 'Communication' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      Communication
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setCategoryFilter('Professionalism')}
-                      className={categoryFilter === 'Professionalism' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      Professionalism
-                    </DropdownMenuItem>
+                    ))}
+                    {!categoryOptions.length && (
+                      <DropdownMenuItem disabled>No categories available</DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -366,25 +410,25 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                       <ChevronDown className="h-4 w-4 text-gray-400" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-full min-w-[200px]">
+                  <DropdownMenuContent className="z-50 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)]">
                     <DropdownMenuItem 
                       onClick={() => setTypeFilter('All Types')}
                       className={typeFilter === 'All Types' ? 'bg-purple-50 text-purple-700' : ''}
                     >
                       All Types
                     </DropdownMenuItem>
+                    {typeOptions.map((option) => (
                     <DropdownMenuItem 
-                      onClick={() => setTypeFilter('Platform Course')}
-                      className={typeFilter === 'Platform Course' ? 'bg-purple-50 text-purple-700' : ''}
+                        key={option}
+                        onClick={() => setTypeFilter(option)}
+                        className={typeFilter === option ? 'bg-purple-50 text-purple-700' : ''}
                     >
-                      Platform Course
+                        {option}
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setTypeFilter('External')}
-                      className={typeFilter === 'External' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      External
-                    </DropdownMenuItem>
+                    ))}
+                    {!typeOptions.length && (
+                      <DropdownMenuItem disabled>No types available</DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -399,37 +443,22 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                       <ChevronDown className="h-4 w-4 text-gray-400" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-full min-w-[200px]">
+                  <DropdownMenuContent className="z-50 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)]">
                     <DropdownMenuItem 
                       onClick={() => setYearFilter('All Years')}
                       className={yearFilter === 'All Years' ? 'bg-purple-50 text-purple-700' : ''}
                     >
                       All Years
                     </DropdownMenuItem>
+                    {yearOptions.map((option) => (
                     <DropdownMenuItem 
-                      onClick={() => setYearFilter('2026')}
-                      className={yearFilter === '2026' ? 'bg-purple-50 text-purple-700' : ''}
+                        key={option}
+                        onClick={() => setYearFilter(option)}
+                        className={yearFilter === option ? 'bg-purple-50 text-purple-700' : ''}
                     >
-                      2026
+                        {option}
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setYearFilter('2025')}
-                      className={yearFilter === '2025' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      2025
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setYearFilter('2024')}
-                      className={yearFilter === '2024' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      2024
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setYearFilter('2023')}
-                      className={yearFilter === '2023' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      2023
-                    </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -454,7 +483,7 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
                         <div
                           className="bg-purple-600 h-1.5 rounded-full"
-                          style={{ width: `${(cat.hours / 30) * 100}%` }}
+                          style={{ width: `${categoryBreakdown.length ? (cat.hours / Math.max(...categoryBreakdown.map((i) => i.hours), 1)) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -694,8 +723,8 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     <CheckCircle className="text-green-600 w-4 h-4 sm:w-5 sm:h-5" size={16} />
-                    <span className="font-semibold text-gray-900 text-xs sm:text-sm">Verified Status</span>
-                    <span className="text-green-600 font-medium text-xs sm:text-sm">Verified</span>
+                    <span className="font-semibold text-gray-900 text-xs sm:text-sm">Activity Status</span>
+                    <span className="text-green-600 font-medium text-xs sm:text-sm">{selectedActivity.status}</span>
                   </div>
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     <FileText className="text-gray-600 w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" size={14} />

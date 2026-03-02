@@ -29,11 +29,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Spinner } from "@/components/ui/spinner";
+import { pdpService } from "@/lib/api/pdp";
+import { coursesService } from "@/lib/api/courses";
 
 export default function PDPForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [dentalSpecialties, setDentalSpecialties] = useState<string[]>([]);
+  const [courseOptions, setCourseOptions] = useState<string[]>([]);
+  const [durationOptions, setDurationOptions] = useState<string[]>([]);
+  const [assessmentOptions, setAssessmentOptions] = useState<string[]>([]);
 
   type CurrentSkill = { skill: string; level: string };
   type SkillToDevelop = { skill: string; target: string };
@@ -64,12 +74,9 @@ export default function PDPForm() {
     selectedCourses: [],
     additionalResources: '',
     duration: '',
-    milestones: [
-      { quarter: 'Q1 2025', goal: 'Complete Endodontics course' },
-      { quarter: 'Q2 2025', goal: 'Finish Digital Smile Design' }
-    ],
+    milestones: [],
     assessmentMethods: [],
-    successCriteria: ['Complete 50 CPD hours', 'Obtain 2 new certifications']
+    successCriteria: []
   });
 
   const steps = [
@@ -80,46 +87,7 @@ export default function PDPForm() {
     { number: 5, title: 'Review Criteria', icon: <Eye size={20} />, completed: false }
   ];
 
-  const dentalSpecialties = [
-    'Endodontics',
-    'Implantology',
-    'Prosthodontics',
-    'Orthodontics',
-    'Periodontics',
-    'Oral Surgery',
-    'Aesthetic Dentistry',
-    'Paediatric Dentistry',
-    'Restorative Dentistry',
-    'Digital Dentistry'
-  ];
-
   const skillLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
-  
-  const courses = [
-    'Advanced Endodontics Masterclass',
-    'Digital Smile Design Workshop',
-    'Implantology Certification Program',
-    'Aesthetic Dentistry Techniques',
-    'Modern Prosthodontics Course',
-    'Orthodontic Biomechanics',
-    'Periodontal Surgery Advanced',
-    'Paediatric Behavior Management',
-    'CAD/CAM Technology in Dentistry',
-    'Cone Beam CT Interpretation'
-  ];
-
-  const durations = ['3 Months', '6 Months', '12 Months', '24 Months'];
-
-  const assessmentOptions = [
-    'Course completion certificates',
-    'Practical skills assessment',
-    'Case study presentations',
-    'Peer review feedback',
-    'Patient satisfaction surveys',
-    'CPD hours tracking',
-    'Portfolio of completed cases',
-    'Competency-based evaluation'
-  ];
 
   const handleNext = () => {
     if (currentStep < 5) setCurrentStep(currentStep + 1);
@@ -217,6 +185,182 @@ export default function PDPForm() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      try {
+        const [skillsRaw, coursesRaw] = await Promise.all([
+          pdpService.skillsLibrary(),
+          coursesService.library(),
+        ]);
+        if (!alive) return;
+        const skillsObj = (skillsRaw && typeof skillsRaw === "object" ? skillsRaw : {}) as Record<string, unknown>;
+        const skillsData = (skillsObj.data && typeof skillsObj.data === "object" ? skillsObj.data : skillsObj) as Record<string, unknown>;
+        const skillsArray = Array.isArray(skillsData.skills)
+          ? skillsData.skills
+          : Array.isArray(skillsData.items)
+            ? skillsData.items
+            : Array.isArray(skillsRaw)
+              ? skillsRaw
+              : [];
+        const skills = (skillsArray as unknown[])
+          .map((s) => (typeof s === "string" ? s : typeof s === "object" && s ? String((s as Record<string, unknown>).name ?? (s as Record<string, unknown>).skill_name ?? "") : ""))
+          .filter(Boolean);
+        setDentalSpecialties(skills);
+
+        const titles = (coursesRaw ?? []).map((c) => c.title ?? "").filter(Boolean) as string[];
+        const durations = Array.from(new Set((coursesRaw ?? []).map((c) => c.duration ?? "").filter(Boolean) as string[]));
+        const features = Array.from(
+          new Set(
+            (coursesRaw ?? [])
+              .flatMap((c) => (Array.isArray((c as any)?.features) ? (c as any).features : []))
+              .map((f) => String(f))
+              .filter(Boolean)
+          )
+        );
+        setCourseOptions(titles);
+        setDurationOptions(durations);
+        setAssessmentOptions(features.length ? features : [
+          "Course completion certificate",
+          "Practical skills assessment",
+          "Portfolio review",
+        ]);
+      } catch {
+        if (!alive) return;
+        setDentalSpecialties([]);
+        setCourseOptions([]);
+        setDurationOptions([]);
+        setAssessmentOptions([
+          "Course completion certificate",
+          "Practical skills assessment",
+          "Portfolio review",
+        ]);
+      }
+    };
+
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const pdpId = searchParams.get("id");
+    if (!pdpId) return;
+
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+
+    const run = async () => {
+      setIsLoadingPlan(true);
+      setSubmitError("");
+      try {
+        const raw = await pdpService.getById(pdpId);
+        if (!alive) return;
+        const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+        const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+        const careerObjectives = Array.isArray(data.career_objectives)
+          ? (data.career_objectives as Array<Record<string, unknown>>)
+              .map((o) => getText(o?.objective))
+              .filter(Boolean)
+          : [''];
+        const currentSkills = Array.isArray(data.current_skills)
+          ? (data.current_skills as Array<Record<string, unknown>>).map((s) => ({
+              skill: getText(s?.skill_name),
+              level: getText(s?.current_proficiency, 'Intermediate'),
+            }))
+          : [{ skill: '', level: 'Advanced' }];
+        const skillsToDevelop = Array.isArray(data.skills_to_develop)
+          ? (data.skills_to_develop as Array<Record<string, unknown>>).map((s) => ({
+              skill: getText(s?.skill_name),
+              target: getText(s?.target_proficiency, 'Advanced'),
+            }))
+          : [{ skill: '', target: 'Advanced' }];
+        const milestones = Array.isArray(data.milestones)
+          ? (data.milestones as Array<Record<string, unknown>>).map((m) => ({
+              quarter: getText(m?.quarter),
+              goal: getText(m?.title) || getText(m?.description),
+            }))
+          : [];
+
+        setFormData((prev) => ({
+          ...prev,
+          pdpName: getText(data.name),
+          startDate: getText(data.start_date),
+          endDate: getText(data.end_date),
+          careerObjectives: careerObjectives.length ? careerObjectives : [''],
+          currentSkills: currentSkills.length ? currentSkills : [{ skill: '', level: 'Advanced' }],
+          skillsToDevelop: skillsToDevelop.length ? skillsToDevelop : [{ skill: '', target: 'Advanced' }],
+          milestones: milestones.length ? milestones : prev.milestones,
+        }));
+      } catch {
+        if (!alive) return;
+        setSubmitError("Unable to load PDP data for editing.");
+      } finally {
+        if (!alive) return;
+        setIsLoadingPlan(false);
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, [searchParams]);
+
+  const handleSavePlan = async () => {
+    setSubmitError("");
+    setIsSubmitting(true);
+    const editId = searchParams.get("id");
+    try {
+      const payload = {
+        name: formData.pdpName || "Professional Development Plan",
+        description: formData.additionalResources || "PDP generated from frontend form",
+        status: "active",
+        year: (formData.startDate?.slice(0, 4) || new Date().getFullYear().toString()),
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+        career_objectives: formData.careerObjectives
+          .filter(Boolean)
+          .map((objective, index) => ({ objective, specialty: objective, priority: index + 1 })),
+        current_skills: formData.currentSkills
+          .filter((s) => s.skill)
+          .map((s) => ({
+            skill_name: s.skill,
+            current_proficiency: s.level,
+            target_proficiency: s.level,
+          })),
+        skills_to_develop: formData.skillsToDevelop
+          .filter((s) => s.skill)
+          .map((s, index) => ({
+            skill_name: s.skill,
+            target_proficiency: s.target,
+            priority: index + 1,
+          })),
+        milestones: formData.milestones
+          .filter((m) => m.goal)
+          .map((m) => ({
+            title: m.goal,
+            description: m.goal,
+            quarter: m.quarter,
+            completed: false,
+          })),
+      };
+
+      const response = editId
+        ? await pdpService.update(editId, payload)
+        : await pdpService.create(payload);
+      const root = (response && typeof response === "object" ? response : {}) as Record<string, unknown>;
+      const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+      const createdId = String(data.id ?? root.id ?? editId ?? "");
+      router.push(`/pdp?view=detail&id=${createdId}`);
+    } catch {
+      setSubmitError("Unable to save PDP. Please review inputs and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -301,6 +445,17 @@ export default function PDPForm() {
 
         {/* Form Content */}
         <div className="bg-white rounded-lg p-4 sm:p-8 shadow-sm border border-gray-200">
+          {isLoadingPlan && (
+            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 flex items-center gap-2">
+              <Spinner />
+              Loading PDP details...
+            </div>
+          )}
+          {submitError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {submitError}
+            </div>
+          )}
           {/* Step 1: Career Objectives */}
           {currentStep === 1 && (
             <div>
@@ -655,7 +810,7 @@ export default function PDPForm() {
                   <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3">Select Courses</h3>
                   <p className="text-sm text-gray-600 mb-3 sm:mb-4">Choose the courses you want to include in your learning plan</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                    {courses.map((course) => (
+                    {courseOptions.map((course) => (
                       <label key={course} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
                         <input
                           type="checkbox"
@@ -707,7 +862,7 @@ export default function PDPForm() {
                       <SelectValue placeholder="Select Duration" />
                     </SelectTrigger>
                     <SelectContent>
-                      {durations.map((duration, index) => (
+                      {durationOptions.map((duration, index) => (
                         <SelectItem key={index} value={duration}>{duration}</SelectItem>
                       ))}
                     </SelectContent>
@@ -848,12 +1003,23 @@ export default function PDPForm() {
             
             {currentStep === 5 ? (
               <button
-                onClick={() => router.push('/pdp?view=detail')}
-                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm sm:text-base"
+                onClick={() => void handleSavePlan()}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-60"
               >
-                <Save size={16} />
-                <span className="hidden sm:inline">Save Changes</span>
-                <span className="sm:hidden">Save</span>
+                {isSubmitting ? (
+                  <>
+                    <Spinner />
+                    <span className="hidden sm:inline">Saving PDP...</span>
+                    <span className="sm:hidden">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    <span className="hidden sm:inline">Save Changes</span>
+                    <span className="sm:hidden">Save</span>
+                  </>
+                )}
               </button>
             ) : (
               <button

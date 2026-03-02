@@ -1,5 +1,6 @@
 import { authApi, publicApi } from "@/lib/api/http";
 import { API_PATHS } from "@/lib/api/endpoints";
+import { tokenStorage } from "@/lib/api/token";
 
 export type RegisterPayload = {
   firstName: string;
@@ -37,11 +38,9 @@ const extractToken = (raw: unknown): string | null => {
 
 export const authService = {
   async login(payload: LoginPayload): Promise<AuthResult> {
-    const response = await publicApi.post(API_PATHS.auth.login, null, {
-      params: {
-        email: payload.email,
-        password: payload.password,
-      },
+    const response = await publicApi.post(API_PATHS.auth.login, {
+      email: payload.email,
+      password: payload.password,
     });
     const token = extractToken(response.data);
     if (!token) throw new Error("Login succeeded but token was not found in response");
@@ -49,14 +48,12 @@ export const authService = {
   },
 
   async register(payload: RegisterPayload): Promise<AuthResult> {
-    const response = await publicApi.post(API_PATHS.auth.register, null, {
-      params: {
-        first_name: payload.firstName,
-        last_name: payload.lastName,
-        email: payload.email,
-        password: payload.password,
-        role: payload.role,
-      },
+    const response = await publicApi.post(API_PATHS.auth.register, {
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      email: payload.email,
+      password: payload.password,
+      role: payload.role,
     });
     const token = extractToken(response.data);
     if (!token) throw new Error("Register succeeded but token was not found in response");
@@ -69,7 +66,8 @@ export const authService = {
 
   async validateToken(): Promise<boolean> {
     try {
-      await authApi.post(API_PATHS.auth.validateToken);
+      const token = tokenStorage.get();
+      await authApi.post(API_PATHS.auth.validateToken, token ? { token } : {});
       return true;
     } catch {
       return false;

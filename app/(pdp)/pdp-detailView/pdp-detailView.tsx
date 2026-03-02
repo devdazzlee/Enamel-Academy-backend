@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   ArrowLeft,
@@ -34,77 +34,55 @@ import {
 import { Button } from "@/components/ui/button";
 import jsPDF from "jspdf";
 import { toPng } from "html-to-image";
+import { Spinner } from "@/components/ui/spinner";
+import { pdpService } from "@/lib/api/pdp";
+
+type PDPDetailData = {
+  id?: string;
+  title: string;
+  status: string;
+  dateRange: string;
+  lastUpdated: string;
+  progress: number;
+  careerObjectives: string[];
+  currentSkills: Array<{ skill: string; level: string }>;
+  skillsToDevelop: Array<{ skill: string; target: string }>;
+  courses: Array<{ title: string; duration: string; status: string }>;
+  milestones: Array<{ quarter: string; goal: string; status: string }>;
+  achievements: string[];
+  reflection: string;
+};
 
 export default function PDPDetailView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedPDPData, setEditedPDPData] = useState<typeof pdpData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [pdpData, setPdpData] = useState<PDPDetailData>({
+    title: 'PDP Plan',
+    status: 'Draft',
+    dateRange: 'Date range not available',
+    lastUpdated: 'Not available',
+    progress: 0,
+    careerObjectives: [],
+    currentSkills: [],
+    skillsToDevelop: [],
+    courses: [],
+    milestones: [],
+    achievements: [],
+    reflection: ''
+  });
+  const [editedPDPData, setEditedPDPData] = useState<PDPDetailData | null>(null);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  
-  const pdpData = {
-    title: '2023 Annual Plan',
-    status: 'Completed',
-    dateRange: 'January 1, 2023 - December 31, 2023',
-    lastUpdated: 'December 15, 2023',
-    progress: 100,
-    careerObjectives: [
-      'Become a specialist in Advanced Endodontics',
-      'Achieve proficiency in Digital Smile Design',
-      'Obtain Implantology Certification',
-      'Develop expertise in aesthetic dentistry procedures'
-    ],
-    currentSkills: [
-      { skill: 'General Dentistry', level: 'Advanced' },
-      { skill: 'Root Canal Treatment', level: 'Intermediate' },
-      { skill: 'Crown & Bridge Work', level: 'Intermediate' },
-      { skill: 'Patient Communication', level: 'Advanced' }
-    ],
-    skillsToDevelop: [
-      { skill: 'Endodontics', target: 'Advanced' },
-      { skill: 'Implantology', target: 'Intermediate' },
-      { skill: 'Digital Dentistry', target: 'Intermediate' },
-      { skill: 'Aesthetic Procedures', target: 'Advanced' }
-    ],
-    courses: [
-      { title: 'Advanced Endodontics Masterclass', duration: '40 hours', status: 'Completed' },
-      { title: 'Digital Smile Design Workshop', duration: '20 hours', status: 'Completed' },
-      { title: 'Implantology Certification Program', duration: '60 hours', status: 'Completed' },
-      { title: 'Aesthetic Dentistry Techniques', duration: '30 hours', status: 'Completed' }
-    ],
-    milestones: [
-      { quarter: 'Q1 2025', goal: 'Complete Endodontics course', status: 'Completed' },
-      { quarter: 'Q2 2025', goal: 'Finish Digital Smile Design', status: 'Completed' },
-      { quarter: 'Q3 2025', goal: 'Start Implantology certification', status: 'Completed' },
-      { quarter: 'Q4 2025', goal: 'Complete all certifications', status: 'Completed' }
-    ],
-    achievements: [
-      'Successfully completed 4 advanced courses',
-      'Gained proficiency in 3 new dental specialties',
-      'Logged 150 CPD hours',
-      'Improved patient satisfaction scores by 25%'
-    ],
-    reflection: 'This year has been transformative for my dental career. The combination of advanced endodontics training and digital dentistry skills has significantly enhanced my clinical capabilities. I feel more confident in complex cases and have received excellent patient feedback.'
-  };
-
-  const dentalSpecialties = [
-    'General Dentistry',
-    'Endodontics',
-    'Implantology',
-    'Prosthodontics',
-    'Orthodontics',
-    'Periodontics',
-    'Oral Surgery',
-    'Aesthetic Dentistry',
-    'Paediatric Dentistry',
-    'Restorative Dentistry',
-    'Digital Dentistry',
-    'Oral Pathology',
-    'Dental Anesthesiology',
-    'Dental Radiology'
-  ];
+  const [specialtyOptions, setSpecialtyOptions] = useState<string[]>([]);
+  const [componentSyncLoading, setComponentSyncLoading] = useState("");
+  const [componentSyncError, setComponentSyncError] = useState("");
+  const [componentSyncMessage, setComponentSyncMessage] = useState("");
+  const [linkActivityId, setLinkActivityId] = useState("");
+  const [linkCourseId, setLinkCourseId] = useState("");
 
   const skillLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
 
@@ -118,12 +96,138 @@ export default function PDPDetailView() {
   };
 
   const handleSave = () => {
-    // Here you would typically save data to your backend
-    console.log('Saving PDP data:', editedPDPData);
-    setIsEditing(false);
-    setIsMobileModalOpen(false);
-    // Show success message
-    alert('PDP data saved successfully!');
+    const run = async () => {
+      if (!editedPDPData?.id) {
+        setLoadError("Unable to save: PDP id missing.");
+        return;
+      }
+      try {
+        await pdpService.update(editedPDPData.id, {
+          name: editedPDPData.title,
+          status: editedPDPData.status.toLowerCase(),
+          progress_percentage: editedPDPData.progress,
+          career_objectives: editedPDPData.careerObjectives.map((objective, index) => ({
+            objective,
+            specialty: objective,
+            priority: index + 1,
+          })),
+          current_skills: editedPDPData.currentSkills.map((skill) => ({
+            skill_name: skill.skill,
+            current_proficiency: skill.level,
+            target_proficiency: skill.level,
+          })),
+          skills_to_develop: editedPDPData.skillsToDevelop.map((skill, index) => ({
+            skill_name: skill.skill,
+            target_proficiency: skill.target,
+            priority: index + 1,
+          })),
+          milestones: editedPDPData.milestones.map((m) => ({
+            title: m.goal,
+            description: m.goal,
+            quarter: m.quarter,
+            completed: m.status.toLowerCase() === "completed",
+          })),
+          achievements: editedPDPData.achievements,
+          reflection: { content: editedPDPData.reflection },
+        });
+        setPdpData(editedPDPData);
+        setIsEditing(false);
+        setIsMobileModalOpen(false);
+      } catch {
+        setLoadError("Failed to save PDP changes. Please try again.");
+      }
+    };
+    void run();
+  };
+
+  const handleComponentSync = async (
+    type: "objective" | "skillCurrent" | "skillDevelop" | "activity" | "milestone" | "reflection" | "linkCourse"
+  ) => {
+    if (!currentData.id) {
+      setComponentSyncError("PDP id is missing.");
+      return;
+    }
+    setComponentSyncError("");
+    setComponentSyncMessage("");
+    setComponentSyncLoading(type);
+    try {
+      if (type === "objective") {
+        const objective = currentData.careerObjectives.find(Boolean);
+        if (!objective) throw new Error("No objective to sync.");
+        await pdpService.addCareerObjective(currentData.id, {
+          objective,
+          specialty: objective,
+          priority: 1,
+        });
+        setComponentSyncMessage("Career objective synced.");
+      }
+      if (type === "skillCurrent") {
+        const skill = currentData.currentSkills.find((s) => s.skill);
+        if (!skill) throw new Error("No current skill to sync.");
+        await pdpService.addSkill(currentData.id, {
+          skill_name: skill.skill,
+          skill_type: "current",
+          current_proficiency: skill.level,
+          target_proficiency: skill.level,
+        });
+        setComponentSyncMessage("Current skill synced.");
+      }
+      if (type === "skillDevelop") {
+        const skill = currentData.skillsToDevelop.find((s) => s.skill);
+        if (!skill) throw new Error("No skill-to-develop to sync.");
+        await pdpService.addSkill(currentData.id, {
+          skill_name: skill.skill,
+          skill_type: "develop",
+          target_proficiency: skill.target,
+        });
+        setComponentSyncMessage("Skill to develop synced.");
+      }
+      if (type === "activity") {
+        const activity = currentData.courses.find((c) => c.title);
+        if (!activity) throw new Error("No learning activity to sync.");
+        await pdpService.addLearningActivity(currentData.id, {
+          activity_name: activity.title,
+          activity_type: "course",
+          duration_hours: Number.parseInt(activity.duration, 10) || 0,
+          status: activity.status.toLowerCase() || "planned",
+        });
+        setComponentSyncMessage("Learning activity synced.");
+      }
+      if (type === "milestone") {
+        const milestone = currentData.milestones.find((m) => m.goal);
+        if (!milestone) throw new Error("No milestone to sync.");
+        await pdpService.addMilestone(currentData.id, {
+          title: milestone.goal,
+          description: milestone.goal,
+          quarter: milestone.quarter,
+          completed: milestone.status.toLowerCase() === "completed",
+        });
+        setComponentSyncMessage("Milestone synced.");
+      }
+      if (type === "reflection") {
+        if (!currentData.reflection.trim()) throw new Error("No reflection to sync.");
+        await pdpService.addReflection(currentData.id, {
+          content: currentData.reflection,
+          achievements: currentData.achievements.join(", "),
+        });
+        setComponentSyncMessage("Reflection synced.");
+      }
+      if (type === "linkCourse") {
+        if (!linkActivityId.trim() || !linkCourseId.trim()) {
+          throw new Error("Enter activity id and course id first.");
+        }
+        await pdpService.linkCourse(currentData.id, {
+          activity_id: linkActivityId.trim(),
+          course_id: linkCourseId.trim(),
+        });
+        setComponentSyncMessage("Course linked to PDP activity.");
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to sync component.";
+      setComponentSyncError(msg);
+    } finally {
+      setComponentSyncLoading("");
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -202,6 +306,34 @@ export default function PDPDetailView() {
   };
 
   const currentData = editedPDPData || pdpData;
+  const dynamicSpecialties = useMemo(() => {
+    const fromData = [
+      ...currentData.currentSkills.map((s) => s.skill),
+      ...currentData.skillsToDevelop.map((s) => s.skill),
+    ].filter(Boolean);
+    return Array.from(new Set([...(specialtyOptions || []), ...fromData]));
+  }, [currentData.currentSkills, currentData.skillsToDevelop, specialtyOptions]);
+  const careerObjectiveOptions = useMemo(() => {
+    const mapped = dynamicSpecialties.map((s) => `Develop expertise in ${s}`);
+    return Array.from(new Set([...(currentData.careerObjectives || []), ...mapped])).filter(Boolean);
+  }, [currentData.careerObjectives, dynamicSpecialties]);
+  const courseTitleOptions = useMemo(
+    () => Array.from(new Set(currentData.courses.map((c) => c.title).filter(Boolean))),
+    [currentData.courses]
+  );
+  const courseDurationOptions = useMemo(
+    () => Array.from(new Set(currentData.courses.map((c) => c.duration).filter(Boolean))),
+    [currentData.courses]
+  );
+  const milestoneQuarterOptions = useMemo(
+    () => Array.from(new Set(currentData.milestones.map((m) => m.quarter).filter(Boolean))),
+    [currentData.milestones]
+  );
+  const milestoneGoalOptions = useMemo(
+    () => Array.from(new Set(currentData.milestones.map((m) => m.goal).filter(Boolean))),
+    [currentData.milestones]
+  );
+  const sectionStatus = (value: boolean) => (value ? "Completed" : "In Progress");
 
   useEffect(() => {
     const stepParam = searchParams.get('step');
@@ -211,6 +343,116 @@ export default function PDPDetailView() {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
+  }, [searchParams]);
+
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      try {
+        const raw = await pdpService.skillsLibrary();
+        if (!alive) return;
+        const skillsObj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+        const skillsData = (skillsObj.data && typeof skillsObj.data === "object" ? skillsObj.data : skillsObj) as Record<string, unknown>;
+        const skillsArray = Array.isArray(skillsData.skills)
+          ? skillsData.skills
+          : Array.isArray(skillsData.items)
+            ? skillsData.items
+            : Array.isArray(raw)
+              ? raw
+              : [];
+        const parsed = (skillsArray as unknown[])
+          .map((s) => (typeof s === "string" ? s : typeof s === "object" && s ? String((s as Record<string, unknown>).name ?? (s as Record<string, unknown>).skill_name ?? "") : ""))
+          .filter(Boolean);
+        setSpecialtyOptions(parsed);
+      } catch {
+        if (!alive) return;
+        setSpecialtyOptions([]);
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const planId = searchParams.get("id");
+    if (!planId) {
+      setIsLoading(false);
+      return;
+    }
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+    const getNum = (v: unknown, fallback = 0) =>
+      typeof v === "number" ? v : (typeof v === "string" && !Number.isNaN(Number(v)) ? Number(v) : fallback);
+    const run = async () => {
+      setIsLoading(true);
+      setLoadError("");
+      try {
+        const raw = await pdpService.getById(planId);
+        if (!alive) return;
+        const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+        const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+        const courses = Array.isArray(data.learning_activities)
+          ? (data.learning_activities as Array<Record<string, unknown>>).map((a) => ({
+              title: getText(a.activity_name, "Learning Activity"),
+              duration: `${getNum(a.duration_hours, 0)} hours`,
+              status: getText(a.status, "planned"),
+            }))
+          : [];
+        setPdpData({
+          id: String(data.id ?? planId),
+          title: getText(data.name, "PDP Plan"),
+          status: getText(data.status, "draft"),
+          dateRange:
+            getText(data.start_date) && getText(data.end_date)
+              ? `${getText(data.start_date)} - ${getText(data.end_date)}`
+              : "Date range not available",
+          lastUpdated: getText(data.updated_at, "Not available"),
+          progress: getNum(data.progress_percentage, 0),
+          careerObjectives: Array.isArray(data.career_objectives)
+            ? (data.career_objectives as Array<Record<string, unknown>>).map((o) => getText(o.objective)).filter(Boolean)
+            : [],
+          currentSkills: Array.isArray(data.current_skills)
+            ? (data.current_skills as Array<Record<string, unknown>>).map((s) => ({
+                skill: getText(s.skill_name),
+                level: getText(s.current_proficiency, "Intermediate"),
+              }))
+            : [],
+          skillsToDevelop: Array.isArray(data.skills_to_develop)
+            ? (data.skills_to_develop as Array<Record<string, unknown>>).map((s) => ({
+                skill: getText(s.skill_name),
+                target: getText(s.target_proficiency, "Advanced"),
+              }))
+            : [],
+          courses,
+          milestones: Array.isArray(data.milestones)
+            ? (data.milestones as Array<Record<string, unknown>>).map((m) => ({
+                quarter: getText(m.quarter),
+                goal: getText(m.title) || getText(m.description),
+                status: typeof m.completed === "boolean" ? (m.completed ? "Completed" : "In Progress") : "In Progress",
+              }))
+            : [],
+          achievements: Array.isArray(data.achievements)
+            ? (data.achievements as unknown[]).map((a) => getText(a)).filter(Boolean)
+            : [],
+          reflection:
+            (data.reflection && typeof data.reflection === "object"
+              ? getText((data.reflection as Record<string, unknown>).content)
+              : getText(data.reflection)) || "",
+        });
+      } catch {
+        if (!alive) return;
+        setLoadError("Unable to load PDP details.");
+      } finally {
+        if (!alive) return;
+        setIsLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
   }, [searchParams]);
 
   return (
@@ -295,16 +537,46 @@ export default function PDPDetailView() {
       </div>
 
       <div ref={printAreaRef} id="pdp-print-area" className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+        {isLoading && (
+          <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
+            <Spinner />
+            Loading PDP details...
+          </div>
+        )}
+        {loadError && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            {loadError}
+          </div>
+        )}
+        <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3">
+          <p className="text-sm font-semibold text-gray-900">PDP Component API Actions</p>
+          <p className="text-xs text-gray-600 mb-2">Sync individual PDP component endpoints from this page.</p>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => handleComponentSync("objective")} disabled={componentSyncLoading === "objective"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Sync Objective</button>
+            <button onClick={() => handleComponentSync("skillCurrent")} disabled={componentSyncLoading === "skillCurrent"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Sync Current Skill</button>
+            <button onClick={() => handleComponentSync("skillDevelop")} disabled={componentSyncLoading === "skillDevelop"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Sync Skill to Develop</button>
+            <button onClick={() => handleComponentSync("activity")} disabled={componentSyncLoading === "activity"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Sync Activity</button>
+            <button onClick={() => handleComponentSync("milestone")} disabled={componentSyncLoading === "milestone"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Sync Milestone</button>
+            <button onClick={() => handleComponentSync("reflection")} disabled={componentSyncLoading === "reflection"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Sync Reflection</button>
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <input value={linkActivityId} onChange={(e) => setLinkActivityId(e.target.value)} placeholder="Activity ID" className="rounded-md border px-2 py-1 text-xs" />
+            <input value={linkCourseId} onChange={(e) => setLinkCourseId(e.target.value)} placeholder="Course ID" className="rounded-md border px-2 py-1 text-xs" />
+            <button onClick={() => handleComponentSync("linkCourse")} disabled={componentSyncLoading === "linkCourse"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Link Course</button>
+          </div>
+          {componentSyncError && <p className="mt-2 text-xs text-red-600">{componentSyncError}</p>}
+          {componentSyncMessage && <p className="mt-2 text-xs text-green-600">{componentSyncMessage}</p>}
+        </div>
         {/* Progress Bar */}
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-200">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs sm:text-sm font-medium text-gray-700">Overall Progress</span>
-            <span className="text-xs sm:text-sm font-bold text-green-600">{pdpData.progress}%</span>
+            <span className="text-xs sm:text-sm font-bold text-green-600">{currentData.progress}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
             <div 
               className="bg-gradient-to-r from-green-500 to-blue-500 h-2 sm:h-3 rounded-full"
-              style={{ width: `${pdpData.progress}%` }}
+              style={{ width: `${currentData.progress}%` }}
             />
           </div>
         </div>
@@ -322,7 +594,7 @@ export default function PDPDetailView() {
                   <p className="text-sm sm:text-base text-gray-600">Your professional goals and career aspirations</p>
                 </div>
                 <span className="px-2 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0">
-                  Completed
+                  {sectionStatus(currentData.careerObjectives.filter(Boolean).length > 0)}
                 </span>
               </div>
               <div className="mt-3 sm:mt-4 space-y-2">
@@ -340,66 +612,15 @@ export default function PDPDetailView() {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-full min-w-[300px] max-h-60 overflow-y-auto">
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Become a specialist in Advanced Endodontics")}
-                                className={objective === "Become a specialist in Advanced Endodontics" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Become a specialist in Advanced Endodontics
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Achieve proficiency in Digital Smile Design")}
-                                className={objective === "Achieve proficiency in Digital Smile Design" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Achieve proficiency in Digital Smile Design
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Obtain Implantology Certification")}
-                                className={objective === "Obtain Implantology Certification" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Obtain Implantology Certification
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Develop expertise in aesthetic dentistry procedures")}
-                                className={objective === "Develop expertise in aesthetic dentistry procedures" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Develop expertise in aesthetic dentistry procedures
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Master advanced surgical techniques")}
-                                className={objective === "Master advanced surgical techniques" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Master advanced surgical techniques
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Become a leader in dental practice management")}
-                                className={objective === "Become a leader in dental practice management" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Become a leader in dental practice management
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Specialize in paediatric dentistry")}
-                                className={objective === "Specialize in paediatric dentistry" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Specialize in paediatric dentistry
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Excel in cosmetic dentistry")}
-                                className={objective === "Excel in cosmetic dentistry" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Excel in cosmetic dentistry
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Become an orthodontic specialist")}
-                                className={objective === "Become an orthodontic specialist" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Become an orthodontic specialist
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateCareerObjective(index, "Master digital dentistry technologies")}
-                                className={objective === "Master digital dentistry technologies" ? "bg-purple-50 text-purple-700" : ""}
-                              >
-                                Master digital dentistry technologies
-                              </DropdownMenuItem>
+                              {(careerObjectiveOptions.length ? careerObjectiveOptions : [objective]).filter(Boolean).map((option) => (
+                                <DropdownMenuItem
+                                  key={option}
+                                  onClick={() => updateCareerObjective(index, option)}
+                                  className={objective === option ? "bg-purple-50 text-purple-700" : ""}
+                                >
+                                  {option}
+                                </DropdownMenuItem>
+                              ))}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -448,7 +669,7 @@ export default function PDPDetailView() {
                   <p className="text-sm sm:text-base text-gray-600">Current skills and areas for development</p>
                 </div>
                 <span className="px-2 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0">
-                  Completed
+                  {sectionStatus(currentData.currentSkills.length > 0 || currentData.skillsToDevelop.length > 0)}
                 </span>
               </div>
 
@@ -479,7 +700,7 @@ export default function PDPDetailView() {
                                 <SelectValue placeholder="Select skill" />
                               </SelectTrigger>
                               <SelectContent>
-                                {dentalSpecialties.map(specialty => (
+                                {dynamicSpecialties.map(specialty => (
                                   <SelectItem key={specialty} value={specialty}>{specialty}</SelectItem>
                                 ))}
                               </SelectContent>
@@ -553,7 +774,7 @@ export default function PDPDetailView() {
                                 <SelectValue placeholder="Select skill" />
                               </SelectTrigger>
                               <SelectContent>
-                                {dentalSpecialties.map(specialty => (
+                                {dynamicSpecialties.map(specialty => (
                                   <SelectItem key={specialty} value={specialty}>{specialty}</SelectItem>
                                 ))}
                               </SelectContent>
@@ -614,7 +835,7 @@ export default function PDPDetailView() {
                   <p className="text-sm sm:text-base text-gray-600">Selected courses and learning activities</p>
                 </div>
                 <span className="px-2 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0">
-                  Completed
+                  {sectionStatus(currentData.courses.length > 0)}
                 </span>
               </div>
 
@@ -644,16 +865,9 @@ export default function PDPDetailView() {
                                 <SelectValue placeholder="Select course" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Advanced Endodontics Masterclass">Advanced Endodontics Masterclass</SelectItem>
-                                <SelectItem value="Digital Smile Design Workshop">Digital Smile Design Workshop</SelectItem>
-                                <SelectItem value="Implantology Certification Program">Implantology Certification Program</SelectItem>
-                                <SelectItem value="Aesthetic Dentistry Techniques">Aesthetic Dentistry Techniques</SelectItem>
-                                <SelectItem value="Modern Prosthodontics Course">Modern Prosthodontics Course</SelectItem>
-                                <SelectItem value="Orthodontic Biomechanics">Orthodontic Biomechanics</SelectItem>
-                                <SelectItem value="Periodontal Surgery Advanced">Periodontal Surgery Advanced</SelectItem>
-                                <SelectItem value="Paediatric Behavior Management">Paediatric Behavior Management</SelectItem>
-                                <SelectItem value="CAD/CAM Technology in Dentistry">CAD/CAM Technology in Dentistry</SelectItem>
-                                <SelectItem value="Cone Beam CT Interpretation">Cone Beam CT Interpretation</SelectItem>
+                                {(courseTitleOptions.length ? courseTitleOptions : [course.title]).filter(Boolean).map((title) => (
+                                  <SelectItem key={title} value={title}>{title}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <Select
@@ -674,13 +888,9 @@ export default function PDPDetailView() {
                                 <SelectValue placeholder="Duration" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="20 hours">20 hours</SelectItem>
-                                <SelectItem value="30 hours">30 hours</SelectItem>
-                                <SelectItem value="40 hours">40 hours</SelectItem>
-                                <SelectItem value="50 hours">50 hours</SelectItem>
-                                <SelectItem value="60 hours">60 hours</SelectItem>
-                                <SelectItem value="80 hours">80 hours</SelectItem>
-                                <SelectItem value="100 hours">100 hours</SelectItem>
+                                {(courseDurationOptions.length ? courseDurationOptions : [course.duration]).filter(Boolean).map((duration) => (
+                                  <SelectItem key={duration} value={duration}>{duration}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -745,7 +955,7 @@ export default function PDPDetailView() {
                   <p className="text-sm sm:text-base text-gray-600">Key deadlines and progress checkpoints</p>
                 </div>
                 <span className="px-2 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0">
-                  Completed
+                  {sectionStatus(currentData.milestones.length > 0)}
                 </span>
               </div>
 
@@ -775,14 +985,9 @@ export default function PDPDetailView() {
                                 <SelectValue placeholder="Quarter" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Q1 2025">Q1 2025</SelectItem>
-                                <SelectItem value="Q2 2025">Q2 2025</SelectItem>
-                                <SelectItem value="Q3 2025">Q3 2025</SelectItem>
-                                <SelectItem value="Q4 2025">Q4 2025</SelectItem>
-                                <SelectItem value="Q1 2026">Q1 2026</SelectItem>
-                                <SelectItem value="Q2 2026">Q2 2026</SelectItem>
-                                <SelectItem value="Q3 2026">Q3 2026</SelectItem>
-                                <SelectItem value="Q4 2026">Q4 2026</SelectItem>
+                                {(milestoneQuarterOptions.length ? milestoneQuarterOptions : [milestone.quarter]).filter(Boolean).map((quarter) => (
+                                  <SelectItem key={quarter} value={quarter}>{quarter}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <Select
@@ -827,14 +1032,9 @@ export default function PDPDetailView() {
                                 <SelectValue placeholder="Milestone goal" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Complete Endodontics course">Complete Endodontics course</SelectItem>
-                                <SelectItem value="Finish Digital Smile Design">Finish Digital Smile Design</SelectItem>
-                                <SelectItem value="Start Implantology certification">Start Implantology certification</SelectItem>
-                                <SelectItem value="Complete all certifications">Complete all certifications</SelectItem>
-                                <SelectItem value="Master advanced techniques">Master advanced techniques</SelectItem>
-                                <SelectItem value="Obtain practical experience">Obtain practical experience</SelectItem>
-                                <SelectItem value="Pass final assessment">Pass final assessment</SelectItem>
-                                <SelectItem value="Submit portfolio">Submit portfolio</SelectItem>
+                                {(milestoneGoalOptions.length ? milestoneGoalOptions : [milestone.goal]).filter(Boolean).map((goal) => (
+                                  <SelectItem key={goal} value={goal}>{goal}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -878,14 +1078,14 @@ export default function PDPDetailView() {
                   <p className="text-sm sm:text-base text-gray-600">Progress evaluation and personal insights</p>
                 </div>
                 <span className="px-2 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0">
-                  Completed
+                  {sectionStatus(currentData.achievements.length > 0 || Boolean(currentData.reflection))}
                 </span>
               </div>
 
               <div className="mb-4 sm:mb-6">
                 <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3">Key Achievements</h3>
                 <div className="space-y-1 sm:space-y-2">
-                  {pdpData.achievements.map((achievement, index) => (
+                  {currentData.achievements.map((achievement, index) => (
                     <div key={index} className="flex items-start gap-2">
                       <CheckCircle className="text-green-600 mt-0.5 flex-shrink-0" size={16} />
                       <span className="text-gray-700 text-sm sm:text-base leading-relaxed">{achievement}</span>
@@ -896,7 +1096,7 @@ export default function PDPDetailView() {
 
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3">Personal Reflection</h3>
-                <p className="text-gray-700 leading-relaxed text-sm sm:text-base">{pdpData.reflection}</p>
+                <p className="text-gray-700 leading-relaxed text-sm sm:text-base">{currentData.reflection}</p>
               </div>
             </div>
           </div>
@@ -935,10 +1135,9 @@ export default function PDPDetailView() {
                             <SelectValue placeholder="Select career objective" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Become a specialist in Advanced Endodontics">Become a specialist in Advanced Endodontics</SelectItem>
-                            <SelectItem value="Achieve proficiency in Digital Smile Design">Achieve proficiency in Digital Smile Design</SelectItem>
-                            <SelectItem value="Obtain Implantology Certification">Obtain Implantology Certification</SelectItem>
-                            <SelectItem value="Develop expertise in aesthetic dentistry procedures">Develop expertise in aesthetic dentistry procedures</SelectItem>
+                            {(careerObjectiveOptions.length ? careerObjectiveOptions : [objective]).filter(Boolean).map((option) => (
+                              <SelectItem key={option} value={option}>{option}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <button
@@ -987,7 +1186,7 @@ export default function PDPDetailView() {
                               <SelectValue placeholder="Select skill" />
                             </SelectTrigger>
                             <SelectContent>
-                              {dentalSpecialties.map(specialty => (
+                              {dynamicSpecialties.map(specialty => (
                                 <SelectItem key={specialty} value={specialty}>{specialty}</SelectItem>
                               ))}
                             </SelectContent>

@@ -1,0 +1,1015 @@
+{
+  "info": {
+    "name": "React Dental API - PDP Collection",
+    "description": "Complete collection of PDP API endpoints for dental professionals",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Smith\",\n    \"email\": \"dr.smith@dentalclinic.com\",\n    \"password\": \"SecurePass123!\",\n    \"role\": \"dentist\",\n    \"dental_license_number\": \"DEN123456\",\n    \"dental_specialty\": \"General Dentistry\",\n    \"dental_clinic\": \"Smith Dental Care\",\n    \"dental_experience_years\": \"8\",\n    \"dental_qualifications\": \"DDS, MOrth RCS\",\n    \"dental_registration_body\": \"General Dental Council\",\n    \"dental_registration_date\": \"2016-05-15\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"dr.smith@dentalclinic.com\",\n    \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "user"]
+            }
+          }
+        },
+        {
+          "name": "Validate Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"{{jwtToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/validate-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "validate-token"]
+            }
+          }
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Johnathan\",\n    \"last_name\": \"Smithson\",\n    \"email\": \"dr.smithson@dentalclinic.com\",\n    \"display_name\": \"Dr. Johnathan Smithson\",\n    \"dental_specialty\": \"Orthodontics\",\n    \"dental_clinic\": \"Smithson Orthodontic Center\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/user/update",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "user", "update"]
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"current_password\": \"SecurePass123!\",\n    \"new_password\": \"NewSecurePass456!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/user/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "user", "change-password"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dental Roles",
+      "item": [
+        {
+          "name": "Get All Dental Roles",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dental/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "dental", "roles"]
+            }
+          }
+        },
+        {
+          "name": "Get Role Permissions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dental/permissions/dentist",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "dental", "permissions", "dentist"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Personal Development Plan (PDP)",
+      "item": [
+        {
+          "name": "Get All PDPs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp?status=active&year=2025&per_page=10&page=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "year",
+                  "value": "2025"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single PDP",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123"]
+            }
+          }
+        },
+        {
+          "name": "Create PDP - Complete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"2025 Professional Development Plan\",\n    \"description\": \"Comprehensive PDP focusing on advanced endodontics and implantology\",\n    \"status\": \"active\",\n    \"year\": \"2025\",\n    \"start_date\": \"2025-01-01\",\n    \"end_date\": \"2025-12-31\",\n    \"career_objectives\": [\n        {\n            \"objective\": \"Become a specialist in Advanced Endodontics\",\n            \"specialty\": \"Endodontics\",\n            \"priority\": 1\n        },\n        {\n            \"objective\": \"Achieve proficiency in Digital Smile Design\",\n            \"specialty\": \"Digital Dentistry\",\n            \"priority\": 2\n        },\n        {\n            \"objective\": \"Obtain Implantology Certification\",\n            \"specialty\": \"Implantology\",\n            \"priority\": 3\n        }\n    ],\n    \"current_skills\": [\n        {\n            \"skill_name\": \"General Dentistry\",\n            \"current_proficiency\": \"Advanced\",\n            \"target_proficiency\": \"Expert\"\n        },\n        {\n            \"skill_name\": \"Root Canal Treatment\",\n            \"current_proficiency\": \"Intermediate\",\n            \"target_proficiency\": \"Advanced\"\n        }\n    ],\n    \"skills_to_develop\": [\n        {\n            \"skill_name\": \"Endodontics\",\n            \"target_proficiency\": \"Advanced\",\n            \"priority\": 1\n        },\n        {\n            \"skill_name\": \"Implantology\",\n            \"target_proficiency\": \"Advanced\",\n            \"priority\": 2\n        },\n        {\n            \"skill_name\": \"Digital Dentistry\",\n            \"target_proficiency\": \"Advanced\",\n            \"priority\": 3\n        }\n    ],\n    \"learning_activities\": [\n        {\n            \"activity_name\": \"Advanced Endodontics Masterclass\",\n            \"activity_type\": \"course\",\n            \"duration_hours\": 40,\n            \"priority\": 1,\n            \"status\": \"planned\",\n            \"start_date\": \"2025-02-01\"\n        },\n        {\n            \"activity_name\": \"Digital Smile Design Workshop\",\n            \"activity_type\": \"workshop\",\n            \"duration_hours\": 20,\n            \"priority\": 2,\n            \"status\": \"planned\",\n            \"start_date\": \"2025-03-15\"\n        },\n        {\n            \"activity_name\": \"Implantology Certification Program\",\n            \"activity_type\": \"course\",\n            \"duration_hours\": 60,\n            \"priority\": 3,\n            \"status\": \"planned\",\n            \"start_date\": \"2025-04-10\"\n        }\n    ],\n    \"milestones\": [\n        {\n            \"title\": \"Complete Endodontics course\",\n            \"description\": \"Finish all modules and pass final assessment\",\n            \"due_date\": \"2025-03-31\",\n            \"quarter\": \"Q1\",\n            \"completed\": false\n        },\n        {\n            \"title\": \"Finish Digital Smile Design\",\n            \"description\": \"Complete workshop and submit final project\",\n            \"due_date\": \"2025-06-30\",\n            \"quarter\": \"Q2\",\n            \"completed\": false\n        },\n        {\n            \"title\": \"Complete all certifications\",\n            \"description\": \"Finish all planned courses and obtain certificates\",\n            \"due_date\": \"2025-12-31\",\n            \"quarter\": \"Q4\",\n            \"completed\": false\n        }\n    ],\n    \"reflection\": {\n        \"content\": \"This year has been transformative for my dental career. The combination of advanced endodontics training and digital dentistry skills has significantly enhanced my clinical capabilities.\",\n        \"achievements\": \"Completed 4 advanced courses, gained proficiency in 3 new dental specialties, logged 150 CPD hours\",\n        \"challenges\": \"Time management between courses and clinical work, adapting to new digital workflows\"\n    },\n    \"achievements\": [\n        \"Successfully completed Advanced Endodontics Masterclass\",\n        \"Improved patient satisfaction scores by 25%\",\n        \"Implemented digital smile design in practice\"\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp"]
+            }
+          }
+        },
+        {
+          "name": "Create PDP - Minimal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"2025 Basic PDP\",\n    \"description\": \"Simplified PDP with minimal fields\",\n    \"status\": \"draft\",\n    \"year\": \"2025\",\n    \"start_date\": \"2025-01-01\",\n    \"end_date\": \"2025-12-31\",\n    \"career_objectives\": [\n        {\n            \"objective\": \"Improve clinical skills\",\n            \"specialty\": \"General Dentistry\"\n        }\n    ],\n    \"skills_to_develop\": [\n        {\n            \"skill_name\": \"Composite Bonding\",\n            \"target_proficiency\": \"Advanced\"\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp"]
+            }
+          }
+        },
+        {
+          "name": "Update PDP",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"2025 Updated PDP\",\n    \"description\": \"Updated description with new objectives\",\n    \"status\": \"active\",\n    \"progress_percentage\": 25,\n    \"career_objectives\": [\n        {\n            \"objective\": \"Master advanced endodontics\",\n            \"specialty\": \"Endodontics\",\n            \"completed\": false\n        },\n        {\n            \"objective\": \"Learn implant placement\",\n            \"specialty\": \"Implantology\",\n            \"completed\": false\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123"]
+            }
+          }
+        },
+        {
+          "name": "Update PDP Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"completed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123", "status"]
+            }
+          }
+        },
+        {
+          "name": "Delete PDP",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123"]
+            }
+          }
+        },
+        {
+          "name": "Get PDP Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Skills Library",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/skills-library",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "skills-library"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PDP Components",
+      "item": [
+        {
+          "name": "Add Career Objective",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"objective\": \"Become certified in Invisalign\",\n    \"specialty\": \"Orthodontics\",\n    \"priority\": 4\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/objectives",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123", "objectives"]
+            }
+          }
+        },
+        {
+          "name": "Add Current Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"skill_name\": \"Composite Bonding\",\n    \"skill_type\": \"current\",\n    \"current_proficiency\": \"Intermediate\",\n    \"target_proficiency\": \"Advanced\",\n    \"priority\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123", "skills"]
+            }
+          }
+        },
+        {
+          "name": "Add Skill to Develop",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"skill_name\": \"CBCT Interpretation\",\n    \"skill_type\": \"develop\",\n    \"target_proficiency\": \"Advanced\",\n    \"priority\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123", "skills"]
+            }
+          }
+        },
+        {
+          "name": "Add Learning Activity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"activity_name\": \"Advanced CBCT Interpretation Course\",\n    \"activity_type\": \"course\",\n    \"duration_hours\": 25,\n    \"priority\": 1,\n    \"status\": \"planned\",\n    \"start_date\": \"2025-07-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/activities",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123", "activities"]
+            }
+          }
+        },
+        {
+          "name": "Add Milestone",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Complete CBCT Interpretation Course\",\n    \"description\": \"Finish all modules and pass certification exam\",\n    \"due_date\": \"2025-08-30\",\n    \"quarter\": \"Q3\",\n    \"completed\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/milestones",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123", "milestones"]
+            }
+          }
+        },
+        {
+          "name": "Add Reflection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"content\": \"Successfully completed endodontics course and started implantology training. The practical sessions were very helpful.\",\n    \"type\": \"mid-year\",\n    \"achievements\": \"Completed endodontics course with distinction\",\n    \"challenges\": \"Need more practice with implant placement techniques\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/reflection",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123", "reflection"]
+            }
+          }
+        },
+        {
+          "name": "Link Course to PDP Activity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"activity_id\": \"67b123abc456\",\n    \"course_id\": 456\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/link-course",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "pdp", "123", "link-course"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard & Courses",
+      "item": [
+        {
+          "name": "Get User Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Course Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/courses/123",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "dashboard", "courses", "123"]
+            }
+          }
+        },
+        {
+          "name": "Get Continue Learning",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/continue-learning",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "dashboard", "continue-learning"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Course Library",
+      "item": [
+        {
+          "name": "Get Course Library",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/library?plan=free&category=endodontics&format=self-paced&length=medium&page=1&per_page=10&sort=popular",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "library"],
+              "query": [
+                {
+                  "key": "plan",
+                  "value": "free"
+                },
+                {
+                  "key": "category",
+                  "value": "endodontics"
+                },
+                {
+                  "key": "format",
+                  "value": "self-paced"
+                },
+                {
+                  "key": "length",
+                  "value": "medium"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "popular"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Ongoing Courses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/ongoing",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "ongoing"]
+            }
+          }
+        },
+        {
+          "name": "Enroll in Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/enroll/123",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "enroll", "123"]
+            }
+          }
+        },
+        {
+          "name": "Get Course Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "categories"]
+            }
+          }
+        },
+        {
+          "name": "Get Course Filters",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/filters",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "filters"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Certificates",
+      "item": [
+        {
+          "name": "Get Course Certificate",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/course/123",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "certificates", "course", "123"]
+            }
+          }
+        },
+        {
+          "name": "Get My Certificates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/my-certificates",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "certificates", "my-certificates"]
+            }
+          }
+        },
+        {
+          "name": "Check Certificate Availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/check/123",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "certificates", "check", "123"]
+            }
+          }
+        },
+        {
+          "name": "Preview Certificate",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/preview/123",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "certificates", "preview", "123"]
+            }
+          }
+        },
+        {
+          "name": "Verify Certificate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_id\": 123,\n    \"course_id\": 456\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/certificates/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "certificates", "verify"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assignments & Quizzes",
+      "item": [
+        {
+          "name": "Get Course Assignments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assignments",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "123", "assignments"]
+            }
+          }
+        },
+        {
+          "name": "Get Course Quizzes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/quizzes",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "123", "quizzes"]
+            }
+          }
+        },
+        {
+          "name": "Get Course Assessments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assessments",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "123", "assessments"]
+            }
+          }
+        },
+        {
+          "name": "Get Assignment Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assignment-stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "123", "assignment-stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Quiz Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/quiz-stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "courses", "123", "quiz-stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "CPD Tracking",
+      "item": [
+        {
+          "name": "Get CPD Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "cpd", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Get CPD History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/history?year=2025&limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "cpd", "history"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2025"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get CPD Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/analytics",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "cpd", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "Get CPD Requirements",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/wp-json/reactapi/v1/cpd/requirements/dentist",
+              "host": ["{{baseUrl}}"],
+              "path": ["wp-json", "reactapi", "v1", "cpd", "requirements", "dentist"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://yourwebsite.com",
+      "type": "string",
+      "description": "Your WordPress site URL"
+    },
+    {
+      "key": "jwtToken",
+      "value": "YOUR_JWT_TOKEN_HERE",
+      "type": "string",
+      "description": "JWT token obtained from login"
+    }
+  ]
+}

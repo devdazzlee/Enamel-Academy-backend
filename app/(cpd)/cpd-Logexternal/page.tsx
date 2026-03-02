@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Upload, CheckCircle, Info } from 'lucide-react';
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from 'next/navigation';
+import { cpdService } from "@/lib/api/cpd";
 
 
 export default function LogExternalCPD() {
@@ -20,14 +22,15 @@ export default function LogExternalCPD() {
     reflection: '',
     application: ''
   });
+  const [evidenceFile, setEvidenceFile] = useState<File | undefined>(undefined);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingMeta, setIsLoadingMeta] = useState(true);
+  const [metaError, setMetaError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState("");
+  const [selectedRole, setSelectedRole] = useState("dentist");
 
-  const gdcRequirements = [
-    '250 hours over 5 years',
-    'Mix of clinical and non-clinical CPD',
-    'Record learning outcomes',
-    'Reflect on learning',
-    'Keep evidence for audit'
-  ];
+  const [gdcRequirements, setGdcRequirements] = useState<string[]>([]);
 
   const loggingTips = [
     'Log CPD activities as soon as possible after completion',
@@ -36,14 +39,98 @@ export default function LogExternalCPD() {
     'Include specific examples where possible'
   ];
 
-  const gdcCategories = [
-    'Clinical',
-    'Management & Leadership',
-    'Communication',
-    'Professionalism',
-    'Research & Audit',
-    'Education & Training'
-  ];
+  const [gdcCategories, setGdcCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+    const run = async () => {
+      setIsLoadingMeta(true);
+      setMetaError("");
+      try {
+        const raw = await cpdService.requirements(selectedRole);
+        if (!alive) return;
+        const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+        const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+
+        const requirementList = Array.isArray(data.requirements)
+          ? data.requirements
+          : Array.isArray(data.mandatory_requirements)
+            ? data.mandatory_requirements
+            : [];
+        const categoryList = Array.isArray(data.categories)
+          ? data.categories
+          : Array.isArray(data.gdc_categories)
+            ? data.gdc_categories
+            : [];
+
+        const parsedRequirements = (requirementList as unknown[])
+          .map((item) => (typeof item === "string" ? item : getText((item as Record<string, unknown>)?.name ?? (item as Record<string, unknown>)?.title, "")))
+          .filter(Boolean);
+        const parsedCategories = (categoryList as unknown[])
+          .map((item) => (typeof item === "string" ? item : getText((item as Record<string, unknown>)?.name ?? (item as Record<string, unknown>)?.title, "")))
+          .filter(Boolean);
+
+        setGdcRequirements(parsedRequirements);
+        setGdcCategories(parsedCategories);
+      } catch {
+        if (!alive) return;
+        setMetaError("Unable to load GDC metadata right now.");
+      } finally {
+        if (alive) setIsLoadingMeta(false);
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, [selectedRole]);
+
+  const categories = useMemo(() => gdcCategories, [gdcCategories]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitError("");
+    setSubmitSuccess("");
+
+    if (!formData.activityTitle || !formData.dateCompleted || !formData.cpdHours || !formData.category) {
+      setSubmitError("Please complete all required fields.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await cpdService.logExternal({
+        title: formData.activityTitle,
+        provider: formData.provider,
+        date_completed: formData.dateCompleted,
+        hours: formData.cpdHours,
+        gdc_category: formData.category,
+        activity_type: formData.activityType || "external",
+        learning_outcomes: formData.learningOutcomes,
+        reflection: formData.reflection,
+        apply_learning: formData.application,
+        evidence: evidenceFile,
+      });
+      setSubmitSuccess("External CPD logged successfully.");
+      setFormData({
+        activityTitle: '',
+        provider: '',
+        dateCompleted: '',
+        cpdHours: '',
+        category: '',
+        activityType: '',
+        learningOutcomes: '',
+        reflection: '',
+        application: ''
+      });
+      setEvidenceFile(undefined);
+    } catch {
+      setSubmitError("Failed to log external CPD. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -78,7 +165,28 @@ export default function LogExternalCPD() {
                 Enter information about your CPD activity. Fields marked with * are required.
               </p>
 
-              <form className="space-y-6">
+              {isLoadingMeta && (
+                <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
+                  <Spinner />
+                  Loading GDC metadata...
+                </div>
+              )}
+              {metaError && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  {metaError}
+                </div>
+              )}
+              {submitSuccess && (
+                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                  {submitSuccess}
+                </div>
+              )}
+              {submitError && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {submitError}
+                </div>
+              )}
+              <form className="space-y-6" onSubmit={handleSubmit}>
                 {/* Activity Title */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -162,6 +270,22 @@ export default function LogExternalCPD() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Role
+                    </label>
+                    <select
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value)}
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
+                    >
+                      <option value="dentist">dentist</option>
+                      <option value="dental_nurse">dental_nurse</option>
+                      <option value="dental_care_professional">dental_care_professional</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       GDC Category *
                     </label>
                     <select
@@ -172,7 +296,7 @@ export default function LogExternalCPD() {
                       className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
                     >
                       <option value="">Select category</option>
-                      {gdcCategories.map((cat) => (
+                      {categories.map((cat) => (
                         <option key={cat} value={cat}>
                           {cat}
                         </option>
@@ -266,24 +390,37 @@ export default function LogExternalCPD() {
                   <p className="text-xs text-gray-500 mb-3">
                     Attach certificates, attendance records, photos, or other supporting documents
                   </p>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors cursor-pointer">
+                  <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors cursor-pointer block">
                     <Upload className="mx-auto text-gray-400 mb-3" size={32} />
                     <p className="text-purple-600 font-medium mb-1">Click to upload or drag and drop</p>
                     <p className="text-xs text-gray-500">PDF, JPG, PNG, DOC up to 10MB</p>
-                  </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        setEvidenceFile(file);
+                      }}
+                    />
+                  </label>
+                  {evidenceFile && (
+                    <p className="text-xs text-gray-600 mt-2">Selected: {evidenceFile.name}</p>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
                   <button
                     type="submit"
-                    className="w-full sm:flex-1 py-3 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors text-sm sm:text-base"
+                    disabled={isSubmitting}
+                    className="w-full sm:flex-1 py-3 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle size={20} className="w-5 h-5 sm:w-5 sm:h-5" />
-                    <span className="font-medium">Log CPD Activity</span>
+                    <span className="font-medium">{isSubmitting ? "Logging..." : "Log CPD Activity"}</span>
                   </button>
                   <button
                     type="button"
+                    onClick={() => router.back()}
                     className="w-full sm:w-auto px-6 sm:px-8 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-semibold transition-colors text-sm sm:text-base"
                   >
                     Cancel
@@ -302,7 +439,7 @@ export default function LogExternalCPD() {
                 <h3 className="font-semibold text-blue-900">GDC Requirements</h3>
               </div>
               <ul className="space-y-2">
-                {gdcRequirements.map((req, index) => (
+                {(gdcRequirements.length ? gdcRequirements : ['Requirement data not available']).map((req, index) => (
                   <li key={index} className="flex items-start space-x-2">
                     <CheckCircle size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-blue-800">{req}</span>
@@ -333,7 +470,7 @@ export default function LogExternalCPD() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-900 mb-4">GDC Categories</h3>
               <div className="space-y-2">
-                {gdcCategories.map((category, index) => (
+                {categories.map((category, index) => (
                   <div
                     key={index}
                     className="px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-700"

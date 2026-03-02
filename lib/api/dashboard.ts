@@ -7,6 +7,7 @@ export type DashboardStats = {
   ongoingCourses?: number;
   cpdPoints?: number;
   certificates?: number;
+  totalTimeSpent?: string;
 };
 
 export type ContinueLearningCourse = {
@@ -22,6 +23,8 @@ export type RecommendedCourse = {
   id: string | number;
   title?: string;
   thumbnail?: string;
+  excerpt?: string;
+  difficulty?: string;
   duration?: string;
   category?: string;
   rating?: number;
@@ -104,6 +107,8 @@ const toDashboardItem = (
       getString(item.course_image),
     progress,
     duration: getString(item.duration) ?? getString(item.course_duration),
+    excerpt: getString(item.excerpt) ?? getString(item.description),
+    difficulty: getString(item.difficulty) ?? getString(item.level),
     lastAccessed: getString(item.last_accessed) ?? getString(item.last_accessed_date),
     category:
       getString(item.category) ??
@@ -131,6 +136,7 @@ const normalizeDashboardRoot = (raw: unknown): DashboardRoot => {
   if (typeof data.ongoing_courses === "number") stats.ongoingCourses = data.ongoing_courses;
   if (typeof data.cpd_points === "number") stats.cpdPoints = data.cpd_points;
   if (typeof data.certificates === "number") stats.certificates = data.certificates;
+  stats.totalTimeSpent = getString(data.total_time_spent) ?? getString(data.totalTimeSpent);
 
   const continueLearning: ContinueLearningCourse[] = [];
   const continueLearningSource =

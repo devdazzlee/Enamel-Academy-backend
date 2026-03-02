@@ -13,6 +13,7 @@ export function RecommendedCourses() {
   const [courses, setCourses] = useState<RecommendedCourse[]>([])
   const [progressCourses, setProgressCourses] = useState<CourseProgressDetail[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
 
   const handleStartCourse = (courseId: string | number) => {
     router.push(`/course-detail?id=${courseId}`)
@@ -23,6 +24,7 @@ export function RecommendedCourses() {
 
     const run = async () => {
       setIsLoading(true)
+      setHasError(false)
       try {
         const data = await dashboardService.root()
         if (!alive) return
@@ -31,6 +33,8 @@ export function RecommendedCourses() {
       } catch {
         if (!alive) return
         setCourses([])
+        setProgressCourses([])
+        setHasError(true)
       } finally {
         if (!alive) return
         setIsLoading(false)
@@ -79,8 +83,17 @@ export function RecommendedCourses() {
           <span className="text-muted-foreground">Courses</span>
         </h2>
         <div className="text-center py-12 text-muted-foreground">
-          <p className="text-sm">No recommended courses available.</p>
-          <p className="text-xs mt-1">Check back later for new courses.</p>
+          {hasError ? (
+            <>
+              <p className="text-sm">Unable to load recommended courses.</p>
+              <p className="text-xs mt-1">Please refresh and try again.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm">No recommended courses available.</p>
+              <p className="text-xs mt-1">Check back later for new courses.</p>
+            </>
+          )}
         </div>
       </section>
     )
@@ -113,10 +126,10 @@ export function RecommendedCourses() {
                     />
                   </div>
                   <div className="p-3 sm:p-4">
-                    <h3 className="font-semibold text-foreground mb-2 text-sm sm:text-base line-clamp-2">
+                    <h3 className="font-semibold text-foreground mb-2 text-sm sm:text-base line-clamp-2 break-words">
                       {course.title ?? "Untitled Course"}
                     </h3>
-                    <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-2 sm:mb-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-2 sm:mb-3">
                       <span className="flex items-center gap-0.5 sm:gap-1">
                         <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         {course.status ?? "Not available"}
@@ -132,7 +145,7 @@ export function RecommendedCourses() {
                         style={{ width: `${progress}%` }}
                       />
                     </div>
-                    <div className="text-xs text-muted-foreground mb-3 sm:mb-4">
+                    <div className="text-xs text-muted-foreground mb-3 sm:mb-4 break-words">
                       Last activity: {course.lastActivity ?? "Not available"}
                     </div>
                     <button
@@ -157,10 +170,22 @@ export function RecommendedCourses() {
                 />
               </div>
               <div className="p-3 sm:p-4">
-                <h3 className="font-semibold text-foreground mb-2 text-sm sm:text-base line-clamp-2">
+                <h3 className="font-semibold text-foreground mb-2 text-sm sm:text-base line-clamp-2 break-words">
                   {course.title ?? "Untitled Course"}
                 </h3>
-                <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-2 sm:mb-3">
+                {course.excerpt && (
+                  <p className="mb-2 text-xs sm:text-sm text-muted-foreground line-clamp-2 break-words">
+                    {course.excerpt}
+                  </p>
+                )}
+                {course.difficulty && (
+                  <div className="mb-2 sm:mb-3">
+                    <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-primary">
+                      {course.difficulty}
+                    </span>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-2 sm:mb-3">
                   {course.rating !== undefined && (
                     <span className="flex items-center gap-0.5 sm:gap-1">
                       <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
@@ -168,13 +193,13 @@ export function RecommendedCourses() {
                     </span>
                   )}
                   {course.instructor && (
-                    <span className="flex items-center gap-0.5 sm:gap-1">
+                    <span className="flex items-center gap-0.5 sm:gap-1 min-w-0 max-w-full">
                       <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                      {course.instructor}
+                      <span className="truncate">{course.instructor}</span>
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-3 sm:mb-4">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-3 sm:mb-4">
                   {course.duration && course.duration !== "Not specified" && (
                     <span className="flex items-center gap-0.5 sm:gap-1">
                       <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
@@ -182,9 +207,9 @@ export function RecommendedCourses() {
                     </span>
                   )}
                   {course.category && (
-                    <span className="flex items-center gap-0.5 sm:gap-1">
+                    <span className="flex items-center gap-0.5 sm:gap-1 min-w-0">
                       <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                      {course.category}
+                      <span className="truncate">{course.category}</span>
                     </span>
                   )}
                 </div>

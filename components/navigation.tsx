@@ -63,6 +63,7 @@ export function Navigation({ activeItem }: NavigationProps) {
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isProfileLoading, setIsProfileLoading] = useState(true)
   const logout = useAuthStore((s) => s.logout)
   const [displayName, setDisplayName] = useState("")
 
@@ -70,6 +71,7 @@ export function Navigation({ activeItem }: NavigationProps) {
     let alive = true
 
     const run = async () => {
+      setIsProfileLoading(true)
       try {
         const me = await userService.me()
         if (!alive) return
@@ -77,6 +79,9 @@ export function Navigation({ activeItem }: NavigationProps) {
       } catch {
         if (!alive) return
         setDisplayName("")
+      } finally {
+        if (!alive) return
+        setIsProfileLoading(false)
       }
     }
 
@@ -88,6 +93,7 @@ export function Navigation({ activeItem }: NavigationProps) {
   }, [])
 
   const handleLogout = async () => {
+    if (isLoggingOut) return
     setIsLoggingOut(true)
     try {
       await logout()
@@ -149,7 +155,9 @@ export function Navigation({ activeItem }: NavigationProps) {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 px-3 py-2 text-sm text-[#6b7280] hover:text-[#1a1a1a] rounded-lg hover:bg-[#f5f5f5] transition-colors">
                   <User className="h-4 w-4" />
-                  <span>{displayName}</span>
+                  <span>
+                    {isProfileLoading ? "Loading..." : displayName || "User"}
+                  </span>
                   <ChevronDown className="h-3 w-3" />
                 </button>
               </DropdownMenuTrigger>

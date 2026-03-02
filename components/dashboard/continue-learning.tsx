@@ -10,6 +10,7 @@ export function ContinueLearning() {
   const router = useRouter()
   const [courses, setCourses] = useState<ContinueLearningCourse[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
 
   const handleResume = (courseId: string) => {
     router.push(`/course-detail?id=${courseId}`)
@@ -20,6 +21,7 @@ export function ContinueLearning() {
 
     const run = async () => {
       setIsLoading(true)
+      setHasError(false)
       try {
         const data = await dashboardService.continueLearning()
         if (!alive) return
@@ -27,6 +29,7 @@ export function ContinueLearning() {
       } catch {
         if (!alive) return
         setCourses([])
+        setHasError(true)
       } finally {
         if (!alive) return
         setIsLoading(false)
@@ -73,8 +76,17 @@ export function ContinueLearning() {
           <span className="text-muted-foreground">On-Going Courses</span>
         </h2>
         <div className="text-center py-12 text-muted-foreground">
-          <p className="text-sm">No ongoing courses yet.</p>
-          <p className="text-xs mt-1">Start a course to see your progress here.</p>
+          {hasError ? (
+            <>
+              <p className="text-sm">Unable to load ongoing courses.</p>
+              <p className="text-xs mt-1">Please refresh and try again.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm">No ongoing courses yet.</p>
+              <p className="text-xs mt-1">Start a course to see your progress here.</p>
+            </>
+          )}
         </div>
       </section>
     )

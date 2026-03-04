@@ -4,13 +4,36 @@ import { API_PATHS } from "@/lib/api/endpoints";
 export type LibraryCourse = {
   id: string | number;
   title?: string;
+  slug?: string;
   instructor?: string;
+  excerpt?: string;
+  thumbnail?: string;
+  banner_image?: string;
+  plan?: string;
+  format?: string;
+  difficulty?: string;
   duration?: string;
+  duration_minutes?: number;
   lessons?: number;
   image?: string;
   rating?: number;
   reviews_count?: number;
   students_count?: number;
+  categories?: Array<{
+    id?: string | number;
+    slug?: string;
+    name?: string;
+  }>;
+  tags?: Array<{
+    id?: string | number;
+    slug?: string;
+    name?: string;
+  }>;
+  features?: string[];
+  is_featured?: boolean;
+  is_new?: boolean;
+  created_date?: string;
+  updated_date?: string;
   price?: {
     type?: string;
     amount?: number;
@@ -23,6 +46,9 @@ export type LibraryCourse = {
     total?: number;
     status?: string;
   };
+  is_enrolled?: boolean;
+  is_completed?: boolean;
+  enrollment_date?: string | null;
 };
 
 export type ApiCourse = {
@@ -67,6 +93,45 @@ export type CourseFilters = {
   length?: Array<{ value: string; label: string }>;
   difficulty?: Array<{ value: string; label: string }>;
   sort?: Array<{ value: string; label: string }>;
+};
+
+export type LibraryPagination = {
+  current_page: number;
+  per_page: number;
+  total_courses: number;
+  total_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+};
+
+export type LibraryAppliedFilters = {
+  plan?: string;
+  status?: string;
+  category?: string;
+  format?: string;
+  length?: string;
+  search?: string;
+  page?: number;
+  per_page?: number;
+  sort?: string;
+};
+
+export type LibraryFilterOptions = {
+  plan: Array<{ value: string; label: string }>;
+  status: Array<{ value: string; label: string }>;
+  format: Array<{ value: string; label: string }>;
+  length: Array<{ value: string; label: string }>;
+  difficulty: Array<{ value: string; label: string }>;
+  sort: Array<{ value: string; label: string }>;
+};
+
+export type LibraryResponse = {
+  courses: LibraryCourse[];
+  pagination: LibraryPagination;
+  filters: {
+    applied: LibraryAppliedFilters;
+    options: LibraryFilterOptions;
+  };
 };
 
 export type CourseReflectionPayload = {
@@ -143,11 +208,35 @@ const normalizeLibrary = (raw: unknown): LibraryCourse[] => {
     const title = (c.title as string | undefined) ?? (c.course_title as string | undefined);
     if (typeof title === "string" && title.length > 0) course.title = title;
 
+    const slug = c.slug as string | undefined;
+    if (typeof slug === "string" && slug.length > 0) course.slug = slug;
+
     const instructor = (c.instructor as string | undefined) ?? (c.author as string | undefined);
     if (typeof instructor === "string" && instructor.length > 0) course.instructor = instructor;
 
+    const excerpt = c.excerpt as string | undefined;
+    if (typeof excerpt === "string") course.excerpt = excerpt;
+
+    const thumbnail = c.thumbnail as string | undefined;
+    if (typeof thumbnail === "string" && thumbnail.length > 0) course.thumbnail = thumbnail;
+
+    const bannerImage = c.banner_image as string | undefined;
+    if (typeof bannerImage === "string" && bannerImage.length > 0) course.banner_image = bannerImage;
+
+    const plan = c.plan as string | undefined;
+    if (typeof plan === "string" && plan.length > 0) course.plan = plan;
+
+    const format = c.format as string | undefined;
+    if (typeof format === "string" && format.length > 0) course.format = format;
+
+    const difficulty = c.difficulty as string | undefined;
+    if (typeof difficulty === "string" && difficulty.length > 0) course.difficulty = difficulty;
+
     const duration = c.duration as string | undefined;
     if (typeof duration === "string" && duration.length > 0) course.duration = duration;
+
+    const durationMinutes = toNumber(c.duration_minutes);
+    if (typeof durationMinutes === "number") course.duration_minutes = durationMinutes;
 
     const lessons = toNumber(c.lessons) ?? toNumber(c.lesson_count);
     if (typeof lessons === "number") course.lessons = lessons;
@@ -188,10 +277,151 @@ const normalizeLibrary = (raw: unknown): LibraryCourse[] => {
       };
     }
 
+    if (Array.isArray(c.categories)) {
+      course.categories = (c.categories as unknown[])
+        .map((cat) => {
+          if (!cat || typeof cat !== "object") return null;
+          const obj = cat as Record<string, unknown>;
+          return {
+            id: obj.id as string | number | undefined,
+            slug: obj.slug as string | undefined,
+            name: obj.name as string | undefined,
+          };
+        })
+        .filter(Boolean) as Array<{ id?: string | number; slug?: string; name?: string }>;
+    }
+
+    if (Array.isArray(c.tags)) {
+      course.tags = (c.tags as unknown[])
+        .map((tag) => {
+          if (!tag || typeof tag !== "object") return null;
+          const obj = tag as Record<string, unknown>;
+          return {
+            id: obj.id as string | number | undefined,
+            slug: obj.slug as string | undefined,
+            name: obj.name as string | undefined,
+          };
+        })
+        .filter(Boolean) as Array<{ id?: string | number; slug?: string; name?: string }>;
+    }
+
+    if (Array.isArray(c.features)) {
+      course.features = (c.features as unknown[])
+        .map((f) => (typeof f === "string" ? f : ""))
+        .filter((f) => f.length > 0);
+    }
+
+    if (typeof c.is_featured === "boolean") course.is_featured = c.is_featured;
+    if (typeof c.is_new === "boolean") course.is_new = c.is_new;
+
+    const createdDate = c.created_date as string | undefined;
+    if (typeof createdDate === "string" && createdDate.length > 0) course.created_date = createdDate;
+    const updatedDate = c.updated_date as string | undefined;
+    if (typeof updatedDate === "string" && updatedDate.length > 0) course.updated_date = updatedDate;
+
+    if (typeof c.is_enrolled === "boolean") course.is_enrolled = c.is_enrolled;
+    if (typeof c.is_completed === "boolean") course.is_completed = c.is_completed;
+    if (typeof c.enrollment_date === "string" || c.enrollment_date === null) {
+      course.enrollment_date = c.enrollment_date as string | null;
+    }
+
     result.push(course);
   }
 
   return result;
+};
+
+const normalizeLibraryResponse = (raw: unknown): LibraryResponse => {
+  const defaultResponse: LibraryResponse = {
+    courses: [],
+    pagination: {
+      current_page: 1,
+      per_page: 10,
+      total_courses: 0,
+      total_pages: 1,
+      has_next: false,
+      has_previous: false,
+    },
+    filters: {
+      applied: {},
+      options: {
+        plan: [],
+        status: [],
+        format: [],
+        length: [],
+        difficulty: [],
+        sort: [],
+      },
+    },
+  };
+
+  if (!raw || typeof raw !== "object") return defaultResponse;
+
+  const root = raw as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object"
+    ? root.data
+    : root) as Record<string, unknown>;
+
+  const paginationRaw = (data.pagination && typeof data.pagination === "object"
+    ? data.pagination
+    : {}) as Record<string, unknown>;
+
+  const filtersRaw = (data.filters && typeof data.filters === "object"
+    ? data.filters
+    : {}) as Record<string, unknown>;
+  const appliedRaw = (filtersRaw.applied && typeof filtersRaw.applied === "object"
+    ? filtersRaw.applied
+    : {}) as Record<string, unknown>;
+  const optionsRaw = (filtersRaw.options && typeof filtersRaw.options === "object"
+    ? filtersRaw.options
+    : {}) as Record<string, unknown>;
+
+  const parseOptions = (value: unknown): Array<{ value: string; label: string }> => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((row) => {
+        if (!row || typeof row !== "object") return null;
+        const obj = row as Record<string, unknown>;
+        const itemValue = typeof obj.value === "string" ? obj.value : "";
+        const itemLabel = typeof obj.label === "string" ? obj.label : "";
+        if (!itemValue || !itemLabel) return null;
+        return { value: itemValue, label: itemLabel };
+      })
+      .filter(Boolean) as Array<{ value: string; label: string }>;
+  };
+
+  return {
+    courses: normalizeLibrary(raw),
+    pagination: {
+      current_page: toNumber(paginationRaw.current_page) ?? defaultResponse.pagination.current_page,
+      per_page: toNumber(paginationRaw.per_page) ?? defaultResponse.pagination.per_page,
+      total_courses: toNumber(paginationRaw.total_courses) ?? defaultResponse.pagination.total_courses,
+      total_pages: toNumber(paginationRaw.total_pages) ?? defaultResponse.pagination.total_pages,
+      has_next: Boolean(paginationRaw.has_next),
+      has_previous: Boolean(paginationRaw.has_previous),
+    },
+    filters: {
+      applied: {
+        plan: typeof appliedRaw.plan === "string" ? appliedRaw.plan : "",
+        status: typeof appliedRaw.status === "string" ? appliedRaw.status : "",
+        category: typeof appliedRaw.category === "string" ? appliedRaw.category : "",
+        format: typeof appliedRaw.format === "string" ? appliedRaw.format : "",
+        length: typeof appliedRaw.length === "string" ? appliedRaw.length : "",
+        search: typeof appliedRaw.search === "string" ? appliedRaw.search : "",
+        page: toNumber(appliedRaw.page) ?? 1,
+        per_page: toNumber(appliedRaw.per_page) ?? 10,
+        sort: typeof appliedRaw.sort === "string" ? appliedRaw.sort : "",
+      },
+      options: {
+        plan: parseOptions(optionsRaw.plan),
+        status: parseOptions(optionsRaw.status),
+        format: parseOptions(optionsRaw.format),
+        length: parseOptions(optionsRaw.length),
+        difficulty: parseOptions(optionsRaw.difficulty),
+        sort: parseOptions(optionsRaw.sort),
+      },
+    },
+  };
 };
 
 const stripHtml = (html: string): string => {
@@ -331,6 +561,11 @@ const normalizeOngoing = (raw: unknown): OngoingCoursesResult => {
 
 export const coursesService = {
   async library(filters?: Record<string, string>): Promise<LibraryCourse[]> {
+    const response = await this.libraryWithMeta(filters);
+    return response.courses;
+  },
+
+  async libraryWithMeta(filters?: Record<string, string>): Promise<LibraryResponse> {
     const params = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
@@ -343,7 +578,7 @@ export const coursesService = {
       : API_PATHS.courses.library;
       
     const response = await authApi.get(url);
-    return normalizeLibrary(response.data);
+    return normalizeLibraryResponse(response.data);
   },
 
   async list(): Promise<ApiCourse[]> {

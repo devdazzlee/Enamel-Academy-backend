@@ -29,6 +29,7 @@ import { authApi } from "@/lib/api/http"
 import { coursesService } from "@/lib/api/courses"
 import { assignmentService } from "@/lib/api/assignments"
 import { certificatesService } from "@/lib/api/certificates"
+import ReactPlayer from "react-player"
 
 type Section = "about" | "learn" | "assess" | "evaluate"
 type EvaluateSubPage = "resources" | "feedback" | "completed"
@@ -60,6 +61,14 @@ type CourseResourceItem = {
   url?: string
 }
 
+type LessonStep = {
+  id: string
+  title: string
+  description: string
+  videoUrl: string
+  topics: Array<{ title: string; duration: string }>
+}
+
 const decodeHtmlEntities = (input: string): string => {
   if (!input) return ""
   const namedMap: Record<string, string> = {
@@ -89,6 +98,13 @@ const sanitizeApiText = (value: unknown, fallback = ""): string => {
     .trim()
     .replace(/^["']+|["']+$/g, "")
   return cleaned || fallback
+}
+
+const extractVideoUrl = (html: unknown): string => {
+  if (typeof html !== "string" || !html.trim()) return ""
+  const decoded = decodeHtmlEntities(html)
+  const directMatch = decoded.match(/https?:\/\/[^\s<>"']+/i)
+  return directMatch ? directMatch[0] : ""
 }
 
 const feedbackCriteria = [
@@ -620,20 +636,38 @@ export default function CoursePlayerPage() {
       setInsightActionLoading(false)
     }
   }
-  
+
   // ─── Helpers ────────────────────────────────────
 
   const stripHtml = (value: string) => value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
-  const courseDescription = stripHtml(String(courseContent?.description ?? "")) || String(courseContent?.excerpt ?? "")
+  const courseDescription =
+    stripHtml(String(courseContent?.description ?? ""))
+    || sanitizeApiText(courseContent?.curriculum_overview, "")
+    || sanitizeApiText(courseContent?.excerpt, "")
+  const curriculumSections = Array.isArray(course?.curriculum) ? course.curriculum : []
+  const lessonSteps = useMemo<LessonStep[]>(() => (
+    curriculumSections.map((section: any, index: number) => {
+      const title = sanitizeApiText(section?.title, `Lesson ${index + 1}`)
+      const description = sanitizeApiText(section?.description, "")
+      const videoUrl = extractVideoUrl(section?.html_content)
+      const topics = Array.isArray(section?.topics)
+        ? section.topics.map((t: any) => ({
+            title: sanitizeApiText(t?.title, ""),
+            duration: sanitizeApiText(t?.duration, "Not specified"),
+          })).filter((t) => t.title)
+        : []
+      return {
+        id: String(section?.id ?? `lesson-${index + 1}`),
+        title,
+        description,
+        videoUrl,
+        topics,
+      }
+    })
+  ), [curriculumSections])
   const objectives = Array.isArray(courseContent?.learning_objectives) ? courseContent.learning_objectives : []
   const features = Array.isArray(courseContent?.features) ? courseContent.features : []
-  const topics = Array.isArray(course?.curriculum)
-    ? course.curriculum.flatMap((section: any) =>
-        Array.isArray(section?.topics)
-          ? section.topics.map((t: any) => sanitizeApiText(t?.title, ""))
-          : []
-      )
-    : []
+  const topics = lessonSteps.flatMap((step) => step.topics.map((t) => t.title))
   const categories = Array.isArray(courseContent?.categories) ? courseContent.categories.map((c: any) => String(c?.name ?? "")) : []
 
   const courseDetails = useMemo(() => ({
@@ -644,7 +678,7 @@ export default function CoursePlayerPage() {
     objectives: objectives.length ? objectives : ["No objectives provided by API."],
     learningOutcomes: objectives.length ? objectives : ["No learning outcomes provided by API."],
     gdcOutcomes: categories.length ? categories.map((c: string) => `Category: ${c}`) : ["No GDC outcomes provided by API."],
-    topics: topics.filter(Boolean).length ? topics.filter(Boolean) : ["No topics provided by API."],
+    topics: topics.filter(Boolean).length ? Array.from(new Set(topics.filter(Boolean))) : ["No topics provided by API."],
   }), [courseContent, objectives, categories, courseDescription, topics])
 
   const learnPages = useMemo(() => ([
@@ -652,45 +686,77 @@ export default function CoursePlayerPage() {
       title: "Course Overview",
       content: (
         <div className="space-y-4 text-gray-700 leading-relaxed text-sm sm:text-base">
-          <p>{courseDescription || "No overview available for this course yet."}</p>
+          <p>{courseDescription || "Overview will be available soon."}</p>
+          {courseDetails.objectives.length > 0 && (
+            <div>
+              <p className="font-semibold text-gray-900 mb-2">Learning Objectives</p>
+              <ol className="space-y-1">
+                {courseDetails.objectives.map((item: string, i: number) => (
+                  <li key={i}>{i + 1}. {item}</li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
       ),
     },
-    {
-      title: "Learning Objectives",
+    ...lessonSteps.map((step, idx) => ({
+      title: `Step ${idx + 1}: ${step.title}`,
       content: (
-        <ul className="space-y-2 ml-4">
-          {courseDetails.objectives.map((item: string, i: number) => (
-            <li key={i} className="text-gray-700 text-sm sm:text-base">{item}</li>
-          ))}
-        </ul>
+        <div className="space-y-4">
+          {step.videoUrl ? (
+            <div className="aspect-video overflow-hidden rounded-lg border border-gray-200 bg-black">
+              <ReactPlayer src={step.videoUrl} controls width="100%" height="100%" style={{ maxWidth: "100%" }} />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              No video URL returned by API for this lesson.
+            </div>
+          )}
+          {step.description && <p className="text-sm sm:text-base text-gray-700">{step.description}</p>}
+          <div>
+            <p className="font-semibold text-gray-900 mb-2">Topics</p>
+            {step.topics.length > 0 ? (
+              <div className="space-y-2">
+                {step.topics.map((topic, i) => (
+                  <div
+                    key={`${step.id}-topic-${i}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                  >
+                    <div className="min-w-0 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-[11px] font-semibold flex items-center justify-center shrink-0">
+                        {i + 1}
+                      </div>
+                      <span className="text-sm sm:text-base text-gray-700 truncate">{topic.title}</span>
+                    </div>
+                    <span className="text-[11px] sm:text-xs text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded-full shrink-0">
+                      {topic.duration}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No topics returned for this lesson.</p>
+            )}
+          </div>
+        </div>
       ),
-    },
-    {
-      title: "Topics Covered",
-      content: (
-        <ul className="space-y-2 ml-4">
-          {courseDetails.topics.map((item: string, i: number) => (
-            <li key={i} className="text-gray-700 text-sm sm:text-base">{item}</li>
-          ))}
-        </ul>
-      ),
-    },
+    })),
     {
       title: "Course Resources",
       content: (
-        <ul className="space-y-2 ml-4">
+        <ol className="space-y-2 text-sm sm:text-base text-gray-700">
           {(resources.length ? resources : [{ title: "No resources available" }]).map((item, i) => (
-            <li key={i} className="text-gray-700 text-sm sm:text-base">{item.title}</li>
+            <li key={i}>{i + 1}. {item.title}</li>
           ))}
-        </ul>
+        </ol>
       ),
     },
     {
       title: "Consent and Declaration",
       content: "consent",
     },
-  ]), [courseDescription, courseDetails.objectives, courseDetails.topics, resources])
+  ]), [courseDescription, courseDetails.objectives, lessonSteps, resources])
 
   const sectionItems: { key: Section; label: string; number: number }[] = [
     { key: "about", label: "About", number: 1 },
@@ -868,7 +934,7 @@ export default function CoursePlayerPage() {
                 }`}
               >
                 <Link2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span className="leading-tight">{r.title}</span>
+                <span className="leading-tight">{i + 1}. {r.title}</span>
               </button>
             ))}
             {resourceActionError && (
@@ -966,14 +1032,11 @@ export default function CoursePlayerPage() {
         {/* Topics Covered */}
         <div>
           <h3 className="font-bold text-gray-900 mb-3">Topics Covered</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <ol className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {courseDetails.topics.map((t, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
-                <div className="w-2 h-2 bg-purple-600 rounded-full flex-shrink-0" />
-                {t}
-              </div>
+              <li key={i} className="text-sm text-gray-700">{i + 1}. {t}</li>
             ))}
-          </div>
+          </ol>
         </div>
           </div>
 
@@ -1119,6 +1182,15 @@ export default function CoursePlayerPage() {
       )
     }
     const allAnswered = selectedAnswers.every((a) => a !== null)
+    const hasAssignmentDetail = Boolean(
+      assignmentDetailSummary && assignmentDetailSummary !== "No assignment details available."
+    )
+    const hasQuizDetail = Boolean(
+      quizDetailSummary && quizDetailSummary !== "No quiz details available."
+    )
+    const hasQuizAttemptsDetail = Boolean(
+      quizAttemptsSummary && quizAttemptsSummary !== "No quiz attempts available."
+    )
 
     return (
       <div>
@@ -1130,11 +1202,36 @@ export default function CoursePlayerPage() {
           {assessmentMetaError && <p className="text-xs sm:text-sm text-red-600">{assessmentMetaError}</p>}
           {!assessmentMetaLoading && !assessmentMetaError && (
             <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] text-gray-500">Quiz Attempts</p>
+                  <p className="text-sm font-semibold text-gray-900">{quizStatsSummary.attempted} / {quizStatsSummary.total}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] text-gray-500">Quiz Passed</p>
+                  <p className="text-sm font-semibold text-gray-900">{quizStatsSummary.passed}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] text-gray-500">Assignments Completed</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {assignmentStatsSummary.completed} / {assignmentStatsSummary.total}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] text-gray-500">Assignments Pending</p>
+                  <p className="text-sm font-semibold text-gray-900">{assignmentStatsSummary.pending}</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <p className="mb-2 text-xs font-semibold text-gray-700">Assignments ({assignmentItems.length})</p>
                   <div className="space-y-1">
-                    {assignmentItems.length === 0 && <p className="text-xs text-gray-500">No assignments found.</p>}
+                    {assignmentItems.length === 0 && (
+                      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                        No assignments found from API.
+                      </div>
+                    )}
                     {assignmentItems.map((item) => (
                       <button
                         key={item.id}
@@ -1155,7 +1252,11 @@ export default function CoursePlayerPage() {
                 <div>
                   <p className="mb-2 text-xs font-semibold text-gray-700">Quizzes ({quizItems.length})</p>
                   <div className="space-y-1">
-                    {quizItems.length === 0 && <p className="text-xs text-gray-500">No quizzes found.</p>}
+                    {quizItems.length === 0 && (
+                      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                        No quizzes found from API.
+                      </div>
+                    )}
                     {quizItems.map((item) => (
                       <button
                         key={item.id}
@@ -1175,17 +1276,15 @@ export default function CoursePlayerPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs sm:text-sm text-gray-700">
-                <p>Quiz attempts tracked: {quizStatsSummary.attempted} / {quizStatsSummary.total}</p>
-                <p>Quiz passed: {quizStatsSummary.passed}</p>
-                <p>Assignments completed: {assignmentStatsSummary.completed} / {assignmentStatsSummary.total}</p>
-                <p>Assignments pending: {assignmentStatsSummary.pending}</p>
-                <p>{assignmentDetailSummary}</p>
-                <p>{quizDetailSummary}</p>
-                <p>{quizAttemptsSummary}</p>
-                {insightActionLoading && <p className="text-xs text-gray-500">Loading selected item details...</p>}
-                {insightActionError && <p className="text-xs text-red-600">{insightActionError}</p>}
-              </div>
+              {(hasAssignmentDetail || hasQuizDetail || hasQuizAttemptsDetail || insightActionLoading || insightActionError) && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs sm:text-sm text-gray-700 space-y-1">
+                  {hasAssignmentDetail && <p>{assignmentDetailSummary}</p>}
+                  {hasQuizDetail && <p>{quizDetailSummary}</p>}
+                  {hasQuizAttemptsDetail && <p>{quizAttemptsSummary}</p>}
+                  {insightActionLoading && <p className="text-xs text-gray-500">Loading selected item details...</p>}
+                  {insightActionError && <p className="text-xs text-red-600">{insightActionError}</p>}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1400,7 +1499,7 @@ export default function CoursePlayerPage() {
               <Link2 className={`w-5 h-5 mt-0.5 flex-shrink-0 ${r.url ? "text-purple-600" : "text-gray-400"}`} />
               <div>
                 <h3 className={`font-semibold text-sm sm:text-base transition-colors ${r.url ? "text-gray-900 group-hover:text-purple-700" : "text-gray-700"}`}>
-                  {r.title}
+                  {i + 1}. {r.title}
                 </h3>
                 <p className="text-gray-500 text-xs sm:text-sm mt-0.5">{r.description}</p>
               </div>

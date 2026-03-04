@@ -14,12 +14,8 @@ import {
   BarChart,
   Globe,
   Target,
-  Calendar,
   Monitor,
-  Infinity,
-  FileText,
-  Smartphone,
-  Repeat
+  Tag
 } from 'lucide-react';
 
 import { coursesService, type ApiCourse, type LibraryCourse } from "@/lib/api/courses"
@@ -74,8 +70,11 @@ type CourseInstructor = {
 type CourseData = {
   curriculum?: CurriculumSection[];
   course?: {
+    id?: number | string;
+    slug?: string;
     excerpt?: string;
     description?: string;
+    thumbnail?: string;
     banner_image?: string;
     duration?: string;
     duration_minutes?: number;
@@ -85,6 +84,8 @@ type CourseData = {
     rating?: number;
     reviews_count?: number;
     students_count?: number;
+    categories?: Array<{ id?: number | string; slug?: string; name?: string }>;
+    tags?: Array<{ id?: number | string; slug?: string; name?: string }>;
     cpd_points?: number;
     price?: {
       type?: string;
@@ -93,6 +94,18 @@ type CourseData = {
       display?: string;
     };
     features?: string[];
+    is_featured?: boolean;
+    is_new?: boolean;
+    created_date?: string;
+    is_enrolled?: boolean;
+    is_completed?: boolean;
+    enrollment_date?: string | null;
+    user_progress?: {
+      percentage?: number;
+      completed?: number;
+      total?: number;
+      status?: string;
+    };
     learning_objectives?: string[];
     requirements?: string[];
     prerequisites?: string[];
@@ -103,6 +116,23 @@ type CourseData = {
   };
   related_courses?: RelatedCourse[];
   instructor?: CourseInstructor | null;
+};
+
+type DashboardCourseDetail = {
+  progress: {
+    overallPercentage: number;
+    completedSteps: number;
+    totalSteps: number;
+    lastActivityDate: string;
+  };
+  modules: Array<{
+    id: string;
+    title: string;
+    totalTopics: number;
+    completedTopics: number;
+    progress: number;
+  }>;
+  nextLesson: string;
 };
 
 const decodeHtmlEntities = (input: string): string => {
@@ -148,6 +178,7 @@ export function CourseDetailClient() {
   const [isEnrolled, setIsEnrolled] = useState(false)
   const [enrollConfirmedByAction, setEnrollConfirmedByAction] = useState(false)
   const [dashboardCourse, setDashboardCourse] = useState<ContinueLearningCourse | RecommendedCourse | null>(null)
+  const [dashboardDetail, setDashboardDetail] = useState<DashboardCourseDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedSection, setExpandedSection] = useState<number | null>(null)
@@ -161,6 +192,54 @@ export function CourseDetailClient() {
   const [addToPdpSuccess, setAddToPdpSuccess] = useState('')
   const [addedPdpId, setAddedPdpId] = useState<string>('')
   const [isOpeningLinkedPdp, setIsOpeningLinkedPdp] = useState(false)
+
+  const toNumber = (value: unknown, fallback = 0): number => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+    return fallback;
+  };
+
+  const normalizeDashboardDetail = (raw: unknown): DashboardCourseDetail | null => {
+    if (!raw || typeof raw !== "object") return null;
+    const root = raw as Record<string, unknown>;
+    const data = (root.data && typeof root.data === "object"
+      ? root.data
+      : root) as Record<string, unknown>;
+    const progressRaw = (data.progress && typeof data.progress === "object"
+      ? data.progress
+      : {}) as Record<string, unknown>;
+    const modulesRaw = Array.isArray(data.modules) ? data.modules : [];
+    const modules = modulesRaw
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const m = item as Record<string, unknown>;
+        return {
+          id: String(m.id ?? ""),
+          title: sanitizeApiText(m.title, "Untitled Module"),
+          totalTopics: toNumber(m.total_topics),
+          completedTopics: toNumber(m.completed_topics),
+          progress: toNumber(m.progress),
+        };
+      })
+      .filter(Boolean) as DashboardCourseDetail["modules"];
+    return {
+      progress: {
+        overallPercentage: toNumber(progressRaw.overall_percentage),
+        completedSteps: toNumber(progressRaw.completed_steps),
+        totalSteps: toNumber(progressRaw.total_steps),
+        lastActivityDate: sanitizeApiText(progressRaw.last_activity_date, "No activity"),
+      },
+      modules,
+      nextLesson: sanitizeApiText((data.next_lesson as Record<string, unknown> | null)?.title ?? data.next_lesson, ""),
+    };
+  };
+
+  const formatDate = (value: string | null | undefined): string => {
+    if (!value) return "Not available";
+    const dt = new Date(value.replace(" ", "T"));
+    if (Number.isNaN(dt.getTime())) return value;
+    return dt.toLocaleString();
+  };
 
   useEffect(() => {
     if (!courseIdOrSlug) return
@@ -177,12 +256,18 @@ export function CourseDetailClient() {
         setCourse(data)
         setIsEnrolled(Boolean((data as any)?.enrolled ?? (data as any)?.is_enrolled))
         setDashboardCourse(null)
+        setDashboardDetail(null)
         if (data?.id !== undefined && data?.id !== null) {
           try {
             const dashCourse = await dashboardService.courseById(data.id)
             if (alive) setDashboardCourse(dashCourse)
+            const dashRaw = await authApi.get(`/wp-json/reactapi/v1/dashboard/courses/${data.id}`)
+            if (alive) setDashboardDetail(normalizeDashboardDetail(dashRaw.data))
           } catch {
-            if (alive) setDashboardCourse(null)
+            if (alive) {
+              setDashboardCourse(null)
+              setDashboardDetail(null)
+            }
           }
         }
         // Store the full API response to access curriculum and related courses
@@ -445,6 +530,12 @@ export function CourseDetailClient() {
   const formatLabel = sanitizeApiText(apiCourse.format ?? "", "");
   const planLabel = sanitizeApiText(apiCourse.plan ?? "", "");
   const priceLabel = sanitizeApiText(apiCourse.price?.display ?? "", "");
+  const categoryNames = (apiCourse.categories ?? [])
+    .map((item) => sanitizeApiText(item?.name, ""))
+    .filter(Boolean);
+  const tagNames = (apiCourse.tags ?? [])
+    .map((item) => sanitizeApiText(item?.name, ""))
+    .filter(Boolean);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -534,12 +625,6 @@ export function CourseDetailClient() {
                     <span>Language: {apiCourse.language}</span>
                 </div>
                 )}
-                {apiCourse.updated_date && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Calendar size={16} />
-                    <span>Updated: {new Date(apiCourse.updated_date).toLocaleDateString()}</span>
-                </div>
-                )}
                 {apiCourse.cpd_points && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <Target size={16} />
@@ -551,6 +636,51 @@ export function CourseDetailClient() {
                   <Award size={16} />
                     <span>Rating: {apiCourse.rating} ({apiCourse.reviews_count ?? 0} reviews)</span>
                 </div>
+                )}
+                {categoryNames.length > 0 && (
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Tag size={16} />
+                    <span>Categories: {categoryNames.join(", ")}</span>
+                  </div>
+                )}
+                {tagNames.length > 0 && (
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Tag size={16} />
+                    <span>Tags: {tagNames.join(", ")}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Curriculum Overview */}
+            {sanitizeApiText(apiCourse.curriculum_overview, "") && (
+              <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 border border-gray-200">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Curriculum Overview</h2>
+                <p className="text-sm sm:text-base text-gray-700">
+                  {sanitizeApiText(apiCourse.curriculum_overview, "")}
+                </p>
+              </div>
+            )}
+
+            {/* Progress & Completion */}
+            <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 border border-gray-200">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Progress & Completion</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+                <div className="text-gray-700">Enrollment Status: <span className="font-medium">{apiCourse.is_enrolled ? "Enrolled" : "Not enrolled"}</span></div>
+                <div className="text-gray-700">Completion Status: <span className="font-medium">{apiCourse.is_completed ? "Completed" : "In progress"}</span></div>
+                <div className="text-gray-700">Enrolled On: <span className="font-medium">{formatDate(apiCourse.enrollment_date)}</span></div>
+                <div className="text-gray-700">Progress Status: <span className="font-medium">{sanitizeApiText(apiCourse.user_progress?.status, "not-started")}</span></div>
+                <div className="text-gray-700">User Progress: <span className="font-medium">{toNumber(apiCourse.user_progress?.percentage)}%</span></div>
+                <div className="text-gray-700">Completed Steps: <span className="font-medium">{toNumber(apiCourse.user_progress?.completed)} / {toNumber(apiCourse.user_progress?.total)}</span></div>
+                {dashboardDetail && (
+                  <>
+                    <div className="text-gray-700">Dashboard Progress: <span className="font-medium">{dashboardDetail.progress.overallPercentage}%</span></div>
+                    <div className="text-gray-700">Dashboard Steps: <span className="font-medium">{dashboardDetail.progress.completedSteps} / {dashboardDetail.progress.totalSteps}</span></div>
+                    <div className="text-gray-700 sm:col-span-2">Last Activity: <span className="font-medium">{dashboardDetail.progress.lastActivityDate}</span></div>
+                    {dashboardDetail.nextLesson && (
+                      <div className="text-gray-700 sm:col-span-2">Next Lesson: <span className="font-medium">{dashboardDetail.nextLesson}</span></div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -604,7 +734,9 @@ export function CourseDetailClient() {
                           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0">
                             {sectionIndex + 1}
                           </div>
-                          <span className="font-semibold text-gray-900 text-sm sm:text-base text-left truncate">{section.title}</span>
+                          <span className="font-semibold text-gray-900 text-sm sm:text-base text-left truncate">
+                            {sanitizeApiText(section.title, `Lesson ${sectionIndex + 1}`)}
+                          </span>
                         </div>
                         <div className={`transform transition-transform flex-shrink-0 ml-2 ${expandedSection === sectionIndex ? 'rotate-90' : ''}`}>
                           <ChevronRight size={16} />
@@ -628,18 +760,21 @@ export function CourseDetailClient() {
                           {(section.topics || []).map((lesson, lessonIndex: number) => (
                             <div key={lessonIndex} className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-100 transition gap-2">
                               <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                                <div className="text-gray-400 flex-shrink-0">
-                                  <Play size={14} className="sm:hidden" />
-                                  <Play size={16} className="hidden sm:block" />
+                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-purple-100 text-purple-700 text-[11px] sm:text-xs font-semibold flex items-center justify-center shrink-0">
+                                  {lessonIndex + 1}
                                 </div>
-                                <span className="text-sm sm:text-base text-gray-700 truncate">{sanitizeApiText(lesson.title, `Topic ${lessonIndex + 1}`)}</span>
+                                <span className="text-sm sm:text-base text-gray-700 truncate">
+                                  {sanitizeApiText(lesson.title, `Topic ${lessonIndex + 1}`)}
+                                </span>
                                 {lesson.is_preview && (
-                                  <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-semibold rounded flex-shrink-0">
+                                  <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-semibold rounded shrink-0">
                                     Preview
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs sm:text-sm text-gray-500 flex-shrink-0 whitespace-nowrap">{sanitizeApiText(lesson.duration, "")}</span>
+                              <span className="text-[11px] sm:text-xs text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded-full shrink-0 whitespace-nowrap">
+                                {sanitizeApiText(lesson.duration, "N/A")}
+                              </span>
                             </div>
                           ))}
                           {(section.topics || []).length === 0 && (

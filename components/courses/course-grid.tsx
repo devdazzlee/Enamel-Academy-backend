@@ -1,10 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Clock, FileText, LayoutGrid } from "lucide-react"
+import { Clock, LayoutGrid, Star, Users, Tag, Sparkles } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-import { coursesService, type LibraryCourse } from "@/lib/api/courses"
+import {
+  coursesService,
+  type LibraryCourse,
+} from "@/lib/api/courses"
 
 export function CourseGrid({ activeFilters, searchQuery }: { 
   activeFilters: Record<string, string[]>
@@ -29,9 +32,9 @@ export function CourseGrid({ activeFilters, searchQuery }: {
           }
         });
         
-        const data = await coursesService.library(filterParams)
+        const data = await coursesService.libraryWithMeta(filterParams)
         if (!alive) return
-        setCourses(data)
+        setCourses(data.courses)
       } catch {
         if (!alive) return
         setCourses([])
@@ -56,6 +59,17 @@ export function CourseGrid({ activeFilters, searchQuery }: {
     }
     return true
   })
+
+  const toTitle = (value: string | undefined): string => {
+    if (!value) return ""
+    return value.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  }
+
+  const progressPercent = (course: LibraryCourse): number => {
+    const p = course.user_progress?.percentage
+    if (typeof p !== "number" || Number.isNaN(p)) return 0
+    return Math.max(0, Math.min(100, p))
+  }
 
   return (
     <section>
@@ -87,7 +101,7 @@ export function CourseGrid({ activeFilters, searchQuery }: {
             <div key={course.id} className="bg-card rounded-xl border border-border overflow-hidden">
               <div className="relative h-28 sm:h-32">
                 <img
-                  src={course.image ?? "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=200&fit=crop"}
+                  src={course.thumbnail ?? course.banner_image ?? course.image ?? "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=200&fit=crop"}
                   alt={course.title ?? "Course"}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
@@ -96,23 +110,53 @@ export function CourseGrid({ activeFilters, searchQuery }: {
                 <h3 className="font-medium text-foreground text-xs sm:text-sm mb-2 line-clamp-2">
                   {course.title ?? "Untitled Course"}
                 </h3>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {(course.categories?.[0]?.name || course.plan) && (
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-muted text-foreground">
+                      Category: {course.categories?.[0]?.name ?? toTitle(course.plan)}
+                    </span>
+                  )}
+                  {course.price?.display && (
+                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${course.price.type === "free" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                      Price: {course.price.display}
+                    </span>
+                  )}
+                  {course.is_new && (
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-purple-100 text-purple-700">
+                      New
+                    </span>
+                  )}
+                </div>
+                {course.excerpt && (
+                  <p className="text-[11px] text-muted-foreground mb-2 line-clamp-2">{course.excerpt}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground mb-2">
+                  {course.format && (
+                    <span className="inline-flex items-center gap-1">
+                      <Tag className="h-3 w-3" />
+                      {toTitle(course.format)}
+                    </span>
+                  )}
+                  {course.difficulty && (
+                    <span className="inline-flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      {toTitle(course.difficulty)}
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-2 sm:mb-3">
-                  {course.rating && (
+                  {typeof course.rating === "number" && (
                     <span className="flex items-center gap-0.5 sm:gap-1 min-w-0">
-                      ⭐ {course.rating}
-                      {course.reviews_count && (
+                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-500" />
+                      {course.rating}
+                      {typeof course.reviews_count === "number" && (
                         <span>({course.reviews_count})</span>
                       )}
                     </span>
                   )}
-                  {course.students_count && (
+                  {typeof course.students_count === "number" && (
                     <span className="flex items-center gap-0.5 sm:gap-1 min-w-0">
-                      👥 {course.students_count} students
-                    </span>
-                  )}
-                  {course.price?.display && (
-                    <span className="flex items-center gap-0.5 sm:gap-1 font-medium text-green-600">
-                      {course.price.display}
+                      <Users className="h-3 w-3" /> {course.students_count}
                     </span>
                   )}
                 </div>
@@ -125,15 +169,37 @@ export function CourseGrid({ activeFilters, searchQuery }: {
                   ) : (
                     <span className="flex items-center gap-0.5 sm:gap-1">
                       <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                      Self-paced
+                      {course.format ? toTitle(course.format) : "Self-paced"}
                     </span>
                   )}
+                  <span className="font-medium text-primary">{progressPercent(course)}% progress</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-2 sm:mb-3">
+                  <div
+                    className="h-full bg-linear-to-r from-primary to-accent rounded-full"
+                    style={{ width: `${progressPercent(course)}%` }}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1 mb-2 sm:mb-3">
+                  {(course.features ?? []).slice(0, 3).map((feature) => (
+                    <span key={feature} className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] text-muted-foreground">
+                      {feature}
+                    </span>
+                  ))}
+                  {(course.features?.length ?? 0) > 3 && (
+                    <span className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] text-muted-foreground">
+                      +{(course.features?.length ?? 0) - 3} more
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-muted-foreground mb-2 sm:mb-3">
+                  {course.is_completed ? "Completed" : course.is_enrolled ? "Enrolled" : "Not enrolled"}
                 </div>
                 <button 
                   onClick={() => handleViewCourse(course.id)}
                   className="w-full py-1.5 sm:py-2 bg-primary text-primary-foreground rounded-lg text-xs sm:text-sm font-medium hover:bg-primary/90 transition-colors"
                 >
-                  View Course
+                  {course.is_enrolled ? "Continue Course" : "View Course"}
                 </button>
               </div>
             </div>

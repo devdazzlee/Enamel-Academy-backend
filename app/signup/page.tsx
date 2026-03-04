@@ -9,7 +9,6 @@ import { Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { Spinner } from "@/components/ui/spinner"
 import { useRouter } from "next/navigation"
-import { EnamelLogo } from "@/components/enamel-logo"
 import {
   Select,
   SelectContent,
@@ -107,7 +106,11 @@ export default function SignupPage() {
     <main className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         <div className="flex flex-col items-center mb-10">
-          <EnamelLogo className="mb-2" />
+          <img 
+            src="/logo.svg" 
+            alt="Enamel Academy" 
+            className="h-16 w-auto mb-2"
+          />
           <p className="text-muted-foreground text-sm">Sign up into your account</p>
         </div>
 

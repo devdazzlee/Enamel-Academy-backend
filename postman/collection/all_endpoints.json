@@ -1,0 +1,1832 @@
+{
+  "generated_at": "2026-03-04T21:22:45.823Z",
+  "source_directory": "/Users/mac/Desktop/24 Dec/Enamel-Academy/Enamel--Academy/postman/collection",
+  "source_files": [
+    "React_API_PDP_Postman_Collection (1).json",
+    "React_Dental_API_Postman_Collection.json",
+    "cpd.enamelacademy.co.uk.postman_collection (10).json",
+    "cpd.enamelacademy.co.uk.postman_collection (8).json",
+    "cpd.enamelacademy.co.uk.postman_collection (9).json"
+  ],
+  "total_requests_found": 162,
+  "total_unique_requests": 162,
+  "total_unique_endpoints": 78,
+  "unique_endpoints": [
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/register"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/login"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/user"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/validate-token"
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/user/update"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/user/change-password"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/logout"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/roles"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/permissions/dentist"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/pdp"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp"
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123"
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/status"
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/pdp/stats"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/pdp/skills-library"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/objectives"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/skills"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/activities"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/milestones"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/reflection"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/link-course"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/courses/123"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/continue-learning"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/library"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/ongoing"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/enroll/123"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/categories"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/filters"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/course/123"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/my-certificates"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/check/123"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/preview/123"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/certificates/verify"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assignments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/quizzes"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assessments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assignment-stats"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/quiz-stats"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/summary"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/history"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/analytics"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/requirements/dentist"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/forgot-password"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/verify-otp"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/reset-password"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/validate-reset-token"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/permissions/dental_nurse"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/permissions/dental_care_professional"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/reflection"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/reflection"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/reflections"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/feedback"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/feedback"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/assignments/assignment_123"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/quizzes/456"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/quizzes/456/attempts"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/requirements/dental_nurse"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/requirements/dental_care_professional"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/cpd/log-external"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/cpd/generate-audit-report"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/TESTApi"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/courses/14"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/enroll/"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/course/166"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/check/166"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/preview/166"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/561/assignments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/assignments/assignment_641"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/quizzes/651"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/quizzes/651/attempts"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/561/quizzes"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/561/quiz-stats"
+    }
+  ],
+  "requests": [
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Register User",
+      "folder_path": [
+        "Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/register",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/register"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Login User",
+      "folder_path": [
+        "Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/login",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/login"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Current User",
+      "folder_path": [
+        "Authentication"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/user",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/user"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Validate Token",
+      "folder_path": [
+        "Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/validate-token",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/validate-token"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Update User Profile",
+      "folder_path": [
+        "Authentication"
+      ],
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/user/update",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/user/update"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Change Password",
+      "folder_path": [
+        "Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/user/change-password",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/user/change-password"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Logout",
+      "folder_path": [
+        "Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/logout",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/logout"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get All Dental Roles",
+      "folder_path": [
+        "Dental Roles"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/roles",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dental/roles"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Role Permissions",
+      "folder_path": [
+        "Dental Roles"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/permissions/dentist",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dental/permissions/dentist"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get All PDPs",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/pdp",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp?status=active&year=2025&per_page=10&page=1"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Single PDP",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Create PDP - Complete",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Create PDP - Minimal",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Update PDP",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Update PDP Status",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/status",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/status"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Delete PDP",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "DELETE",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get PDP Statistics",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/pdp/stats",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/stats"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Skills Library",
+      "folder_path": [
+        "Personal Development Plan (PDP)"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/pdp/skills-library",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/skills-library"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Add Career Objective",
+      "folder_path": [
+        "PDP Components"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/objectives",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/objectives"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Add Current Skill",
+      "folder_path": [
+        "PDP Components"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/skills",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/skills"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Add Skill to Develop",
+      "folder_path": [
+        "PDP Components"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/skills",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/skills"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Add Learning Activity",
+      "folder_path": [
+        "PDP Components"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/activities",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/activities"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Add Milestone",
+      "folder_path": [
+        "PDP Components"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/milestones",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/milestones"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Add Reflection",
+      "folder_path": [
+        "PDP Components"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/reflection",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/reflection"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Link Course to PDP Activity",
+      "folder_path": [
+        "PDP Components"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/pdp/123/link-course",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/pdp/123/link-course"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get User Dashboard",
+      "folder_path": [
+        "Dashboard & Courses"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dashboard"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Course Details",
+      "folder_path": [
+        "Dashboard & Courses"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/courses/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/courses/123"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Continue Learning",
+      "folder_path": [
+        "Dashboard & Courses"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/continue-learning",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/continue-learning"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Course Library",
+      "folder_path": [
+        "Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/library",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/library?plan=free&category=endodontics&format=self-paced&length=medium&page=1&per_page=10&sort=popular"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Ongoing Courses",
+      "folder_path": [
+        "Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/ongoing",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/ongoing"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Enroll in Course",
+      "folder_path": [
+        "Course Library"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/enroll/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/enroll/123"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Course Categories",
+      "folder_path": [
+        "Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/categories",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/categories"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Course Filters",
+      "folder_path": [
+        "Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/filters",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/filters"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Course Certificate",
+      "folder_path": [
+        "Certificates"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/course/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/course/123"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get My Certificates",
+      "folder_path": [
+        "Certificates"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/my-certificates",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/my-certificates"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Check Certificate Availability",
+      "folder_path": [
+        "Certificates"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/check/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/check/123"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Preview Certificate",
+      "folder_path": [
+        "Certificates"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/preview/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/preview/123"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Verify Certificate",
+      "folder_path": [
+        "Certificates"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/certificates/verify",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/verify"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Course Assignments",
+      "folder_path": [
+        "Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assignments",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assignments"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Course Quizzes",
+      "folder_path": [
+        "Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/quizzes",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/quizzes"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Course Assessments",
+      "folder_path": [
+        "Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assessments",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assessments"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Assignment Stats",
+      "folder_path": [
+        "Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assignment-stats",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assignment-stats"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get Quiz Stats",
+      "folder_path": [
+        "Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/quiz-stats",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/quiz-stats"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get CPD Summary",
+      "folder_path": [
+        "CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/summary",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/summary"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get CPD History",
+      "folder_path": [
+        "CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/history",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/history?year=2025&limit=20&offset=0"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get CPD Analytics",
+      "folder_path": [
+        "CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/analytics",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/analytics"
+    },
+    {
+      "collection_file": "React_API_PDP_Postman_Collection (1).json",
+      "request_name": "Get CPD Requirements",
+      "folder_path": [
+        "CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/requirements/dentist",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/requirements/dentist"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Register User",
+      "folder_path": [
+        "🔐 Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/register",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/register"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Login User",
+      "folder_path": [
+        "🔐 Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/login",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/login"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Current User",
+      "folder_path": [
+        "🔐 Authentication"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/user",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/user"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Update User Profile",
+      "folder_path": [
+        "🔐 Authentication"
+      ],
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/user/update",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/user/update"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Change Password",
+      "folder_path": [
+        "🔐 Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/user/change-password",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/user/change-password"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Validate Token",
+      "folder_path": [
+        "🔐 Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/validate-token",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/validate-token"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Logout",
+      "folder_path": [
+        "🔐 Authentication"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/logout",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/logout"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Forgot Password - Request OTP",
+      "folder_path": [
+        "🔑 Password Reset"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/forgot-password",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/forgot-password"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Verify OTP",
+      "folder_path": [
+        "🔑 Password Reset"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/verify-otp",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/verify-otp"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Reset Password",
+      "folder_path": [
+        "🔑 Password Reset"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/reset-password",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/reset-password"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Validate Reset Token",
+      "folder_path": [
+        "🔑 Password Reset"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/validate-reset-token",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/validate-reset-token"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get All Dental Roles",
+      "folder_path": [
+        "🦷 Dental Roles"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/roles",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dental/roles"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Role Permissions - Dentist",
+      "folder_path": [
+        "🦷 Dental Roles"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/permissions/dentist",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dental/permissions/dentist"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Role Permissions - Dental Nurse",
+      "folder_path": [
+        "🦷 Dental Roles"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/permissions/dental_nurse",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dental/permissions/dental_nurse"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Role Permissions - DCP",
+      "folder_path": [
+        "🦷 Dental Roles"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dental/permissions/dental_care_professional",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dental/permissions/dental_care_professional"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get User Dashboard",
+      "folder_path": [
+        "📊 Dashboard & Courses"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dashboard"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Dashboard Stats",
+      "folder_path": [
+        "📊 Dashboard & Courses"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/stats",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/stats"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Continue Learning",
+      "folder_path": [
+        "📊 Dashboard & Courses"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/continue-learning",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/continue-learning"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Details",
+      "folder_path": [
+        "📊 Dashboard & Courses"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/courses/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/dashboard/courses/123"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Library with Filters",
+      "folder_path": [
+        "📚 Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/library",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/library?plan=free&category=endodontics&format=self-paced&length=medium&page=1&per_page=10&sort=popular"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Ongoing Courses",
+      "folder_path": [
+        "📚 Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/ongoing",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/ongoing"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Enroll in Course",
+      "folder_path": [
+        "📚 Course Library"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/enroll/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/enroll/123"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Categories",
+      "folder_path": [
+        "📚 Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/categories",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/categories"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Filters",
+      "folder_path": [
+        "📚 Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/filters",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/filters"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course by ID",
+      "folder_path": [
+        "📚 Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses?id=123"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course by Slug",
+      "folder_path": [
+        "📚 Course Library"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses?slug=advanced-endodontics"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Save Course Reflection",
+      "folder_path": [
+        "📝 Course Reflection & Feedback"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/reflection",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/reflection"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Reflection",
+      "folder_path": [
+        "📝 Course Reflection & Feedback"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/reflection",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/reflection"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get All Reflections",
+      "folder_path": [
+        "📝 Course Reflection & Feedback"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/reflections",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/reflections"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Save Course Feedback",
+      "folder_path": [
+        "📝 Course Reflection & Feedback"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/feedback",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/feedback"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Feedback",
+      "folder_path": [
+        "📝 Course Reflection & Feedback"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/feedback",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/feedback"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Certificate",
+      "folder_path": [
+        "📜 Certificates"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/course/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/course/123"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get My Certificates",
+      "folder_path": [
+        "📜 Certificates"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/my-certificates",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/my-certificates"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Check Certificate Availability",
+      "folder_path": [
+        "📜 Certificates"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/check/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/check/123"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Preview Certificate",
+      "folder_path": [
+        "📜 Certificates"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/preview/123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/preview/123"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Verify Certificate",
+      "folder_path": [
+        "📜 Certificates"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/certificates/verify",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/certificates/verify"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Assignments",
+      "folder_path": [
+        "📋 Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assignments",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assignments"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Quizzes",
+      "folder_path": [
+        "📋 Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/quizzes",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/quizzes"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Course Assessments",
+      "folder_path": [
+        "📋 Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assessments",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assessments"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Assignment Stats",
+      "folder_path": [
+        "📋 Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/assignment-stats",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/assignment-stats"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Quiz Stats",
+      "folder_path": [
+        "📋 Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/123/quiz-stats",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/courses/123/quiz-stats"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Assignment Details",
+      "folder_path": [
+        "📋 Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/assignments/assignment_123",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/assignments/assignment_123"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Quiz Details",
+      "folder_path": [
+        "📋 Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/quizzes/456",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/quizzes/456"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get Quiz Attempts",
+      "folder_path": [
+        "📋 Assignments & Quizzes"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/quizzes/456/attempts",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/quizzes/456/attempts"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get CPD Summary",
+      "folder_path": [
+        "📈 CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/summary",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/summary"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get CPD History",
+      "folder_path": [
+        "📈 CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/history",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/history?year=2025&limit=20&offset=0"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get CPD Analytics",
+      "folder_path": [
+        "📈 CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/analytics",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/analytics"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get CPD Requirements - Dentist",
+      "folder_path": [
+        "📈 CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/requirements/dentist",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/requirements/dentist"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get CPD Requirements - Dental Nurse",
+      "folder_path": [
+        "📈 CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/requirements/dental_nurse",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/requirements/dental_nurse"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Get CPD Requirements - DCP",
+      "folder_path": [
+        "📈 CPD Tracking"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/cpd/requirements/dental_care_professional",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/requirements/dental_care_professional"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Log External CPD - Multipart Form",
+      "folder_path": [
+        "📤 External CPD & Audit Reports"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/cpd/log-external",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/log-external"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Generate Audit Report - PDF",
+      "folder_path": [
+        "📤 External CPD & Audit Reports"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/cpd/generate-audit-report",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/generate-audit-report"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Generate Audit Report - Summary",
+      "folder_path": [
+        "📤 External CPD & Audit Reports"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/cpd/generate-audit-report",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/generate-audit-report"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Generate Audit Report - Excel",
+      "folder_path": [
+        "📤 External CPD & Audit Reports"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/cpd/generate-audit-report",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/generate-audit-report"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Generate Audit Report - Evidence ZIP",
+      "folder_path": [
+        "📤 External CPD & Audit Reports"
+      ],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/cpd/generate-audit-report",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/cpd/generate-audit-report"
+    },
+    {
+      "collection_file": "React_Dental_API_Postman_Collection.json",
+      "request_name": "Test API Endpoint",
+      "folder_path": [
+        "🧪 Test API"
+      ],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/TESTApi",
+      "raw_url": "{{baseUrl}}/wp-json/reactapi/v1/TESTApi"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Register",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/register",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/register?first_name=APi user test&last_name=APi user test&email=apiusertes@gmail.com&password=APIuser"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Login",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/login",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/login?email=apiusertes@gmail.com&password=newpassword@123"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Get Users Logins Detail",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/user",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Update User Profile",
+      "folder_path": [],
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/user/update",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user/update?first_name=update first name"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Update User Password",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/user/change-password",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user/change-password?current_password=%23X1caidz*oHJ$ISJ$RTml5%23Y&new_password=newpassword@123"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Dashboard",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Dashboard stats",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/stats",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/stats"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Dashboard Continue-learning",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/continue-learning",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/continue-learning"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Get courses by ID",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/courses/14",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/courses/14"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Get course library",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/library",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/library"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Get course details for library by Course ID or slug",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/?id=561"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Get ongoing courses",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/ongoing",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/ongoing"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Get all course categories",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/categories",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/categories"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Get available filter",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/filters",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/filters"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "Enroll user in a course by userid",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/enroll/",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/enroll/?id=561"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (10).json",
+      "request_name": "User logout",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/logout",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/logout"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Register",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/register",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/register?first_name=APi user test&last_name=APi user test&email=apiusertes111@gmail.com&password=APIuser&role=dentist"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Login",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/login",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/login?email=apiusertes111@gmail.com&password=newpassword@123"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get Users Logins Detail",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/user",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Update User Profile",
+      "folder_path": [],
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/user/update",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user/update?first_name=update first name"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Update User Password",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/user/change-password",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user/change-password?current_password=%23X1caidz*oHJ$ISJ$RTml5%23Y&new_password=newpassword@123"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Dashboard",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Dashboard stats",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/stats",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/stats"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Dashboard Continue-learning",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/continue-learning",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/continue-learning"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get courses by ID",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/courses/14",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/courses/14"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get course library",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/library",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/library"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get course details for library by Course ID or slug",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/?id=561"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get certificate for a specific completed course",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/course/166",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/certificates/course/166"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get all certificates for current user",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/my-certificates",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/certificates/my-certificates"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Check if certificate is available for a course",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/check/166",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/certificates/check/166"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Preview certificate design for a course",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/certificates/preview/166",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/certificates/preview/166"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get all assignments for a specific course",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/561/assignments",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/561/assignments"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get specific assignment details (ID format: assignment_123)",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/assignments/assignment_641",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/assignments/assignment_641"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get specific quiz details",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/quizzes/651",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/quizzes/651"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get user attempts for a specific quiz",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/quizzes/651/attempts",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/quizzes/651/attempts"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get all quizzes for a specific course",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/561/quizzes",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/561/quizzes"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get quiz statistics for a course",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/561/quiz-stats",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/561/quiz-stats"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Verify a certificate (public endpoint)",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/certificates/verify",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/certificates/verify?course_id=166&user_id=8"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get ongoing courses",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/ongoing",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/ongoing"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get all course categories",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/categories",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/categories"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Get available filter",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/filters",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/filters"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "Enroll user in a course by userid",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/enroll/",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/enroll/?id=561"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (8).json",
+      "request_name": "User logout",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/logout",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/logout"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Register",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/register",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/register?first_name=APi user test&last_name=APi user test&email=apiusertes111@gmail.com&password=APIuser&role=dentist"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Login",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/login",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/login?email=apiusertes111@gmail.com&password=newpassword@123"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Get Users Logins Detail",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/user",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Update User Profile",
+      "folder_path": [],
+      "method": "PUT",
+      "endpoint": "/wp-json/reactapi/v1/user/update",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user/update?first_name=update first name"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Update User Password",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/user/change-password",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/user/change-password?current_password=%23X1caidz*oHJ$ISJ$RTml5%23Y&new_password=newpassword@123"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Dashboard",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Dashboard stats",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/stats",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/stats"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Dashboard Continue-learning",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/continue-learning",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/continue-learning"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Get courses by ID",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/dashboard/courses/14",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/dashboard/courses/14"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Get course library",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/library",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/library"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Get course details for library by Course ID or slug",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/?id=561"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Get ongoing courses",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/ongoing",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/ongoing"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Get all course categories",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/categories",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/categories"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Get available filter",
+      "folder_path": [],
+      "method": "GET",
+      "endpoint": "/wp-json/reactapi/v1/courses/filters",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/filters"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "Enroll user in a course by userid",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/courses/enroll/",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/courses/enroll/?id=561"
+    },
+    {
+      "collection_file": "cpd.enamelacademy.co.uk.postman_collection (9).json",
+      "request_name": "User logout",
+      "folder_path": [],
+      "method": "POST",
+      "endpoint": "/wp-json/reactapi/v1/logout",
+      "raw_url": "{{baseURL}}/wp-json/reactapi/v1/logout"
+    }
+  ]
+}

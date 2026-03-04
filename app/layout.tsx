@@ -3,6 +3,7 @@ import "./globals.css"
 import type { Metadata } from "next"
 import localFont from "next/font/local"
 import { AuthHydrator } from "@/components/auth-hydrator"
+import { RouteGuard } from "@/components/route-guard"
 import "@/lib/debug-api" // Import to expose debug helpers
 import { AppProvider } from "@/lib/app-context"
 import { Analytics } from "@vercel/analytics/next"
@@ -40,7 +41,7 @@ export default function RootLayout({
       <body className={`${rubik.variable} ${rubik.className} antialiased`}>
         <AppProvider>
           <AuthHydrator />
-          {children}
+          <RouteGuard>{children}</RouteGuard>
         </AppProvider>
         <Analytics />
       </body>

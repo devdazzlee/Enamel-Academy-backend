@@ -27,15 +27,21 @@ import { dashboardService, type ContinueLearningCourse, type RecommendedCourse }
 import { pdpService } from "@/lib/api/pdp"
 import { authApi } from "@/lib/api/http";
 import { Spinner } from "@/components/ui/spinner";
+import ReactPlayer from "react-player";
 
 type CurriculumTopic = {
   title?: string;
   duration?: string;
-  is_preview?: boolean;
+  type?: string;
+  is_preview?: boolean | number;
 };
 
 type CurriculumSection = {
+  id?: number | string;
   title?: string;
+  description?: string;
+  html_content?: string;
+  total_topics?: number;
   topics?: CurriculumTopic[];
 };
 
@@ -68,14 +74,70 @@ type CourseInstructor = {
 type CourseData = {
   curriculum?: CurriculumSection[];
   course?: {
+    excerpt?: string;
+    description?: string;
+    banner_image?: string;
     duration?: string;
+    duration_minutes?: number;
+    format?: string;
+    plan?: string;
+    difficulty?: string;
+    rating?: number;
+    reviews_count?: number;
+    students_count?: number;
     cpd_points?: number;
+    price?: {
+      type?: string;
+      amount?: number;
+      currency?: string;
+      display?: string;
+    };
     features?: string[];
     learning_objectives?: string[];
     requirements?: string[];
+    prerequisites?: string[];
+    target_audience?: string[];
+    curriculum_overview?: string;
+    language?: string;
+    updated_date?: string;
   };
   related_courses?: RelatedCourse[];
   instructor?: CourseInstructor | null;
+};
+
+const decodeHtmlEntities = (input: string): string => {
+  if (!input) return "";
+  const entityMap: Record<string, string> = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&apos;": "'",
+    "&nbsp;": " ",
+  };
+  const namedDecoded = Object.entries(entityMap).reduce(
+    (result, [entity, value]) => result.split(entity).join(value),
+    input
+  );
+  return namedDecoded.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+};
+
+const sanitizeApiText = (value: unknown, fallback = ""): string => {
+  if (typeof value !== "string") return fallback;
+  const stripped = decodeHtmlEntities(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^["']+|["']+$/g, "");
+  return stripped || fallback;
+};
+
+const extractVideoUrl = (html: unknown): string => {
+  if (typeof html !== "string" || !html.trim()) return "";
+  const decoded = decodeHtmlEntities(html);
+  const directMatch = decoded.match(/https?:\/\/[^\s<>"']+/i);
+  return directMatch ? directMatch[0] : "";
 };
 
 export function CourseDetailClient() {
@@ -353,18 +415,36 @@ export function CourseDetailClient() {
     courseData?.course?.cpd_points ? { icon: <Award />, value: `${courseData.course.cpd_points} CPD`, label: "Points" } : null,
   ].filter(Boolean) as Array<{ icon: React.ReactNode; value: string; label: string }>
 
-  const learningObjectives = courseData?.course?.learning_objectives ?? [];
-  const requirements = courseData?.course?.requirements ?? [];
+  const apiCourse = courseData?.course ?? {};
+  const learningObjectives = apiCourse.learning_objectives ?? [];
+  const requirements = apiCourse.requirements ?? [];
+  const prerequisites = apiCourse.prerequisites ?? [];
+  const targetAudience = apiCourse.target_audience ?? [];
   const curriculum = courseData?.curriculum ?? [];
   const relatedCourses = courseData?.related_courses ?? [];
   const instructor = courseData?.instructor ?? null;
+  const featureIncludes = (apiCourse.features ?? [])
+    .map((item) => sanitizeApiText(item, ""))
+    .filter(Boolean);
   const courseIncludes = [
     durationLabel ? `${durationLabel} on-demand video` : null,
-    courseData?.course?.features?.includes("Lifetime Access") ? "Lifetime access" : null,
-    courseData?.course?.cpd_points ? `${courseData.course.cpd_points} CPD points` : null,
-    courseData?.course?.features?.includes("Certificate of Completion") ? "Certificate of completion" : null,
-    "Access on mobile and desktop",
+    apiCourse.cpd_points ? `${apiCourse.cpd_points} CPD points` : null,
+    ...featureIncludes,
   ].filter(Boolean) as string[];
+  const uniqueCourseIncludes = Array.from(new Set(courseIncludes));
+  const bannerImage = sanitizeApiText(
+    apiCourse.banner_image ?? (course as any).thumbnail ?? course.image ?? "",
+    ""
+  );
+  const excerptText = sanitizeApiText(apiCourse.excerpt ?? (course as any).excerpt ?? "", "");
+  const descriptionText = sanitizeApiText(
+    apiCourse.description ?? (course as any).description ?? "",
+    "No description returned by API."
+  );
+  const difficultyLabel = sanitizeApiText(apiCourse.difficulty ?? (course as any).level ?? "", "");
+  const formatLabel = sanitizeApiText(apiCourse.format ?? "", "");
+  const planLabel = sanitizeApiText(apiCourse.plan ?? "", "");
+  const priceLabel = sanitizeApiText(apiCourse.price?.display ?? "", "");
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -387,15 +467,19 @@ export function CourseDetailClient() {
           <div className="lg:col-span-2 space-y-4 sm:space-y-8">
             {/* Hero Image */}
             <div className="relative rounded-lg overflow-hidden shadow-lg">
-              <img 
-                src={(course as any).thumbnail ?? course.image ?? "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=800&h=400&fit=crop"}
-                alt={course.title ?? "Course"} 
-                className="w-full h-full object-cover"
-              />
+              {bannerImage ? (
+                <img
+                  src={bannerImage}
+                  alt={course.title ?? "Course"}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-64 bg-gray-200" />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
                 <div className="p-4 sm:p-6 md:p-8 text-white">
-                  <h1 className="text-xl sm:text-2xl md:text-4xl font-bold mb-1 sm:mb-2 break-words line-clamp-3">{course.title ?? "Untitled Course"}</h1>
-                  <p className="text-sm sm:text-base md:text-lg text-gray-200 break-words line-clamp-3">{(course as any).excerpt ?? ""}</p>
+                  <h1 className="text-xl sm:text-2xl md:text-4xl font-bold mb-1 sm:mb-2 break-words line-clamp-3">{course.title ?? "Course"}</h1>
+                  <p className="text-sm sm:text-base md:text-lg text-gray-200 break-words line-clamp-3">{excerptText}</p>
                 </div>
               </div>
             </div>
@@ -417,31 +501,55 @@ export function CourseDetailClient() {
             <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 border border-gray-200">
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">About This Course</h2>
               <p className="text-gray-600 text-sm leading-relaxed">
-                {(course as any).excerpt ?? (course as any).description ?? "No description available."}
+                {descriptionText}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
-                {(course as any).level && (
+                {difficultyLabel && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <BarChart size={16} />
-                    <span>Level: {(course as any).level}</span>
+                    <span>Level: {difficultyLabel}</span>
                 </div>
                 )}
-                {(courseData?.course as any)?.language && (
+                {formatLabel && (
                 <div className="flex items-center gap-2 text-gray-600">
-                  <Globe size={16} />
-                    <span>Language: {(courseData?.course as any).language}</span>
+                  <Monitor size={16} />
+                    <span>Format: {formatLabel}</span>
                 </div>
                 )}
-                {(courseData?.course as any)?.updated_date && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Calendar size={16} />
-                    <span>Updated: {new Date((courseData?.course as any).updated_date).toLocaleDateString()}</span>
-                </div>
-                )}
-                {courseData?.course?.cpd_points && (
+                {planLabel && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <Target size={16} />
-                    <span>CPD Points: {courseData.course.cpd_points}</span>
+                    <span>Plan: {planLabel}</span>
+                </div>
+                )}
+                {priceLabel && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Award size={16} />
+                    <span>Price: {priceLabel}</span>
+                </div>
+                )}
+                {apiCourse.language && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Globe size={16} />
+                    <span>Language: {apiCourse.language}</span>
+                </div>
+                )}
+                {apiCourse.updated_date && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Calendar size={16} />
+                    <span>Updated: {new Date(apiCourse.updated_date).toLocaleDateString()}</span>
+                </div>
+                )}
+                {apiCourse.cpd_points && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Target size={16} />
+                    <span>CPD Points: {apiCourse.cpd_points}</span>
+                </div>
+                )}
+                {typeof apiCourse.rating === "number" && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Award size={16} />
+                    <span>Rating: {apiCourse.rating} ({apiCourse.reviews_count ?? 0} reviews)</span>
                 </div>
                 )}
               </div>
@@ -451,49 +559,15 @@ export function CourseDetailClient() {
             <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 border border-gray-200">
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">This course includes:</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {durationLabel && (
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                    <Monitor size={16} className="sm:hidden" />
-                    <Monitor size={20} className="hidden sm:block" />
+                {uniqueCourseIncludes.map((item) => (
+                  <div key={item} className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle size={16} className="sm:hidden" />
+                      <CheckCircle size={20} className="hidden sm:block" />
+                    </div>
+                    <span className="text-sm sm:text-base text-gray-700">{item}</span>
                   </div>
-                  <span className="text-sm sm:text-base text-gray-700">{durationLabel} on-demand video</span>
-                </div>
-                )}
-                {courseData?.course?.features?.includes("Lifetime Access") && (
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                    <Repeat size={16} className="sm:hidden" />
-                    <Repeat size={20} className="hidden sm:block" />
-                  </div>
-                  <span className="text-sm sm:text-base text-gray-700">Lifetime access</span>
-                </div>
-                )}
-                {courseData?.course?.cpd_points && (
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                    <Award size={16} className="sm:hidden" />
-                    <Award size={20} className="hidden sm:block" />
-                  </div>
-                  <span className="text-sm sm:text-base text-gray-700">{courseData.course.cpd_points} CPD points</span>
-                </div>
-                )}
-                {courseData?.course?.features?.includes("Certificate of Completion") && (
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                    <FileText size={16} className="sm:hidden" />
-                    <FileText size={20} className="hidden sm:block" />
-                  </div>
-                  <span className="text-sm sm:text-base text-gray-700">Certificate of completion</span>
-                </div>
-                )}
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                    <Smartphone size={16} className="sm:hidden" />
-                    <Smartphone size={20} className="hidden sm:block" />
-                  </div>
-                  <span className="text-sm sm:text-base text-gray-700">Access on mobile and desktop</span>
-                </div>
+                ))}
               </div>
             </div>
 
@@ -538,6 +612,19 @@ export function CourseDetailClient() {
                       </button>
                       {expandedSection === sectionIndex && (
                         <div className="border-t border-gray-200 bg-gray-50">
+                          {extractVideoUrl(section.html_content) && (
+                            <div className="p-3 sm:p-4 border-b border-gray-200">
+                              <div className="aspect-video overflow-hidden rounded-lg border border-gray-200 bg-black">
+                                <ReactPlayer
+                                  src={extractVideoUrl(section.html_content)}
+                                  controls
+                                  width="100%"
+                                  height="100%"
+                                  style={{ maxWidth: "100%" }}
+                                />
+                              </div>
+                            </div>
+                          )}
                           {(section.topics || []).map((lesson, lessonIndex: number) => (
                             <div key={lessonIndex} className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-100 transition gap-2">
                               <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
@@ -545,16 +632,21 @@ export function CourseDetailClient() {
                                   <Play size={14} className="sm:hidden" />
                                   <Play size={16} className="hidden sm:block" />
                                 </div>
-                                <span className="text-sm sm:text-base text-gray-700 truncate">{lesson.title}</span>
+                                <span className="text-sm sm:text-base text-gray-700 truncate">{sanitizeApiText(lesson.title, `Topic ${lessonIndex + 1}`)}</span>
                                 {lesson.is_preview && (
                                   <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-semibold rounded flex-shrink-0">
                                     Preview
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs sm:text-sm text-gray-500 flex-shrink-0 whitespace-nowrap">{lesson.duration}</span>
+                              <span className="text-xs sm:text-sm text-gray-500 flex-shrink-0 whitespace-nowrap">{sanitizeApiText(lesson.duration, "")}</span>
                             </div>
                           ))}
+                          {(section.topics || []).length === 0 && (
+                            <div className="p-3 sm:p-4 text-sm text-gray-500">
+                              No topics returned by API for this lesson.
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -580,6 +672,42 @@ export function CourseDetailClient() {
                 </div>
               ) : <p className="text-sm sm:text-base text-gray-500">No requirements returned by API.</p>}
             </div>
+
+            {/* Prerequisites */}
+            {prerequisites.length > 0 && (
+              <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 border border-gray-200">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Prerequisites</h2>
+                <div className="space-y-3">
+                  {prerequisites.map((item: string, index: number) => (
+                    <div key={index} className="flex items-start gap-2 sm:gap-3">
+                      <div className="text-purple-600 mt-0.5 flex-shrink-0">
+                        <CheckCircle size={18} className="sm:hidden" />
+                        <CheckCircle size={20} className="hidden sm:block" />
+                      </div>
+                      <span className="text-sm sm:text-base text-gray-700">{sanitizeApiText(item, "")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Target Audience */}
+            {targetAudience.length > 0 && (
+              <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 border border-gray-200">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Target Audience</h2>
+                <div className="space-y-3">
+                  {targetAudience.map((item: string, index: number) => (
+                    <div key={index} className="flex items-start gap-2 sm:gap-3">
+                      <div className="text-purple-600 mt-0.5 flex-shrink-0">
+                        <CheckCircle size={18} className="sm:hidden" />
+                        <CheckCircle size={20} className="hidden sm:block" />
+                      </div>
+                      <span className="text-sm sm:text-base text-gray-700">{sanitizeApiText(item, "")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Instructor */}
             {instructor && (
@@ -763,7 +891,7 @@ export function CourseDetailClient() {
               <div className="bg-white rounded-lg p-4 sm:p-6 border border-gray-200">
                 <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">This course includes:</h3>
                 <div className="space-y-2 sm:space-y-3">
-                  {courseIncludes.map((item, index) => (
+                  {uniqueCourseIncludes.map((item, index) => (
                     <div key={index} className="flex items-start gap-2 sm:gap-3">
                       <div className="text-green-600 mt-0.5 flex-shrink-0">
                         <CheckCircle size={18} className="sm:hidden" />

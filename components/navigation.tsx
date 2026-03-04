@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { EnamelLogo } from "./enamel-logo"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/lib/stores/auth-store"
 import { userService } from "@/lib/api/user"
@@ -109,7 +108,11 @@ export function Navigation({ activeItem }: NavigationProps) {
       <div className="w-full px-4">
         <nav className="flex items-center h-16 gap-1">
           <Link href="/dashboard" className="flex-shrink-0 mr-1">
-            <EnamelLogo />
+            <img
+              src="/logo.svg"
+              alt="Enamel Academy"
+              className="h-12 w-auto"
+            />
           </Link>
           
           {/* Desktop Navigation */}

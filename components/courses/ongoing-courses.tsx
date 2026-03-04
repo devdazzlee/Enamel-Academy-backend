@@ -4,11 +4,17 @@ import { useEffect, useState } from "react"
 import { FileText } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-import { coursesService, type ApiCourse } from "@/lib/api/courses"
+import { coursesService, type ApiCourse, type OngoingCoursesSummary } from "@/lib/api/courses"
 
 export function OngoingCourses() {
   const router = useRouter()
   const [courses, setCourses] = useState<ApiCourse[]>([])
+  const [summary, setSummary] = useState<OngoingCoursesSummary>({
+    totalOngoing: 0,
+    totalEnrolled: 0,
+    averageCompletion: 0,
+    totalCompletionPercentage: 0,
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
 
@@ -18,12 +24,19 @@ export function OngoingCourses() {
       setIsLoading(true)
       setHasError(false)
       try {
-        const data = await coursesService.ongoing()
+        const data = await coursesService.ongoingWithSummary()
         if (!alive) return
-        setCourses(data)
+        setCourses(data.courses)
+        setSummary(data.summary)
       } catch {
         if (!alive) return
         setCourses([])
+        setSummary({
+          totalOngoing: 0,
+          totalEnrolled: 0,
+          averageCompletion: 0,
+          totalCompletionPercentage: 0,
+        })
         setHasError(true)
       } finally {
         if (!alive) return
@@ -46,6 +59,11 @@ export function OngoingCourses() {
           <span className="text-primary">Complete Your</span>{" "}
           <span className="text-muted-foreground">On-Going Courses</span>
         </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 sm:h-20 rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="bg-card rounded-2xl border border-border overflow-hidden animate-pulse">
@@ -70,6 +88,24 @@ export function OngoingCourses() {
           <span className="text-primary">Continue Your</span>{" "}
           <span className="text-muted-foreground">On-Going Courses</span>
         </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
+          <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+            <p className="text-[11px] sm:text-xs text-muted-foreground">Total Ongoing</p>
+            <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.totalOngoing}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+            <p className="text-[11px] sm:text-xs text-muted-foreground">Total Enrolled</p>
+            <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.totalEnrolled}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+            <p className="text-[11px] sm:text-xs text-muted-foreground">Average Completion</p>
+            <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.averageCompletion}%</p>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+            <p className="text-[11px] sm:text-xs text-muted-foreground">Total Completion</p>
+            <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.totalCompletionPercentage}%</p>
+          </div>
+        </div>
         <div className="text-center py-10 text-muted-foreground">
           {hasError ? (
             <p className="text-sm">Unable to load ongoing courses right now.</p>
@@ -88,6 +124,24 @@ export function OngoingCourses() {
         <span className="text-primary">Continue Your</span>{" "}
         <span className="text-muted-foreground">On-Going Courses</span>
       </h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+          <p className="text-[11px] sm:text-xs text-muted-foreground">Total Ongoing</p>
+          <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.totalOngoing}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+          <p className="text-[11px] sm:text-xs text-muted-foreground">Total Enrolled</p>
+          <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.totalEnrolled}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+          <p className="text-[11px] sm:text-xs text-muted-foreground">Average Completion</p>
+          <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.averageCompletion}%</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
+          <p className="text-[11px] sm:text-xs text-muted-foreground">Total Completion</p>
+          <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.totalCompletionPercentage}%</p>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         {courses.map((course) => {
           const progress = course.progress ?? 0

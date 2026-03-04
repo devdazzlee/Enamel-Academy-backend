@@ -22,6 +22,7 @@ const createBaseClient = (): AxiosInstance => {
 export const publicApi = createBaseClient();
 
 export const authApi = createBaseClient();
+let handlingUnauthorized = false;
 
 authApi.interceptors.request.use((config) => {
   const token = tokenStorage.get();
@@ -38,7 +39,18 @@ authApi.interceptors.response.use(
     if (error.response?.status === 401) {
       tokenStorage.clear();
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("auth:unauthorized"));
+        const url = String(error.config?.url ?? "");
+        const isAuthEndpoint =
+          url.includes("/logout") ||
+          url.includes("/validate-token") ||
+          url.includes("/login");
+        if (!isAuthEndpoint && !handlingUnauthorized) {
+          handlingUnauthorized = true;
+          window.dispatchEvent(new Event("auth:unauthorized"));
+          window.setTimeout(() => {
+            handlingUnauthorized = false;
+          }, 250);
+        }
       }
     }
     return Promise.reject(error);

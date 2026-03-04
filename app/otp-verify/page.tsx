@@ -2,7 +2,6 @@
 
 import React, { Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { EnamelLogo } from "@/components/enamel-logo"
 import { OTPInput } from "@/components/otp-input"
 import { passwordResetService } from "@/lib/api/password-reset"
 import { Spinner } from "@/components/ui/spinner"
@@ -52,7 +51,11 @@ function OTPVerifyPageContent() {
     <main className="min-h-screen bg-[#e8e8e8] flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
         <div className="flex flex-col items-center mb-10">
-          <EnamelLogo className="mb-6" />
+          <img 
+            src="/logo.svg" 
+            alt="Enamel Academy" 
+            className="h-16 w-auto mb-6"
+          />
           <p className="text-[#6b7280] text-sm text-center">
             Verification code sent to your email.{" "}
             <span className="text-[#8b5cf6] font-medium">Check Inbox</span>

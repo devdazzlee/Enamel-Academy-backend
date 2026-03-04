@@ -4,7 +4,6 @@ import React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { EnamelLogo } from "@/components/enamel-logo"
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react"
 import { passwordResetService } from "@/lib/api/password-reset"
 import { Spinner } from "@/components/ui/spinner"
@@ -37,7 +36,11 @@ export default function ForgotPasswordPage() {
     <main className="min-h-screen bg-[#e8e8e8] flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
         <div className="flex flex-col items-center mb-10">
-          <EnamelLogo className="mb-2" />
+          <img 
+            src="/logo.svg" 
+            alt="Enamel Academy" 
+            className="h-16 w-auto mb-2"
+          />
           <p className="text-[#6b7280] text-sm">Reset your password</p>
         </div>
 

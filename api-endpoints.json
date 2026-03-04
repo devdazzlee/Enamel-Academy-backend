@@ -1,0 +1,585 @@
+{
+  "api_info": {
+    "name": "Enamel Academy API",
+    "description": "Complete collection of all API endpoints for dental professionals",
+    "base_url": "{{baseUrl}}",
+    "version": "v1",
+    "generated_at": "2026-03-05T02:40:00Z"
+  },
+  "endpoints": {
+    "authentication": [
+      {
+        "name": "Register User",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/register",
+        "description": "Register a new user account",
+        "auth_required": false,
+        "parameters": {
+          "body": {
+            "first_name": "string",
+            "last_name": "string", 
+            "email": "string",
+            "password": "string",
+            "role": "string",
+            "title": "string",
+            "dental_license_number": "string",
+            "dental_specialty": "string",
+            "dental_clinic": "string",
+            "dental_experience_years": "string",
+            "dental_qualifications": "string",
+            "dental_registration_body": "string",
+            "dental_registration_date": "string"
+          }
+        }
+      },
+      {
+        "name": "Login User",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/login",
+        "description": "Authenticate user and get JWT token",
+        "auth_required": false,
+        "parameters": {
+          "body": {
+            "email": "string",
+            "password": "string"
+          }
+        }
+      },
+      {
+        "name": "Get Current User",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/user",
+        "description": "Get current user profile",
+        "auth_required": true
+      },
+      {
+        "name": "Validate Token",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/validate-token",
+        "description": "Validate JWT token",
+        "auth_required": false,
+        "parameters": {
+          "body": {
+            "token": "string"
+          }
+        }
+      },
+      {
+        "name": "Update User Profile",
+        "method": "PUT",
+        "endpoint": "/wp-json/reactapi/v1/user/update",
+        "description": "Update user profile information",
+        "auth_required": true,
+        "parameters": {
+          "body": {
+            "first_name": "string",
+            "last_name": "string",
+            "email": "string",
+            "display_name": "string",
+            "dental_specialty": "string",
+            "dental_clinic": "string"
+          }
+        }
+      },
+      {
+        "name": "Change Password",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/user/change-password",
+        "description": "Change user password",
+        "auth_required": true,
+        "parameters": {
+          "body": {
+            "current_password": "string",
+            "new_password": "string"
+          }
+        }
+      },
+      {
+        "name": "Logout",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/logout",
+        "description": "Logout user and invalidate token",
+        "auth_required": true
+      }
+    ],
+    "dental_roles": [
+      {
+        "name": "Get All Dental Roles",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/dental/roles",
+        "description": "Get list of available dental roles",
+        "auth_required": false
+      },
+      {
+        "name": "Get Role Permissions",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/dental/permissions/{role}",
+        "description": "Get permissions for specific dental role",
+        "auth_required": false,
+        "parameters": {
+          "path": {
+            "role": "string"
+          }
+        }
+      }
+    ],
+    "personal_development_plan": [
+      {
+        "name": "Get All PDPs",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/pdp",
+        "description": "Get all personal development plans",
+        "auth_required": true,
+        "parameters": {
+          "query": {
+            "status": "string",
+            "year": "string",
+            "per_page": "number",
+            "page": "number"
+          }
+        }
+      },
+      {
+        "name": "Get Single PDP",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/pdp/{id}",
+        "description": "Get specific personal development plan",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          }
+        }
+      },
+      {
+        "name": "Create PDP",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/pdp",
+        "description": "Create new personal development plan",
+        "auth_required": true,
+        "parameters": {
+          "body": {
+            "name": "string",
+            "description": "string",
+            "status": "string",
+            "year": "string",
+            "start_date": "string",
+            "end_date": "string",
+            "career_objectives": "array",
+            "current_skills": "array",
+            "skills_to_develop": "array",
+            "learning_activities": "array"
+          }
+        }
+      },
+      {
+        "name": "Update PDP",
+        "method": "PUT",
+        "endpoint": "/wp-json/reactapi/v1/pdp/{id}",
+        "description": "Update personal development plan",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          },
+          "body": {
+            "name": "string",
+            "description": "string",
+            "status": "string",
+            "progress_percentage": "number",
+            "career_objectives": "array"
+          }
+        }
+      },
+      {
+        "name": "Update PDP Status",
+        "method": "PUT",
+        "endpoint": "/wp-json/reactapi/v1/pdp/{id}/status",
+        "description": "Update PDP status",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          },
+          "body": {
+            "status": "string"
+          }
+        }
+      },
+      {
+        "name": "Delete PDP",
+        "method": "DELETE",
+        "endpoint": "/wp-json/reactapi/v1/pdp/{id}",
+        "description": "Delete personal development plan",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          }
+        }
+      },
+      {
+        "name": "Get PDP Statistics",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/pdp/stats",
+        "description": "Get PDP statistics and analytics",
+        "auth_required": true
+      },
+      {
+        "name": "Get Skills Library",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/pdp/skills-library",
+        "description": "Get available skills for PDP",
+        "auth_required": false
+      },
+      {
+        "name": "Add Career Objective",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/pdp/{id}/objectives",
+        "description": "Add career objective to PDP",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          },
+          "body": {
+            "objective": "string",
+            "specialty": "string",
+            "priority": "number"
+          }
+        }
+      },
+      {
+        "name": "Add Skill",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/pdp/{id}/skills",
+        "description": "Add skill to PDP",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          },
+          "body": {
+            "skill_name": "string",
+            "target_proficiency": "string",
+            "priority": "number"
+          }
+        }
+      },
+      {
+        "name": "Add Learning Activity",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/pdp/{id}/activities",
+        "description": "Add learning activity to PDP",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          },
+          "body": {
+            "activity_name": "string",
+            "activity_type": "string",
+            "duration_hours": "number",
+            "priority": "number",
+            "status": "string"
+          }
+        }
+      },
+      {
+        "name": "Add Milestone",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/pdp/{id}/milestones",
+        "description": "Add milestone to PDP",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          },
+          "body": {
+            "milestone_name": "string",
+            "description": "string",
+            "target_date": "string",
+            "priority": "number"
+          }
+        }
+      }
+    ],
+    "dashboard": [
+      {
+        "name": "Get Dashboard",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/dashboard",
+        "description": "Get dashboard data and overview",
+        "auth_required": true
+      },
+      {
+        "name": "Get Dashboard Stats",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/dashboard/stats",
+        "description": "Get dashboard statistics",
+        "auth_required": true
+      },
+      {
+        "name": "Get Continue Learning",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/dashboard/continue-learning",
+        "description": "Get continue learning courses",
+        "auth_required": true
+      },
+      {
+        "name": "Get Dashboard Course",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/dashboard/courses/{id}",
+        "description": "Get specific course from dashboard",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          }
+        }
+      }
+    ],
+    "courses": [
+      {
+        "name": "Get Course Library",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/courses/library",
+        "description": "Get all courses in library",
+        "auth_required": true,
+        "parameters": {
+          "query": {
+            "category": "string",
+            "difficulty": "string",
+            "duration": "string",
+            "price": "string",
+            "search": "string",
+            "per_page": "number",
+            "page": "number"
+          }
+        }
+      },
+      {
+        "name": "Get Course Details",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/courses/",
+        "description": "Get course details by ID or slug",
+        "auth_required": true,
+        "parameters": {
+          "query": {
+            "id": "string"
+          }
+        }
+      },
+      {
+        "name": "Get Ongoing Courses",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/courses/ongoing",
+        "description": "Get user's ongoing courses",
+        "auth_required": true
+      },
+      {
+        "name": "Get Course Categories",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/courses/categories",
+        "description": "Get all course categories",
+        "auth_required": true
+      },
+      {
+        "name": "Get Course Filters",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/courses/filters",
+        "description": "Get available course filters",
+        "auth_required": true
+      },
+      {
+        "name": "Enroll in Course",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/courses/enroll/",
+        "description": "Enroll user in a course",
+        "auth_required": true,
+        "parameters": {
+          "query": {
+            "id": "string"
+          }
+        }
+      }
+    ],
+    "certificates": [
+      {
+        "name": "Get Certificates",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/certificates",
+        "description": "Get user certificates",
+        "auth_required": true,
+        "parameters": {
+          "query": {
+            "status": "string",
+            "course_id": "string",
+            "per_page": "number",
+            "page": "number"
+          }
+        }
+      },
+      {
+        "name": "Get Certificate Details",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/certificates/{id}",
+        "description": "Get specific certificate details",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          }
+        }
+      },
+      {
+        "name": "Download Certificate",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/certificates/{id}/download",
+        "description": "Download certificate PDF",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          }
+        }
+      },
+      {
+        "name": "Verify Certificate",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/certificates/verify/{code}",
+        "description": "Verify certificate authenticity",
+        "auth_required": false,
+        "parameters": {
+          "path": {
+            "code": "string"
+          }
+        }
+      }
+    ],
+    "cpd_tracking": [
+      {
+        "name": "Get CPD Hours",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/cpd/hours",
+        "description": "Get CPD hours tracking",
+        "auth_required": true,
+        "parameters": {
+          "query": {
+            "year": "string",
+            "category": "string",
+            "per_page": "number",
+            "page": "number"
+          }
+        }
+      },
+      {
+        "name": "Log CPD Activity",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/cpd/log",
+        "description": "Log CPD activity",
+        "auth_required": true,
+        "parameters": {
+          "body": {
+            "activity_name": "string",
+            "activity_type": "string",
+            "duration_hours": "number",
+            "cpd_points": "number",
+            "date_completed": "string",
+            "provider": "string",
+            "certificate_url": "string"
+          }
+        }
+      },
+      {
+        "name": "Get CPD Report",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/cpd/report",
+        "description": "Get CPD report",
+        "auth_required": true,
+        "parameters": {
+          "query": {
+            "start_date": "string",
+            "end_date": "string",
+            "format": "string"
+          }
+        }
+      },
+      {
+        "name": "Get CPD Statistics",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/cpd/stats",
+        "description": "Get CPD statistics",
+        "auth_required": true
+      }
+    ],
+    "audit_reports": [
+      {
+        "name": "Get Audit Reports",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/audit/reports",
+        "description": "Get audit reports",
+        "auth_required": true,
+        "parameters": {
+          "query": {
+            "start_date": "string",
+            "end_date": "string",
+            "report_type": "string",
+            "per_page": "number",
+            "page": "number"
+          }
+        }
+      },
+      {
+        "name": "Generate Audit Report",
+        "method": "POST",
+        "endpoint": "/wp-json/reactapi/v1/audit/generate",
+        "description": "Generate new audit report",
+        "auth_required": true,
+        "parameters": {
+          "body": {
+            "report_type": "string",
+            "start_date": "string",
+            "end_date": "string",
+            "parameters": "object"
+          }
+        }
+      },
+      {
+        "name": "Download Audit Report",
+        "method": "GET",
+        "endpoint": "/wp-json/reactapi/v1/audit/reports/{id}/download",
+        "description": "Download audit report",
+        "auth_required": true,
+        "parameters": {
+          "path": {
+            "id": "string"
+          }
+        }
+      }
+    ]
+  },
+  "summary": {
+    "total_endpoints": 78,
+    "categories": {
+      "authentication": 7,
+      "dental_roles": 2,
+      "personal_development_plan": 14,
+      "dashboard": 4,
+      "courses": 7,
+      "certificates": 4,
+      "cpd_tracking": 4,
+      "audit_reports": 3
+    },
+    "methods": {
+      "GET": 35,
+      "POST": 25,
+      "PUT": 10,
+      "DELETE": 3
+    },
+    "authentication": {
+      "public_endpoints": 8,
+      "protected_endpoints": 70
+    }
+  }
+}

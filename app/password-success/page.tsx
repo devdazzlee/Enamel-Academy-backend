@@ -2,7 +2,6 @@
 
 import React from "react"
 import Link from "next/link"
-import { EnamelLogo } from "@/components/enamel-logo"
 import { CheckCircle } from "lucide-react"
 
 export default function PasswordSuccessPage() {
@@ -10,7 +9,11 @@ export default function PasswordSuccessPage() {
     <main className="min-h-screen bg-[#e8e8e8] flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
         <div className="flex flex-col items-center text-center">
-          <EnamelLogo className="mb-8" />
+          <img 
+            src="/logo.svg" 
+            alt="Enamel Academy" 
+            className="h-16 w-auto mb-8"
+          />
           
           <div className="mb-6">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto">

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { EnamelLogo } from "@/components/enamel-logo"
 import { Mail, Lock } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuthStore } from "@/lib/stores/auth-store"
@@ -36,7 +35,11 @@ export default function LoginPage() {
     <main className="min-h-screen bg-[#e8e8e8] flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
         <div className="flex flex-col items-center mb-10">
-          <EnamelLogo className="mb-2" />
+          <img 
+            src="/logo.svg" 
+            alt="Enamel Academy" 
+            className="h-16 w-auto mb-2"
+          />
           <p className="text-[#6b7280] text-sm">Sign in to your account</p>
         </div>
 

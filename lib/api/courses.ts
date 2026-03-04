@@ -90,6 +90,18 @@ export type CourseFeedbackPayload = {
   comment: string;
 };
 
+export type OngoingCoursesSummary = {
+  totalOngoing: number;
+  totalEnrolled: number;
+  averageCompletion: number;
+  totalCompletionPercentage: number;
+};
+
+export type OngoingCoursesResult = {
+  courses: ApiCourse[];
+  summary: OngoingCoursesSummary;
+};
+
 export type EnrollResult = {
   success: boolean;
   message?: string;
@@ -282,6 +294,41 @@ const normalizeCourses = (raw: unknown): ApiCourse[] => {
   return result;
 };
 
+const normalizeOngoing = (raw: unknown): OngoingCoursesResult => {
+  const defaultSummary: OngoingCoursesSummary = {
+    totalOngoing: 0,
+    totalEnrolled: 0,
+    averageCompletion: 0,
+    totalCompletionPercentage: 0,
+  };
+
+  if (!raw || typeof raw !== "object") {
+    return { courses: [], summary: defaultSummary };
+  }
+
+  const root = raw as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object"
+    ? root.data
+    : root) as Record<string, unknown>;
+
+  const ongoingCourses = Array.isArray(data.ongoing_courses)
+    ? data.ongoing_courses
+    : [];
+  const summaryRaw = (data.summary && typeof data.summary === "object"
+    ? data.summary
+    : {}) as Record<string, unknown>;
+
+  return {
+    courses: normalizeCourses({ data: { courses: ongoingCourses } }),
+    summary: {
+      totalOngoing: toNumber(summaryRaw.total_ongoing) ?? 0,
+      totalEnrolled: toNumber(summaryRaw.total_enrolled) ?? 0,
+      averageCompletion: toNumber(summaryRaw.average_completion) ?? 0,
+      totalCompletionPercentage: toNumber(summaryRaw.total_completion_percentage) ?? 0,
+    },
+  };
+};
+
 export const coursesService = {
   async library(filters?: Record<string, string>): Promise<LibraryCourse[]> {
     const params = new URLSearchParams();
@@ -322,7 +369,12 @@ export const coursesService = {
 
   async ongoing(): Promise<ApiCourse[]> {
     const response = await authApi.get(API_PATHS.courses.ongoing);
-    return normalizeCourses(response.data);
+    return normalizeOngoing(response.data).courses;
+  },
+
+  async ongoingWithSummary(): Promise<OngoingCoursesResult> {
+    const response = await authApi.get(API_PATHS.courses.ongoing);
+    return normalizeOngoing(response.data);
   },
 
   async categories(): Promise<ApiCategory[]> {

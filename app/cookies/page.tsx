@@ -2,7 +2,6 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
-import { EnamelLogo } from "@/components/enamel-logo"
 
 export default function CookiesPage() {
   const [preferences, setPreferences] = useState({
@@ -31,7 +30,11 @@ export default function CookiesPage() {
     <main className="min-h-screen bg-[#e8e8e8] py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col items-center mb-8">
-          <EnamelLogo className="mb-4" />
+          <img 
+            src="/logo.svg" 
+            alt="Enamel Academy" 
+            className="h-16 w-auto mb-4"
+          />
           <h1 className="text-3xl font-bold text-[#1a1a1a]">Cookie Policy</h1>
         </div>
 

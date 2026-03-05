@@ -294,6 +294,14 @@ export function CourseDetailClient() {
     if (!course?.id || isStartingCourse) return
     setIsStartingCourse(true)
     if (course?.id) {
+      const resumeFromNextLesson = sanitizeApiText(dashboardDetail?.nextLesson, "")
+      const firstIncompleteModule = (dashboardDetail?.modules ?? []).find((m) => m.progress < 100)
+      const resumeTitle = resumeFromNextLesson || sanitizeApiText(firstIncompleteModule?.title, "")
+      if (resumeTitle) {
+        const params = new URLSearchParams({ resume: resumeTitle })
+        router.push(`/course/${course.id}?${params.toString()}`)
+        return
+      }
       router.push(`/course/${course.id}`)
     }
   };
@@ -536,6 +544,10 @@ export function CourseDetailClient() {
   const tagNames = (apiCourse.tags ?? [])
     .map((item) => sanitizeApiText(item?.name, ""))
     .filter(Boolean);
+  const hasInProgressSignal =
+    toNumber(apiCourse.user_progress?.percentage) > 0
+    || toNumber(dashboardDetail?.progress.overallPercentage) > 0
+    || Boolean(sanitizeApiText(dashboardDetail?.nextLesson, ""));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -559,11 +571,11 @@ export function CourseDetailClient() {
             {/* Hero Image */}
             <div className="relative rounded-lg overflow-hidden shadow-lg">
               {bannerImage ? (
-                <img
+              <img 
                   src={bannerImage}
-                  alt={course.title ?? "Course"}
-                  className="w-full h-full object-cover"
-                />
+                alt={course.title ?? "Course"} 
+                className="w-full h-full object-cover"
+              />
               ) : (
                 <div className="w-full h-64 bg-gray-200" />
               )}
@@ -691,10 +703,10 @@ export function CourseDetailClient() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {uniqueCourseIncludes.map((item) => (
                   <div key={item} className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
                       <CheckCircle size={16} className="sm:hidden" />
                       <CheckCircle size={20} className="hidden sm:block" />
-                    </div>
+                  </div>
                     <span className="text-sm sm:text-base text-gray-700">{item}</span>
                   </div>
                 ))}
@@ -953,9 +965,9 @@ export function CourseDetailClient() {
                     </>
                   ) : (
                     <>
-                      <Play size={18} className="sm:hidden" />
-                      <Play size={20} className="hidden sm:block" />
-                      Start Course
+                  <Play size={18} className="sm:hidden" />
+                  <Play size={20} className="hidden sm:block" />
+                      {hasInProgressSignal ? "Resume Course" : "Start Course"}
                     </>
                   )}
                 </button>

@@ -20,6 +20,12 @@ import {
 import { useAuthStore } from "@/lib/stores/auth-store"
 import { rolesService } from "@/lib/api/roles"
 
+const SIGNUP_ALLOWED_ROLES: Array<{ value: string; label: string }> = [
+  { value: "dentist", label: "Dentist" },
+  { value: "dental_nurse", label: "Dental Nurse" },
+  { value: "dental_care_professional", label: "Dental Care Professional" },
+]
+
 export default function SignupPage() {
   const router = useRouter()
   const { register, isLoading } = useAuthStore()
@@ -37,6 +43,8 @@ export default function SignupPage() {
   const [roleOptions, setRoleOptions] = useState<Array<{ value: string; label: string }>>([])
   const [rolesLoading, setRolesLoading] = useState(true)
   const [rolesError, setRolesError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -55,10 +63,20 @@ export default function SignupPage() {
             return { value, label }
           })
           .filter((r) => r.value && r.label)
-        setRoleOptions(mapped)
+        const allowedMap = new Map(mapped.map((r) => [r.value, r.label]))
+        const allowedOnly = SIGNUP_ALLOWED_ROLES
+          .map((role) => ({
+            value: role.value,
+            label: allowedMap.get(role.value) || role.label,
+          }))
+          .filter((role) => allowedMap.has(role.value))
+
+        // Keep signup strict to only three professional roles.
+        setRoleOptions(allowedOnly)
       } catch {
         if (!alive) return
-        setRoleOptions([])
+        // Safe fallback in case roles API fails.
+        setRoleOptions(SIGNUP_ALLOWED_ROLES)
         setRolesError("Unable to load profession list. Please refresh and try again.")
       } finally {
         if (alive) setRolesLoading(false)
@@ -172,25 +190,45 @@ export default function SignupPage() {
             </div>
             <div>
               <label className="block text-sm text-muted-foreground mb-2">Password :</label>
-              <input
-                type="password"
-                name="password"
-                placeholder="xxxxxxxxxx"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-card border border-border rounded-full text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  placeholder="xxxxxxxxxx"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 pr-12 bg-card border border-border rounded-full text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 px-4 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-sm text-muted-foreground mb-2">Confirm Password :</label>
-              <input
-                type="password"
-                name="confirmPassword"
-                placeholder="xxxxxxxxxx"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-card border border-border rounded-full text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  name="confirmPassword"
+                  placeholder="xxxxxxxxxx"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 pr-12 bg-card border border-border rounded-full text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 px-4 text-muted-foreground hover:text-foreground"
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm text-muted-foreground mb-2">I am a :</label>

@@ -180,6 +180,7 @@ export function CourseGrid({ activeFilters, searchQuery }: {
                     style={{ width: `${progressPercent(course)}%` }}
                   />
                 </div>
+                {/* Feature tags hidden per UI request; keep code for future re-enable.
                 <div className="flex flex-wrap gap-1 mb-2 sm:mb-3">
                   {(course.features ?? []).slice(0, 3).map((feature) => (
                     <span key={feature} className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] text-muted-foreground">
@@ -192,6 +193,7 @@ export function CourseGrid({ activeFilters, searchQuery }: {
                     </span>
                   )}
                 </div>
+                */}
                 <div className="text-[11px] text-muted-foreground mb-2 sm:mb-3">
                   {course.is_completed ? "Completed" : course.is_enrolled ? "Enrolled" : "Not enrolled"}
                 </div>

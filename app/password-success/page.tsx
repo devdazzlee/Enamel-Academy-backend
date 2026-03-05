@@ -1,10 +1,20 @@
 "use client"
 
-import React from "react"
+import React, { useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { CheckCircle } from "lucide-react"
 
 export default function PasswordSuccessPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      router.push("/login")
+    }, 3000)
+    return () => window.clearTimeout(timer)
+  }, [router])
+
   return (
     <main className="min-h-screen bg-[#e8e8e8] flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
@@ -28,6 +38,7 @@ export default function PasswordSuccessPage() {
           <p className="text-[#6b7280] text-sm mb-8 max-w-md">
             Your password has been successfully changed. You can now use your new password to login to your account.
           </p>
+          <p className="text-[#6b7280] text-xs mb-4">Redirecting to login in 3 seconds...</p>
 
           <Link
             href="/login"

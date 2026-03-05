@@ -22,13 +22,31 @@ export type ContinueLearningCourse = {
 export type RecommendedCourse = {
   id: string | number;
   title?: string;
+  slug?: string;
   thumbnail?: string;
+  thumbnailLarge?: string;
   excerpt?: string;
+  description?: string;
   difficulty?: string;
+  cpdHours?: number;
+  courseFormat?: string;
   duration?: string;
+  durationMinutes?: number;
   category?: string;
+  categories?: Array<{ id?: string | number; name?: string; slug?: string; description?: string; count?: number }>;
+  tags?: Array<{ id?: string | number; name?: string; slug?: string; description?: string; count?: number }>;
+  categoryNames?: string[];
+  tagNames?: string[];
   rating?: number;
+  reviewsCount?: number;
+  studentsCount?: number;
   instructor?: string;
+  isFeatured?: boolean;
+  isPopular?: boolean;
+  isNew?: boolean;
+  recommendationScore?: number;
+  permalink?: string;
+  previewUrl?: string;
 };
 
 export type CourseProgressDetail = {
@@ -77,6 +95,32 @@ const pickName = (value: unknown): string | undefined => {
   return undefined;
 };
 
+const parseTaxonomy = (value: unknown): Array<{ id?: string | number; name?: string; slug?: string; description?: string; count?: number }> => {
+  if (!Array.isArray(value)) return [];
+  const result: Array<{ id?: string | number; name?: string; slug?: string; description?: string; count?: number }> = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const row: { id?: string | number; name?: string; slug?: string; description?: string; count?: number } = {};
+    if (typeof obj.id === "string" || typeof obj.id === "number") row.id = obj.id;
+    const name = getString(obj.name) ?? getString(obj.title);
+    if (name) row.name = name;
+    const slug = getString(obj.slug);
+    if (slug) row.slug = slug;
+    const description = getString(obj.description);
+    if (description) row.description = description;
+    const count = getNumber(obj.count);
+    if (typeof count === "number") row.count = count;
+    result.push(row);
+  }
+  return result;
+};
+
+const parseStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string" && v.trim() !== "").map((v) => v.trim());
+};
+
 const toDashboardItem = (
   item: Record<string, unknown>
 ): ContinueLearningCourse | RecommendedCourse | null => {
@@ -99,26 +143,44 @@ const toDashboardItem = (
   return {
     id,
     title: getString(item.title) ?? getString(item.course_title) ?? getString(item.name),
+    slug: getString(item.slug) ?? getString(item.course_slug),
     thumbnail:
       getString(item.thumbnail) ??
       getString(item.image) ??
       getString(item.featured_image) ??
       getString(item.banner_image) ??
       getString(item.course_image),
+    thumbnailLarge: getString(item.thumbnail_large),
     progress,
     duration: getString(item.duration) ?? getString(item.course_duration),
+    durationMinutes: getNumber(item.duration_minutes),
     excerpt: getString(item.excerpt) ?? getString(item.description),
+    description: getString(item.description),
     difficulty: getString(item.difficulty) ?? getString(item.level),
+    cpdHours: getNumber(item.cpd_hours),
+    courseFormat: getString(item.course_format),
     lastAccessed: getString(item.last_accessed) ?? getString(item.last_accessed_date),
     category:
       getString(item.category) ??
       getString(item.category_name) ??
       (Array.isArray(item.categories) ? getString(item.categories[0]) : undefined),
+    categories: parseTaxonomy(item.categories),
+    tags: parseTaxonomy(item.tags),
+    categoryNames: parseStringArray(item.category_names),
+    tagNames: parseStringArray(item.tag_names),
     rating: getNumber(item.rating) ?? getNumber(item.avg_rating) ?? getNumber(item.average_rating),
+    reviewsCount: getNumber(item.reviews_count),
+    studentsCount: getNumber(item.students_count),
     instructor:
       pickName(item.instructor) ??
       pickName(item.author) ??
       pickName(item.tutor),
+    isFeatured: typeof item.is_featured === "boolean" ? item.is_featured : undefined,
+    isPopular: typeof item.is_popular === "boolean" ? item.is_popular : undefined,
+    isNew: typeof item.is_new === "boolean" ? item.is_new : undefined,
+    recommendationScore: getNumber(item.recommendation_score),
+    permalink: getString(item.permalink),
+    previewUrl: getString(item.preview_url),
   };
 };
 

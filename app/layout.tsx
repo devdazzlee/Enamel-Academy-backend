@@ -28,7 +28,14 @@ const rubik = localFont({
 export const metadata: Metadata = {
   title: 'Enamel Academy',
   description: 'Dental Education Platform - CPD Training and Certificates',
-    generator: 'v0.app'
+  generator: 'v0.app',
+  icons: {
+    icon: [
+      { url: '/1-01-01-01.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: ['/1-01-01.ico'],
+    apple: ['/apple-icon.png'],
+  },
 }
 
 export default function RootLayout({

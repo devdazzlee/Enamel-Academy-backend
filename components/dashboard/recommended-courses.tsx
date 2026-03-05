@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, FileText, Users, Award } from "lucide-react"
+import { Clock, FileText, Users, Award, Tag, Sparkles } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { useEffect, useState } from "react"
@@ -14,6 +14,15 @@ export function RecommendedCourses() {
   const [progressCourses, setProgressCourses] = useState<CourseProgressDetail[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
+
+  const toTitle = (value?: string): string => {
+    if (!value) return ""
+    return value
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  }
 
   const handleStartCourse = (courseId: string | number) => {
     router.push(`/course-detail?id=${courseId}`)
@@ -164,7 +173,7 @@ export function RecommendedCourses() {
             <div key={course.id} className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-lg transition-shadow">
               <div className="relative h-40 sm:h-48">
                 <img
-                  src={course.thumbnail ?? "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=200&fit=crop"}
+                  src={course.thumbnailLarge ?? course.thumbnail ?? "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=200&fit=crop"}
                   alt={course.title ?? "Course"}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
@@ -178,21 +187,46 @@ export function RecommendedCourses() {
                     {course.excerpt}
                   </p>
                 )}
-                {course.difficulty && (
-                  <div className="mb-2 sm:mb-3">
-                    <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-primary">
-                      {course.difficulty}
+                <div className="mb-2 sm:mb-3 flex flex-wrap items-center gap-1.5">
+                  {(course.categories?.[0]?.name || course.categoryNames?.[0] || course.category) && (
+                    <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] sm:text-xs font-medium text-foreground">
+                      Category: {course.categories?.[0]?.name ?? course.categoryNames?.[0] ?? course.category}
                     </span>
-                  </div>
-                )}
+                  )}
+                  {course.difficulty && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-primary">
+                      <Sparkles className="h-3 w-3" />
+                      {toTitle(course.difficulty)}
+                    </span>
+                  )}
+                  {course.isNew && (
+                    <span className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-purple-700">
+                      New
+                    </span>
+                  )}
+                  {course.isPopular && (
+                    <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-amber-700">
+                      Popular
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-2 sm:mb-3">
                   {course.rating !== undefined && (
                     <span className="flex items-center gap-0.5 sm:gap-1">
                       <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       {course.rating}
+                      {typeof course.reviewsCount === "number" && (
+                        <span>({course.reviewsCount})</span>
+                      )}
                     </span>
                   )}
-                  {course.instructor && (
+                  {typeof course.studentsCount === "number" && (
+                    <span className="flex items-center gap-0.5 sm:gap-1 min-w-0 max-w-full">
+                      <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                      {course.studentsCount}
+                    </span>
+                  )}
+                  {course.instructor && course.instructor.trim() !== "" && (
                     <span className="flex items-center gap-0.5 sm:gap-1 min-w-0 max-w-full">
                       <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       <span className="truncate">{course.instructor}</span>
@@ -200,16 +234,28 @@ export function RecommendedCourses() {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mb-3 sm:mb-4">
-                  {course.duration && course.duration !== "Not specified" && (
+                  {(course.duration && course.duration !== "Not specified") && (
                     <span className="flex items-center gap-0.5 sm:gap-1">
                       <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       {course.duration}
                     </span>
                   )}
-                  {course.category && (
+                  {(!course.duration || course.duration === "Not specified") && course.durationMinutes !== undefined && course.durationMinutes > 0 && (
+                    <span className="flex items-center gap-0.5 sm:gap-1">
+                      <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                      {course.durationMinutes} min
+                    </span>
+                  )}
+                  {course.courseFormat && (
                     <span className="flex items-center gap-0.5 sm:gap-1 min-w-0">
-                      <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                      <span className="truncate">{course.category}</span>
+                      <Tag className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                      <span className="truncate">{toTitle(course.courseFormat)}</span>
+                    </span>
+                  )}
+                  {typeof course.recommendationScore === "number" && (
+                    <span className="flex items-center gap-0.5 sm:gap-1 min-w-0">
+                      <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                      <span className="truncate">Score {course.recommendationScore}</span>
                     </span>
                   )}
                 </div>

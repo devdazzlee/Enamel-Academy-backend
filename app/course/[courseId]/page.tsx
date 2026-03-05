@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo, useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
   ArrowRight,
@@ -121,7 +121,9 @@ const feedbackCriteria = [
 export default function CoursePlayerPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const courseId = params.courseId as string
+  const resumeLessonParam = sanitizeApiText(searchParams.get("resume") ?? "", "")
   const [course, setCourse] = useState<any>(null)
   const [courseContent, setCourseContent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -164,6 +166,7 @@ export default function CoursePlayerPage() {
   const [learnCompleted, setLearnCompleted] = useState(false)
   const [assessmentCompleted, setAssessmentCompleted] = useState(false)
   const [navGuardMessage, setNavGuardMessage] = useState("")
+  const [resumeApplied, setResumeApplied] = useState(false)
 
   // Assess
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -761,6 +764,22 @@ export default function CoursePlayerPage() {
       content: "consent",
     },
   ]), [courseDescription, courseDetails.objectives, lessonSteps, resources])
+
+  useEffect(() => {
+    if (!resumeLessonParam || resumeApplied || lessonSteps.length === 0) return
+    const target = resumeLessonParam.toLowerCase()
+    const stepIndex = lessonSteps.findIndex((step) => {
+      const title = sanitizeApiText(step.title, "").toLowerCase()
+      return title === target || title.includes(target) || target.includes(title)
+    })
+    if (stepIndex >= 0) {
+      setActiveSection("learn")
+      // learnPages[0] is Course Overview, so lessons start at index 1
+      setLearnPage(stepIndex + 1)
+      setNavGuardMessage("")
+    }
+    setResumeApplied(true)
+  }, [resumeLessonParam, resumeApplied, lessonSteps])
 
   const sectionItems: { key: Section; label: string; number: number }[] = [
     { key: "about", label: "About", number: 1 },

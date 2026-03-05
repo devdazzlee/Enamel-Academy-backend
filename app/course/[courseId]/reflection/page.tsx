@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, Lightbulb, TrendingUp, Target, Award } from 'lucide-react';
 import { coursesService } from "@/lib/api/courses";
+import { GooeyToaster, gooeyToast } from "goey-toast";
+import "goey-toast/styles.css";
 
 export default function ReflectionPage() {
   const params = useParams();
@@ -115,8 +117,10 @@ export default function ReflectionPage() {
     try {
       localStorage.setItem(`course-reflection-draft-${courseId}`, JSON.stringify(formData));
       setFormSuccess("Draft saved successfully.");
+      gooeyToast.success("Draft saved successfully.");
     } catch {
       setFormError("Unable to save draft right now.");
+      gooeyToast.error("Unable to save draft right now.");
     } finally {
       setIsSavingDraft(false);
     }
@@ -156,6 +160,7 @@ export default function ReflectionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <GooeyToaster position="top-right" />
       {/* Header */}
       <header className="bg-[#8b5cf6] text-white px-4 sm:px-6 py-4 sm:py-8">
         <div className="max-w-6xl mx-auto">

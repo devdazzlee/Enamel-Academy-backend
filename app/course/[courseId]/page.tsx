@@ -161,6 +161,9 @@ export default function CoursePlayerPage() {
   // Learn
   const [learnPage, setLearnPage] = useState(0)
   const [consentChecked, setConsentChecked] = useState(false)
+  const [learnCompleted, setLearnCompleted] = useState(false)
+  const [assessmentCompleted, setAssessmentCompleted] = useState(false)
+  const [navGuardMessage, setNavGuardMessage] = useState("")
 
   // Assess
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -583,6 +586,7 @@ export default function CoursePlayerPage() {
     setSelectedAnswers(quizQuestions.map(() => null))
     setShowResults(false)
     setAssessmentScore(0)
+    setAssessmentCompleted(false)
   }, [quizQuestions])
 
   useEffect(() => {
@@ -799,18 +803,43 @@ export default function CoursePlayerPage() {
     quizQuestions.forEach((q, i) => {
       if (selectedAnswers[i] === q.correctAnswer) correct++
     })
+    const isPassed = quizQuestions.length > 0 ? (correct / quizQuestions.length) * 100 >= 80 : false
     setAssessmentScore(correct)
     setShowResults(true)
+    setAssessmentCompleted(isPassed)
   }
 
   const handleRetry = () => {
     setSelectedAnswers(quizQuestions.map(() => null))
     setShowResults(false)
     setAssessmentScore(0)
+    setAssessmentCompleted(false)
   }
 
   const passed = quizQuestions.length > 0 ? (assessmentScore / quizQuestions.length) * 100 >= 80 : false
   const scorePercent = quizQuestions.length > 0 ? ((assessmentScore / quizQuestions.length) * 100).toFixed(1) : "0.0"
+
+  const handleSectionNavigation = (target: Section) => {
+    setNavGuardMessage("")
+
+    if (target === "about" || target === "learn") {
+      setActiveSection(target)
+      return
+    }
+
+    if (target === "assess" && !learnCompleted) {
+      setNavGuardMessage("Complete all Learn steps and confirm declaration before opening Assess.")
+      return
+    }
+
+    if (target === "evaluate" && !assessmentCompleted) {
+      setNavGuardMessage("Pass the assessment before opening Evaluate.")
+      return
+    }
+
+    setActiveSection(target)
+    if (target === "evaluate") setEvaluateSubPage("resources")
+  }
 
   const handleSubmitFeedback = async () => {
     setFeedbackSubmitError("")
@@ -886,10 +915,7 @@ export default function CoursePlayerPage() {
             {sectionItems.map((item) => (
               <button
                 key={item.key}
-                onClick={() => {
-                  setActiveSection(item.key)
-                  if (item.key === "evaluate") setEvaluateSubPage("resources")
-                }}
+                onClick={() => handleSectionNavigation(item.key)}
                 className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm transition-colors ${
                   activeSection === item.key
                     ? "bg-purple-50 text-purple-700 font-medium"
@@ -908,6 +934,9 @@ export default function CoursePlayerPage() {
                 {item.label}
               </button>
             ))}
+            {navGuardMessage && (
+              <p className="px-1 pt-1 text-xs text-amber-700">{navGuardMessage}</p>
+            )}
           </div>
         )}
       </div>
@@ -1129,9 +1158,11 @@ export default function CoursePlayerPage() {
                 <button 
               onClick={() => {
                 if (consentChecked) {
+                  setLearnCompleted(true)
                   setActiveSection("assess")
                   setShowResults(false)
                   setSelectedAnswers(quizQuestions.map(() => null))
+                  setNavGuardMessage("")
                 }
               }}
               disabled={!consentChecked}

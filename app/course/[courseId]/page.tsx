@@ -188,6 +188,9 @@ export default function CoursePlayerPage() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [feedbackSubmitError, setFeedbackSubmitError] = useState("")
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [feedbackStatusNote, setFeedbackStatusNote] = useState("")
+  const [isCourseCompletedByApi, setIsCourseCompletedByApi] = useState(false)
+  const [isCertificateAvailable, setIsCertificateAvailable] = useState(false)
 
   // Fetch course data from API
   useEffect(() => {
@@ -334,6 +337,7 @@ export default function CoursePlayerPage() {
         if (data?.success && data?.data) {
           setCourse(data.data)
           setCourseContent(data.data.course ?? {})
+          setIsCourseCompletedByApi(Boolean((data.data.course as Record<string, unknown> | undefined)?.is_completed))
 
           const topics = Array.isArray(data.data.curriculum)
             ? data.data.curriculum.flatMap((section: any) => Array.isArray(section?.topics) ? section.topics : [])
@@ -567,6 +571,15 @@ export default function CoursePlayerPage() {
             if (comment) setFeedbackComment(comment)
           } catch {
             // Ignore if no prior feedback exists for the user/course.
+          }
+
+          try {
+            const certAvailability = await certificatesService.checkAvailability(courseId)
+            const certRoot = (certAvailability && typeof certAvailability === "object" ? certAvailability : {}) as Record<string, unknown>
+            const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
+            setIsCertificateAvailable(Boolean(certData.available))
+          } catch {
+            setIsCertificateAvailable(false)
           }
         } else {
           setError("Course not found")
@@ -860,9 +873,33 @@ export default function CoursePlayerPage() {
     if (target === "evaluate") setEvaluateSubPage("resources")
   }
 
+  const refreshCompletionStatus = async (): Promise<{ completed: boolean; certificateAvailable: boolean }> => {
+    const courseRes = await authApi.get(`/wp-json/reactapi/v1/courses/?id=${courseId}`)
+    const courseRoot = (courseRes.data && typeof courseRes.data === "object" ? courseRes.data : {}) as Record<string, unknown>
+    const courseData = (courseRoot.data && typeof courseRoot.data === "object" ? courseRoot.data : {}) as Record<string, unknown>
+    const courseObj = (courseData.course && typeof courseData.course === "object" ? courseData.course : {}) as Record<string, unknown>
+    const completed = Boolean(courseObj.is_completed)
+
+    let certificateAvailable = false
+    try {
+      const certAvailability = await certificatesService.checkAvailability(courseId)
+      const certRoot = (certAvailability && typeof certAvailability === "object" ? certAvailability : {}) as Record<string, unknown>
+      const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
+      certificateAvailable = Boolean(certData.available)
+    } catch {
+      certificateAvailable = false
+    }
+
+    setCourse((prev) => (prev ? ({ ...prev, course: { ...(prev.course ?? {}), is_completed: completed } }) : prev))
+    setIsCourseCompletedByApi(completed)
+    setIsCertificateAvailable(certificateAvailable)
+    return { completed, certificateAvailable }
+  }
+
   const handleSubmitFeedback = async () => {
     setFeedbackSubmitError("")
     setFeedbackSubmitted(false)
+    setFeedbackStatusNote("")
 
     const hasUnratedItems = ratings.some((rating) => rating <= 0)
     if (hasUnratedItems) {
@@ -887,7 +924,15 @@ export default function CoursePlayerPage() {
       })
 
       setFeedbackSubmitted(true)
-      setEvaluateSubPage("completed")
+      const status = await refreshCompletionStatus()
+      if (status.completed) {
+        setEvaluateSubPage("completed")
+      } else {
+        setFeedbackStatusNote(
+          "Feedback submitted, but backend still shows this course as not completed. " +
+          "Certificate will be available only after API marks completion."
+        )
+      }
     } catch {
       setFeedbackSubmitError("Unable to submit feedback right now. Please try again.")
     } finally {
@@ -1629,6 +1674,11 @@ export default function CoursePlayerPage() {
             Feedback submitted successfully.
           </div>
         )}
+        {feedbackStatusNote && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs sm:text-sm text-amber-700">
+            {feedbackStatusNote}
+          </div>
+        )}
           </div>
 
       <div className="flex items-center justify-between mt-4 sm:mt-6 gap-3">
@@ -1654,12 +1704,23 @@ export default function CoursePlayerPage() {
   const renderCompleted = () => (
     <div>
       {/* Course Completed Banner */}
-      <div className="bg-green-50 border border-green-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
+      <div className={`${isCourseCompletedByApi ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"} border rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6`}>
         <div className="flex items-start gap-2 sm:gap-3">
-          <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0 mt-0.5" />
+          <CheckCircle className={`w-5 h-5 sm:w-6 sm:h-6 ${isCourseCompletedByApi ? "text-green-600" : "text-amber-600"} flex-shrink-0 mt-0.5`} />
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-green-800">Course Completed!</h2>
-            <p className="text-green-700 text-xs sm:text-sm">Congratulations on completing this CPD course</p>
+            <h2 className={`text-base sm:text-lg font-bold ${isCourseCompletedByApi ? "text-green-800" : "text-amber-800"}`}>
+              {isCourseCompletedByApi ? "Course Completed!" : "Completion Pending in API"}
+            </h2>
+            <p className={`${isCourseCompletedByApi ? "text-green-700" : "text-amber-700"} text-xs sm:text-sm`}>
+              {isCourseCompletedByApi
+                ? "Congratulations on completing this CPD course"
+                : "You passed in UI, but backend has not finalized completion yet."}
+            </p>
+            {!isCertificateAvailable && (
+              <p className="text-xs sm:text-sm text-amber-700 mt-1">
+                Certificate is not available yet according to API.
+              </p>
+            )}
           </div>
         </div>
       </div>

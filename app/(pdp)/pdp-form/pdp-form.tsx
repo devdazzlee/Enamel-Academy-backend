@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { format } from "date-fns";
 import { 
   ArrowLeft,
   Target,
@@ -23,12 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as DateCalendar } from "@/components/ui/calendar";
 import { Spinner } from "@/components/ui/spinner";
 import { pdpService } from "@/lib/api/pdp";
 import { coursesService } from "@/lib/api/courses";
@@ -44,6 +41,8 @@ export default function PDPForm() {
   const [courseOptions, setCourseOptions] = useState<string[]>([]);
   const [durationOptions, setDurationOptions] = useState<string[]>([]);
   const [assessmentOptions, setAssessmentOptions] = useState<string[]>([]);
+  const [proficiencyLevels, setProficiencyLevels] = useState<string[]>([]);
+  const [stepError, setStepError] = useState("");
 
   type CurrentSkill = { skill: string; level: string };
   type SkillToDevelop = { skill: string; target: string };
@@ -87,9 +86,79 @@ export default function PDPForm() {
     { number: 5, title: 'Review Criteria', icon: <Eye size={20} />, completed: false }
   ];
 
-  const skillLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
+  const parseDateValue = (value: string): Date | undefined => {
+    if (!value) return undefined;
+    const normalized = value.includes("T") ? value.split("T")[0] : value;
+    const [year, month, day] = normalized.split("-").map((part) => Number(part));
+    if (!year || !month || !day) return undefined;
+    const parsed = new Date(year, month - 1, day);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  };
+
+  const toApiDate = (value: Date | undefined): string => {
+    if (!value) return "";
+    return format(value, "yyyy-MM-dd");
+  };
+
+  const validateStep = (step: number): string => {
+    if (step === 1) {
+      if (!formData.pdpName.trim()) return "Please enter PDP name before continuing.";
+      if (!formData.startDate || !formData.endDate) return "Please select start and end dates.";
+      if (formData.careerObjectives.filter((x) => x.trim().length > 0).length === 0) {
+        return "Please select at least one career objective.";
+      }
+      return "";
+    }
+    if (step === 2) {
+      const hasCurrent = formData.currentSkills.some((s) => s.skill.trim() && s.level.trim());
+      const hasTarget = formData.skillsToDevelop.some((s) => s.skill.trim() && s.target.trim());
+      if (!hasCurrent || !hasTarget) return "Please select at least one current skill and one skill to develop.";
+      return "";
+    }
+    if (step === 3) {
+      if (formData.selectedCourses.length === 0) return "Please select at least one course in your learning plan.";
+      return "";
+    }
+    if (step === 4) {
+      if (!formData.duration) return "Please select duration before continuing.";
+      return "";
+    }
+    if (step === 5) {
+      if (assessmentOptions.length > 0 && formData.assessmentMethods.length === 0) {
+        return "Please choose at least one assessment method.";
+      }
+      if (formData.successCriteria.filter((x) => x.trim().length > 0).length === 0) {
+        return "Please add at least one success criterion.";
+      }
+      return "";
+    }
+    return "";
+  };
+
+  const handleGoToStep = (targetStep: number) => {
+    if (targetStep <= currentStep) {
+      setStepError("");
+      setCurrentStep(targetStep);
+      return;
+    }
+    for (let s = currentStep; s < targetStep; s += 1) {
+      const error = validateStep(s);
+      if (error) {
+        setStepError(error);
+        return;
+      }
+    }
+    setStepError("");
+    setCurrentStep(targetStep);
+  };
 
   const handleNext = () => {
+    const error = validateStep(currentStep);
+    if (error) {
+      setStepError(error);
+      return;
+    }
+    setStepError("");
     if (currentStep < 5) setCurrentStep(currentStep + 1);
   };
 
@@ -190,30 +259,55 @@ export default function PDPForm() {
 
     const run = async () => {
       try {
-        const [skillsRaw, coursesRaw] = await Promise.all([
+        const [skillsRaw, coursesWithMeta] = await Promise.all([
           pdpService.skillsLibrary(),
-          coursesService.library(),
+          coursesService.libraryWithMeta({ per_page: "100", page: "1" }),
         ]);
         if (!alive) return;
         const skillsObj = (skillsRaw && typeof skillsRaw === "object" ? skillsRaw : {}) as Record<string, unknown>;
         const skillsData = (skillsObj.data && typeof skillsObj.data === "object" ? skillsObj.data : skillsObj) as Record<string, unknown>;
-        const skillsArray = Array.isArray(skillsData.skills)
-          ? skillsData.skills
-          : Array.isArray(skillsData.items)
-            ? skillsData.items
-            : Array.isArray(skillsRaw)
-              ? skillsRaw
-              : [];
+        const skillsByCategory = (skillsData.skills_by_category && typeof skillsData.skills_by_category === "object"
+          ? skillsData.skills_by_category
+          : {}) as Record<string, unknown>;
+        const categorizedSkills = Object.values(skillsByCategory)
+          .flatMap((v) => (Array.isArray(v) ? v : []))
+          .map((s) => (typeof s === "string" ? s : ""))
+          .filter(Boolean);
+        const skillsArray = Array.isArray(skillsData.all_skills)
+          ? skillsData.all_skills
+          : Array.isArray(skillsData.skills)
+            ? skillsData.skills
+            : Array.isArray(skillsData.items)
+              ? skillsData.items
+              : categorizedSkills;
         const skills = (skillsArray as unknown[])
           .map((s) => (typeof s === "string" ? s : typeof s === "object" && s ? String((s as Record<string, unknown>).name ?? (s as Record<string, unknown>).skill_name ?? "") : ""))
           .filter(Boolean);
-        setDentalSpecialties(skills);
+        setDentalSpecialties(Array.from(new Set(skills)));
 
-        const titles = (coursesRaw ?? []).map((c) => c.title ?? "").filter(Boolean) as string[];
-        const durations = Array.from(new Set((coursesRaw ?? []).map((c) => c.duration ?? "").filter(Boolean) as string[]));
+        const apiProficiency = Array.isArray(skillsData.proficiency_levels)
+          ? (skillsData.proficiency_levels as unknown[]).map((v) => (typeof v === "string" ? v : "")).filter(Boolean)
+          : [];
+        setProficiencyLevels(Array.from(new Set(apiProficiency)));
+
+        const coursesRaw = coursesWithMeta.courses ?? [];
+        const titles = coursesRaw.map((c) => c.title ?? "").filter(Boolean) as string[];
+        const durationFromFilters = Array.isArray(coursesWithMeta.filters?.options?.length)
+          ? coursesWithMeta.filters.options.length
+              .map((opt) => opt.label || opt.value || "")
+              .filter(Boolean)
+          : [];
+        const durationFromCourses = Array.from(
+          new Set(
+            coursesRaw
+              .map((c) => c.duration ?? "")
+              .filter((d) => typeof d === "string" && d.trim() !== "" && d !== "Not specified")
+          )
+        ) as string[];
+        const durations = Array.from(new Set([...durationFromFilters, ...durationFromCourses]));
         const features = Array.from(
           new Set(
-            (coursesRaw ?? [])
+            coursesRaw
               .flatMap((c) => (Array.isArray((c as any)?.features) ? (c as any).features : []))
               .map((f) => String(f))
               .filter(Boolean)
@@ -221,21 +315,14 @@ export default function PDPForm() {
         );
         setCourseOptions(titles);
         setDurationOptions(durations);
-        setAssessmentOptions(features.length ? features : [
-          "Course completion certificate",
-          "Practical skills assessment",
-          "Portfolio review",
-        ]);
+        setAssessmentOptions(features);
       } catch {
         if (!alive) return;
         setDentalSpecialties([]);
         setCourseOptions([]);
         setDurationOptions([]);
-        setAssessmentOptions([
-          "Course completion certificate",
-          "Practical skills assessment",
-          "Portfolio review",
-        ]);
+        setProficiencyLevels([]);
+        setAssessmentOptions([]);
       }
     };
 
@@ -310,6 +397,15 @@ export default function PDPForm() {
 
   const handleSavePlan = async () => {
     setSubmitError("");
+    setStepError("");
+    for (let step = 1; step <= 5; step += 1) {
+      const error = validateStep(step);
+      if (error) {
+        setCurrentStep(step);
+        setStepError(error);
+        return;
+      }
+    }
     setIsSubmitting(true);
     const editId = searchParams.get("id");
     try {
@@ -387,7 +483,7 @@ export default function PDPForm() {
               {steps.map((step, index) => (
                 <React.Fragment key={step.number}>
                   <button
-                    onClick={() => setCurrentStep(step.number)}
+                    onClick={() => handleGoToStep(step.number)}
                     className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                       currentStep === step.number 
                         ? 'bg-purple-600 text-white ring-2 ring-purple-300 ring-offset-1' 
@@ -456,6 +552,11 @@ export default function PDPForm() {
               {submitError}
             </div>
           )}
+          {stepError && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              {stepError}
+            </div>
+          )}
           {/* Step 1: Career Objectives */}
           {currentStep === 1 && (
             <div>
@@ -488,23 +589,49 @@ export default function PDPForm() {
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Start Date
                     </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg text-sm sm:text-base flex items-center justify-between hover:bg-gray-50 transition-colors"
+                        >
+                          <span>{parseDateValue(formData.startDate) ? format(parseDateValue(formData.startDate) as Date, "dd/MM/yyyy") : "dd/mm/yyyy"}</span>
+                          <Calendar size={20} />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <DateCalendar
+                          mode="single"
+                          selected={parseDateValue(formData.startDate)}
+                          onSelect={(date) => setFormData({ ...formData, startDate: toApiDate(date) })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       End Date
                     </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
-                      value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg text-sm sm:text-base flex items-center justify-between hover:bg-gray-50 transition-colors"
+                        >
+                          <span>{parseDateValue(formData.endDate) ? format(parseDateValue(formData.endDate) as Date, "dd/MM/yyyy") : "dd/mm/yyyy"}</span>
+                          <Calendar size={20} />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <DateCalendar
+                          mode="single"
+                          selected={parseDateValue(formData.endDate)}
+                          onSelect={(date) => setFormData({ ...formData, endDate: toApiDate(date) })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
@@ -517,126 +644,28 @@ export default function PDPForm() {
                   </p>
                   {formData.careerObjectives.map((objective, index) => (
                     <div key={index} className="flex items-center gap-1.5 sm:gap-2 mb-3 min-w-0">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="flex-1 flex items-center px-2.5 sm:px-4 py-2.5 sm:py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-xs sm:text-sm hover:bg-gray-50 transition-colors text-left min-w-0">
-                            <span className="flex-1 truncate">{objective || "Select a dental specialty"}</span>
-                            <div className="ml-1.5 sm:ml-2 h-4 w-4 text-gray-400 flex-shrink-0">▼</div>
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-full min-w-[300px] max-h-60 overflow-y-auto">
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Become a specialist in Advanced Endodontics" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Become a specialist in Advanced Endodontics" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Become a specialist in Advanced Endodontics
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Achieve proficiency in Digital Smile Design" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Achieve proficiency in Digital Smile Design" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Achieve proficiency in Digital Smile Design
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Obtain Implantology Certification" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Obtain Implantology Certification" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Obtain Implantology Certification
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Develop expertise in aesthetic dentistry procedures" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Develop expertise in aesthetic dentistry procedures" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Develop expertise in aesthetic dentistry procedures
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Master advanced surgical techniques" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Master advanced surgical techniques" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Master advanced surgical techniques
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Become a leader in dental practice management" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Become a leader in dental practice management" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Become a leader in dental practice management
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Specialize in paediatric dentistry" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Specialize in paediatric dentistry" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Specialize in paediatric dentistry
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Excel in cosmetic dentistry" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Excel in cosmetic dentistry" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Excel in cosmetic dentistry
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Become an orthodontic specialist" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Become an orthodontic specialist" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Become an orthodontic specialist
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              const newObjectives = formData.careerObjectives.map((obj, i) => 
-                                i === index ? "Master digital dentistry technologies" : obj
-                              );
-                              setFormData({ ...formData, careerObjectives: newObjectives });
-                            }}
-                            className={objective === "Master digital dentistry technologies" ? "bg-purple-50 text-purple-700" : ""}
-                          >
-                            Master digital dentistry technologies
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <Select
+                        value={objective}
+                        onValueChange={(value) => {
+                          const newObjectives = formData.careerObjectives.map((obj, i) =>
+                            i === index ? value : obj
+                          );
+                          setFormData({ ...formData, careerObjectives: newObjectives });
+                        }}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Select a dental specialty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dentalSpecialties.length > 0 ? (
+                            dentalSpecialties.map((specialty) => (
+                              <SelectItem key={specialty} value={specialty}>{specialty}</SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="__no-skills" disabled>No skills available from API</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                       <button
                         onClick={() => removeObjective(index)}
                         className="p-1.5 sm:p-2.5 text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0"
@@ -705,9 +734,13 @@ export default function PDPForm() {
                           <SelectValue placeholder="Level" />
                         </SelectTrigger>
                         <SelectContent>
-                          {skillLevels.map(level => (
-                            <SelectItem key={level} value={level}>{level}</SelectItem>
-                          ))}
+                          {proficiencyLevels.length > 0 ? (
+                            proficiencyLevels.map(level => (
+                              <SelectItem key={level} value={level}>{level}</SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="__no-levels" disabled>No proficiency levels from API</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                       <button
@@ -764,9 +797,13 @@ export default function PDPForm() {
                           <SelectValue placeholder="Target" />
                         </SelectTrigger>
                         <SelectContent>
-                          {skillLevels.map(level => (
-                            <SelectItem key={level} value={level}>Target: {level}</SelectItem>
-                          ))}
+                          {proficiencyLevels.length > 0 ? (
+                            proficiencyLevels.map(level => (
+                              <SelectItem key={level} value={level}>Target: {level}</SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="__no-levels-target" disabled>No proficiency levels from API</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                       <button
@@ -862,9 +899,13 @@ export default function PDPForm() {
                       <SelectValue placeholder="Select Duration" />
                     </SelectTrigger>
                     <SelectContent>
-                      {durationOptions.map((duration, index) => (
-                        <SelectItem key={index} value={duration}>{duration}</SelectItem>
-                      ))}
+                      {durationOptions.length > 0 ? (
+                        durationOptions.map((duration, index) => (
+                          <SelectItem key={index} value={duration}>{duration}</SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="__no-duration" disabled>No duration options from API</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -935,19 +976,25 @@ export default function PDPForm() {
                 <div>
                   <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-4">Assessment Methods</h3>
                   <p className="text-sm text-gray-600 mb-3 sm:mb-4">Select how you'll evaluate your progress</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                    {assessmentOptions.map((method) => (
-                      <label key={method} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.assessmentMethods.includes(method)}
-                          onChange={() => toggleAssessment(method)}
-                          className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 flex-shrink-0"
-                        />
-                        <span className="text-gray-700 text-xs sm:text-sm leading-tight">{method}</span>
-                      </label>
-                    ))}
-                  </div>
+                  {assessmentOptions.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                      {assessmentOptions.map((method) => (
+                        <label key={method} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.assessmentMethods.includes(method)}
+                            onChange={() => toggleAssessment(method)}
+                            className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 flex-shrink-0"
+                          />
+                          <span className="text-gray-700 text-xs sm:text-sm leading-tight">{method}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-500">
+                      No assessment methods returned by API.
+                    </div>
+                  )}
                 </div>
 
                 <div>

@@ -1,12 +1,29 @@
 "use client"
 
 import { useState } from "react"
+import { format } from "date-fns"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { ArrowLeft, Save, Target, TrendingUp, BookOpen, Calendar, RefreshCw } from "lucide-react"
 import Link from "next/link"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as DateCalendar } from "@/components/ui/calendar"
 
 export default function CreatePDPPage() {
+  const parseDateValue = (value: string): Date | undefined => {
+    if (!value) return undefined
+    const normalized = value.includes("T") ? value.split("T")[0] : value
+    const [year, month, day] = normalized.split("-").map((part) => Number(part))
+    if (!year || !month || !day) return undefined
+    const parsed = new Date(year, month - 1, day)
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  }
+
+  const toApiDate = (value: Date | undefined): string => {
+    if (!value) return ""
+    return format(value, "yyyy-MM-dd")
+  }
+
   const [formData, setFormData] = useState({
     title: "",
     year: new Date().getFullYear(),
@@ -186,23 +203,47 @@ export default function CreatePDPPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">Start Date *</label>
-              <input
-                type="date"
-                value={formData.startDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                required
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 border border-border rounded-lg text-left flex items-center justify-between hover:bg-muted/40"
+                  >
+                    <span>{parseDateValue(formData.startDate) ? format(parseDateValue(formData.startDate) as Date, "dd/MM/yyyy") : "dd/mm/yyyy"}</span>
+                    <Calendar className="h-4 w-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DateCalendar
+                    mode="single"
+                    selected={parseDateValue(formData.startDate)}
+                    onSelect={(date) => setFormData(prev => ({ ...prev, startDate: toApiDate(date) }))}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">End Date *</label>
-              <input
-                type="date"
-                value={formData.endDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                required
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 border border-border rounded-lg text-left flex items-center justify-between hover:bg-muted/40"
+                  >
+                    <span>{parseDateValue(formData.endDate) ? format(parseDateValue(formData.endDate) as Date, "dd/MM/yyyy") : "dd/mm/yyyy"}</span>
+                    <Calendar className="h-4 w-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DateCalendar
+                    mode="single"
+                    selected={parseDateValue(formData.endDate)}
+                    onSelect={(date) => setFormData(prev => ({ ...prev, endDate: toApiDate(date) }))}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
@@ -317,12 +358,25 @@ export default function CreatePDPPage() {
                   placeholder="Milestone title..."
                   className="flex-1 px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
-                <input
-                  type="date"
-                  value={milestone.deadline}
-                  onChange={(e) => updateMilestone(index, "deadline", e.target.value)}
-                  className="px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="px-3 py-2 border border-border rounded-lg min-w-[160px] text-left flex items-center justify-between hover:bg-muted/40"
+                    >
+                      <span>{parseDateValue(milestone.deadline) ? format(parseDateValue(milestone.deadline) as Date, "dd/MM/yyyy") : "dd/mm/yyyy"}</span>
+                      <Calendar className="h-4 w-4 ml-2 shrink-0" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <DateCalendar
+                      mode="single"
+                      selected={parseDateValue(milestone.deadline)}
+                      onSelect={(date) => updateMilestone(index, "deadline", toApiDate(date))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 {formData.milestones.length > 1 && (
                   <button
                     onClick={() => removeMilestone(index)}
@@ -345,12 +399,25 @@ export default function CreatePDPPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Next Review Date</label>
-              <input
-                type="date"
-                value={formData.reviewSchedule}
-                onChange={(e) => setFormData(prev => ({ ...prev, reviewSchedule: e.target.value }))}
-                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 border border-border rounded-lg text-left flex items-center justify-between hover:bg-muted/40"
+                  >
+                    <span>{parseDateValue(formData.reviewSchedule) ? format(parseDateValue(formData.reviewSchedule) as Date, "dd/MM/yyyy") : "dd/mm/yyyy"}</span>
+                    <Calendar className="h-4 w-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DateCalendar
+                    mode="single"
+                    selected={parseDateValue(formData.reviewSchedule)}
+                    onSelect={(date) => setFormData(prev => ({ ...prev, reviewSchedule: toApiDate(date) }))}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>

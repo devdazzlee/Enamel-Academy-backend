@@ -362,6 +362,18 @@ export default function PDPDashboard() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {/* Mobile Card View */}
           <div className="sm:hidden divide-y divide-gray-200">
+            {isLoading && (
+              <>
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={`mobile-skeleton-${idx}`} className="p-4 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/2 mb-3" />
+                    <div className="h-3 bg-gray-100 rounded w-1/4 mb-3" />
+                    <div className="h-2 bg-gray-100 rounded w-full mb-3" />
+                    <div className="h-3 bg-gray-100 rounded w-1/3 ml-auto" />
+                  </div>
+                ))}
+              </>
+            )}
             {plans.map((plan, index) => (
               <div key={index} className="p-4">
                 <div className="flex justify-between items-start mb-3">
@@ -423,6 +435,26 @@ export default function PDPDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
+              {isLoading && (
+                <>
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <tr key={`desktop-skeleton-${idx}`} className="animate-pulse">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
+                        <div className="h-4 bg-gray-200 rounded w-2/3" />
+                      </td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
+                        <div className="h-6 bg-gray-100 rounded-full w-24" />
+                      </td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
+                        <div className="h-2 bg-gray-100 rounded w-full" />
+                      </td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
+                        <div className="h-4 bg-gray-100 rounded w-28 ml-auto" />
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
               {plans.map((plan, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">{plan.title}</td>

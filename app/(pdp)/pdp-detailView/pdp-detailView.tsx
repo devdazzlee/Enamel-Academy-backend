@@ -19,12 +19,6 @@ import {
   ChevronDown
 } from 'lucide-react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -40,14 +34,41 @@ import { pdpService } from "@/lib/api/pdp";
 type PDPDetailData = {
   id?: string;
   title: string;
+  description: string;
   status: string;
+  year: string;
+  authorName: string;
+  authorId: string;
+  createdAt: string;
+  startDate: string;
+  endDate: string;
   dateRange: string;
   lastUpdated: string;
   progress: number;
+  progressDetails: {
+    totalItems: number;
+    completedItems: number;
+    objectivesCompleted: number;
+    skillsDeveloped: number;
+    activitiesCompleted: number;
+    milestonesCompleted: number;
+  };
   careerObjectives: string[];
   currentSkills: Array<{ skill: string; level: string }>;
   skillsToDevelop: Array<{ skill: string; target: string }>;
-  courses: Array<{ title: string; duration: string; status: string }>;
+  courses: Array<{
+    title: string;
+    duration: string;
+    status: string;
+    activityType?: string;
+    courseId?: string;
+    priority?: number;
+    startDate?: string;
+    completionDate?: string;
+    createdAt?: string;
+    certificateUrl?: string;
+    reflection?: string;
+  }>;
   milestones: Array<{ quarter: string; goal: string; status: string }>;
   achievements: string[];
   reflection: string;
@@ -58,14 +79,30 @@ export default function PDPDetailView() {
   const searchParams = useSearchParams();
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [pdpData, setPdpData] = useState<PDPDetailData>({
     title: 'PDP Plan',
+    description: '',
     status: 'Draft',
+    year: '',
+    authorName: '',
+    authorId: '',
+    createdAt: '',
+    startDate: '',
+    endDate: '',
     dateRange: 'Date range not available',
     lastUpdated: 'Not available',
     progress: 0,
+    progressDetails: {
+      totalItems: 0,
+      completedItems: 0,
+      objectivesCompleted: 0,
+      skillsDeveloped: 0,
+      activitiesCompleted: 0,
+      milestonesCompleted: 0,
+    },
     careerObjectives: [],
     currentSkills: [],
     skillsToDevelop: [],
@@ -101,6 +138,8 @@ export default function PDPDetailView() {
         setLoadError("Unable to save: PDP id missing.");
         return;
       }
+      setLoadError("");
+      setIsSavingEdit(true);
       try {
         await pdpService.update(editedPDPData.id, {
           name: editedPDPData.title,
@@ -135,6 +174,8 @@ export default function PDPDetailView() {
         setIsMobileModalOpen(false);
       } catch {
         setLoadError("Failed to save PDP changes. Please try again.");
+      } finally {
+        setIsSavingEdit(false);
       }
     };
     void run();
@@ -393,23 +434,62 @@ export default function PDPDetailView() {
         if (!alive) return;
         const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
         const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+        const toLabel = (input: string) =>
+          input
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (ch) => ch.toUpperCase());
+        const meta = (data.meta && typeof data.meta === "object" ? data.meta : {}) as Record<string, unknown>;
+        const progressDetails = (data.progress_details && typeof data.progress_details === "object"
+          ? data.progress_details
+          : {}) as Record<string, unknown>;
+        const statusValue = Array.isArray(data.status)
+          ? getText((data.status as unknown[])[0], "draft")
+          : getText(data.status, "draft");
+        const yearValue = Array.isArray(data.year)
+          ? getText((data.year as unknown[])[0], "")
+          : getText(data.year, "");
+        const startDate = getText(data.start_date) || getText(meta.start_date);
+        const endDate = getText(data.end_date) || getText(meta.end_date);
         const courses = Array.isArray(data.learning_activities)
           ? (data.learning_activities as Array<Record<string, unknown>>).map((a) => ({
               title: getText(a.activity_name, "Learning Activity"),
               duration: `${getNum(a.duration_hours, 0)} hours`,
-              status: getText(a.status, "planned"),
+              status: toLabel(getText(a.status, "planned")),
+              activityType: toLabel(getText(a.activity_type, "course")),
+              courseId: String(a.course_id ?? ""),
+              priority: getNum(a.priority, 0),
+              startDate: getText(a.start_date),
+              completionDate: getText(a.completion_date),
+              createdAt: getText(a.created_at),
+              certificateUrl: getText(a.certificate_url),
+              reflection: getText(a.reflection),
             }))
           : [];
         setPdpData({
           id: String(data.id ?? planId),
           title: getText(data.name, "PDP Plan"),
-          status: getText(data.status, "draft"),
+          description: getText(data.description),
+          status: toLabel(statusValue),
+          year: yearValue,
+          authorName: getText(data.author_name),
+          authorId: getText(data.author_id),
+          createdAt: getText(data.created_at),
+          startDate,
+          endDate,
           dateRange:
-            getText(data.start_date) && getText(data.end_date)
-              ? `${getText(data.start_date)} - ${getText(data.end_date)}`
+            startDate && endDate
+              ? `${startDate} - ${endDate}`
               : "Date range not available",
           lastUpdated: getText(data.updated_at, "Not available"),
-          progress: getNum(data.progress_percentage, 0),
+          progress: getNum(data.progress_percentage, getNum(meta.progress_percentage, getNum(progressDetails.progress_percentage, 0))),
+          progressDetails: {
+            totalItems: getNum(progressDetails.total_items, 0),
+            completedItems: getNum(progressDetails.completed_items, 0),
+            objectivesCompleted: getNum(progressDetails.objectives_completed, 0),
+            skillsDeveloped: getNum(progressDetails.skills_developed, 0),
+            activitiesCompleted: getNum(progressDetails.activities_completed, 0),
+            milestonesCompleted: getNum(progressDetails.milestones_completed, 0),
+          },
           careerObjectives: Array.isArray(data.career_objectives)
             ? (data.career_objectives as Array<Record<string, unknown>>).map((o) => getText(o.objective)).filter(Boolean)
             : [],
@@ -480,14 +560,25 @@ export default function PDPDetailView() {
               {isEditing ? (
                 <>
                   <Button 
-                    onClick={handleSave} 
-                    className="px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm hidden sm:flex"
+                    onClick={handleSave}
+                    disabled={isSavingEdit}
+                    className="px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm hidden sm:flex disabled:opacity-60"
                   >
-                    <Save size={16} />
-                    <span className="ml-1">Save</span>
+                    {isSavingEdit ? (
+                      <>
+                        <Spinner />
+                        <span className="ml-1">Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        <span className="ml-1">Save</span>
+                      </>
+                    )}
                   </Button>
                   <Button 
                     onClick={handleCancel} 
+                    disabled={isSavingEdit}
                     variant="outline" 
                     className="px-3 sm:px-4 py-2 text-xs sm:text-sm hidden sm:flex"
                   >
@@ -567,6 +658,34 @@ export default function PDPDetailView() {
           {componentSyncError && <p className="mt-2 text-xs text-red-600">{componentSyncError}</p>}
           {componentSyncMessage && <p className="mt-2 text-xs text-green-600">{componentSyncMessage}</p>}
         </div>
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className="rounded-lg border border-gray-200 p-3">
+              <p className="text-xs text-gray-500">Author</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.authorName || "N/A"}</p>
+              <p className="text-xs text-gray-500">{currentData.authorId ? `ID: ${currentData.authorId}` : "ID: N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-3">
+              <p className="text-xs text-gray-500">Status / Year</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.status || "N/A"}</p>
+              <p className="text-xs text-gray-500">{currentData.year || "Year not set"}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-3">
+              <p className="text-xs text-gray-500">Created</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.createdAt || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-3">
+              <p className="text-xs text-gray-500">Start / End</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.startDate || "N/A"} - {currentData.endDate || "N/A"}</p>
+            </div>
+          </div>
+          {currentData.description && (
+            <div className="rounded-lg bg-gray-50 border border-gray-200 p-3">
+              <p className="text-xs text-gray-500 mb-1">Description</p>
+              <p className="text-sm text-gray-700">{currentData.description}</p>
+            </div>
+          )}
+        </div>
         {/* Progress Bar */}
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-200">
           <div className="flex justify-between items-center mb-2">
@@ -578,6 +697,32 @@ export default function PDPDetailView() {
               className="bg-gradient-to-r from-green-500 to-blue-500 h-2 sm:h-3 rounded-full"
               style={{ width: `${currentData.progress}%` }}
             />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 mt-4">
+            <div className="rounded-md bg-gray-50 border border-gray-200 p-2">
+              <p className="text-[11px] text-gray-500">Total Items</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.progressDetails.totalItems}</p>
+            </div>
+            <div className="rounded-md bg-gray-50 border border-gray-200 p-2">
+              <p className="text-[11px] text-gray-500">Completed</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.progressDetails.completedItems}</p>
+            </div>
+            <div className="rounded-md bg-gray-50 border border-gray-200 p-2">
+              <p className="text-[11px] text-gray-500">Objectives</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.progressDetails.objectivesCompleted}</p>
+            </div>
+            <div className="rounded-md bg-gray-50 border border-gray-200 p-2">
+              <p className="text-[11px] text-gray-500">Skills</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.progressDetails.skillsDeveloped}</p>
+            </div>
+            <div className="rounded-md bg-gray-50 border border-gray-200 p-2">
+              <p className="text-[11px] text-gray-500">Activities</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.progressDetails.activitiesCompleted}</p>
+            </div>
+            <div className="rounded-md bg-gray-50 border border-gray-200 p-2">
+              <p className="text-[11px] text-gray-500">Milestones</p>
+              <p className="text-sm font-semibold text-gray-900">{currentData.progressDetails.milestonesCompleted}</p>
+            </div>
           </div>
         </div>
 
@@ -601,34 +746,27 @@ export default function PDPDetailView() {
                 {isEditing ? (
                   <>
                     {currentData.careerObjectives.map((objective: string, index: number) => (
-                      <div key={index} className="flex flex-col gap-2 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-start gap-2 flex-1">
-                          <CheckCircle className="text-green-600 mt-0.5 flex-shrink-0" size={16} />
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="flex-1 flex items-center text-sm bg-white border border-gray-300 rounded-md px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                                <span className="flex-1">{objective || "Select or type career objective"}</span>
-                                <div className="ml-2 h-4 w-4 text-gray-400 flex-shrink-0">▼</div>
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-full min-w-[300px] max-h-60 overflow-y-auto">
-                              {(careerObjectiveOptions.length ? careerObjectiveOptions : [objective]).filter(Boolean).map((option) => (
-                                <DropdownMenuItem
-                                  key={option}
-                                  onClick={() => updateCareerObjective(index, option)}
-                                  className={objective === option ? "bg-purple-50 text-purple-700" : ""}
-                                >
+                      <div key={index} className="grid grid-cols-[16px_1fr_auto] items-center gap-2 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                        <CheckCircle className="text-green-600 shrink-0" size={16} />
+                        <Select value={objective} onValueChange={(value) => updateCareerObjective(index, value)}>
+                          <SelectTrigger className="w-full min-w-0 bg-white">
+                            <SelectValue placeholder="Select career objective" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {(careerObjectiveOptions.length ? careerObjectiveOptions : [objective])
+                              .filter(Boolean)
+                              .map((option) => (
+                                <SelectItem key={option} value={option}>
                                   {option}
-                                </DropdownMenuItem>
+                                </SelectItem>
                               ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                          </SelectContent>
+                        </Select>
                         <Button
                           onClick={() => removeCareerObjective(index)}
                           variant="ghost"
                           size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0 self-start sm:self-auto"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
                         >
                           <X size={16} />
                         </Button>
@@ -679,9 +817,9 @@ export default function PDPDetailView() {
                   <div className="space-y-2 sm:space-y-3">
                     {isEditing ? (
                       currentData.currentSkills.map((skill: { skill: string; level: string }, index: number) => (
-                        <div key={index} className="flex flex-col gap-2 p-2 sm:p-3 bg-gray-50 rounded-lg overflow-hidden">
-                          <div className="flex items-start gap-2 min-w-0">
-                            <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={16} />
+                        <div key={index} className="grid grid-cols-[16px_1fr] gap-x-2 gap-y-2 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                          <CheckCircle className="text-green-600 shrink-0 row-span-2 self-center" size={16} />
+                          <div className="min-w-0">
                             <Select
                               value={skill.skill}
                               onValueChange={(value) => {
@@ -696,7 +834,7 @@ export default function PDPDetailView() {
                                 });
                               }}
                             >
-                              <SelectTrigger className="flex-1 text-sm min-w-0">
+                              <SelectTrigger className="w-full text-sm min-w-0 bg-white">
                                 <SelectValue placeholder="Select skill" />
                               </SelectTrigger>
                               <SelectContent>
@@ -706,7 +844,7 @@ export default function PDPDetailView() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="pl-6">
+                          <div className="min-w-0">
                             <Select
                               value={skill.level}
                               onValueChange={(value) => {
@@ -721,7 +859,7 @@ export default function PDPDetailView() {
                                 });
                               }}
                             >
-                              <SelectTrigger className="w-full text-sm">
+                              <SelectTrigger className="w-full text-sm bg-white">
                                 <SelectValue placeholder="Level" />
                               </SelectTrigger>
                               <SelectContent>
@@ -753,9 +891,9 @@ export default function PDPDetailView() {
                   <div className="space-y-2 sm:space-y-3">
                     {isEditing ? (
                       currentData.skillsToDevelop.map((skill: { skill: string; target: string }, index: number) => (
-                        <div key={index} className="flex flex-col gap-2 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="text-green-600 flex-shrink-0" size={16} />
+                        <div key={index} className="grid grid-cols-[16px_1fr] gap-x-2 gap-y-2 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                          <CheckCircle className="text-green-600 shrink-0 row-span-2 self-center" size={16} />
+                          <div className="min-w-0">
                             <Select
                               value={skill.skill}
                               onValueChange={(value) => {
@@ -770,7 +908,7 @@ export default function PDPDetailView() {
                                 });
                               }}
                             >
-                              <SelectTrigger className="flex-1 text-sm">
+                              <SelectTrigger className="w-full text-sm bg-white">
                                 <SelectValue placeholder="Select skill" />
                               </SelectTrigger>
                               <SelectContent>
@@ -780,29 +918,31 @@ export default function PDPDetailView() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <Select
-                            value={skill.target}
-                            onValueChange={(value) => {
-                              setEditedPDPData(prev => {
-                                if (!prev) return prev;
-                                return {
-                                  ...prev,
-                                  skillsToDevelop: prev.skillsToDevelop.map((s, i) => 
-                                    i === index ? { ...s, target: value } : s
-                                  )
-                                };
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="w-full text-sm">
-                              <SelectValue placeholder="Target" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {skillLevels.map(level => (
-                                <SelectItem key={level} value={level}>Target: {level}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="min-w-0">
+                            <Select
+                              value={skill.target}
+                              onValueChange={(value) => {
+                                setEditedPDPData(prev => {
+                                  if (!prev) return prev;
+                                  return {
+                                    ...prev,
+                                    skillsToDevelop: prev.skillsToDevelop.map((s, i) => 
+                                      i === index ? { ...s, target: value } : s
+                                    )
+                                  };
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-full text-sm bg-white">
+                                <SelectValue placeholder="Target" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {skillLevels.map(level => (
+                                  <SelectItem key={level} value={level}>Target: {level}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -923,12 +1063,33 @@ export default function PDPDetailView() {
                     </div>
                   ))
                 ) : (
-                  currentData.courses.map((course: { title: string; duration: string; status: string }, index: number) => (
+                  currentData.courses.map((course, index: number) => (
                     <div key={index} className="p-3 sm:p-4 bg-gray-50 rounded-lg">
                       <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
                         <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-gray-900 mb-1 text-sm sm:text-base leading-tight">{course.title}</h4>
                           <p className="text-xs sm:text-sm text-gray-600">Duration: {course.duration}</p>
+                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-gray-500">
+                            <p>Type: {course.activityType || "N/A"}</p>
+                            <p>Course ID: {course.courseId || "N/A"}</p>
+                            <p>Priority: {typeof course.priority === "number" ? course.priority : "N/A"}</p>
+                            <p>Start: {course.startDate || "N/A"}</p>
+                            <p>Completed: {course.completionDate || "Not completed"}</p>
+                            <p>Created: {course.createdAt || "N/A"}</p>
+                          </div>
+                          {course.reflection && (
+                            <p className="text-xs text-gray-600 mt-1">Reflection: {course.reflection}</p>
+                          )}
+                          {course.certificateUrl && (
+                            <a
+                              href={course.certificateUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-purple-700 hover:text-purple-800 mt-1 inline-block"
+                            >
+                              Open certificate
+                            </a>
+                          )}
                         </div>
                         <span className="px-2 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold flex-shrink-0">
                           {course.status}
@@ -1226,14 +1387,25 @@ export default function PDPDetailView() {
                 <div className="flex gap-2 pt-3 border-t sticky bottom-0 bg-white pb-1">
                   <Button 
                     onClick={handleSave}
+                    disabled={isSavingEdit}
                     size="sm"
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs h-9"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs h-9 disabled:opacity-60"
                   >
-                    <Save size={14} className="mr-1.5" />
-                    Save Changes
+                    {isSavingEdit ? (
+                      <>
+                        <Spinner />
+                        <span className="ml-1.5">Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} className="mr-1.5" />
+                        Save Changes
+                      </>
+                    )}
                   </Button>
                   <Button 
                     onClick={handleCancel}
+                    disabled={isSavingEdit}
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs h-9"

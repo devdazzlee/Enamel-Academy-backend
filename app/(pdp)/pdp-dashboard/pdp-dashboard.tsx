@@ -14,6 +14,16 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { Spinner } from "@/components/ui/spinner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { pdpService } from "@/lib/api/pdp";
 
 // Main Dashboard Component
@@ -34,6 +44,12 @@ export default function PDPDashboard() {
   const [rowActionLoading, setRowActionLoading] = useState<string>("");
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [confirmDeletePlan, setConfirmDeletePlan] = useState<{ id: string; title: string } | null>(null);
+  const [confirmStatusPlan, setConfirmStatusPlan] = useState<{
+    id: string;
+    title: string;
+    nextStatus: "active" | "completed" | "draft";
+  } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -216,7 +232,6 @@ export default function PDPDashboard() {
   };
 
   const handleDelete = async (planId: string) => {
-    if (!window.confirm("Delete this PDP permanently?")) return;
     setActionError("");
     setActionMessage("");
     setRowActionLoading(`delete-${planId}`);
@@ -229,6 +244,22 @@ export default function PDPDashboard() {
     } finally {
       setRowActionLoading("");
     }
+  };
+
+  const isBusy = (planId: string) =>
+    rowActionLoading === `status-${planId}` ||
+    rowActionLoading === `delete-${planId}` ||
+    rowActionLoading === `view-${planId}` ||
+    rowActionLoading === `edit-${planId}`;
+
+  const openView = (planId: string) => {
+    setRowActionLoading(`view-${planId}`);
+    router.push(`/pdp?view=detail&id=${planId}`);
+  };
+
+  const openEdit = (planId: string, step?: number) => {
+    setRowActionLoading(`edit-${planId}`);
+    router.push(`/pdp?view=form&id=${planId}${step ? `&step=${step}` : ""}`);
   };
 
   return (
@@ -293,9 +324,22 @@ export default function PDPDashboard() {
                 <p className="text-gray-600 text-sm sm:text-base">{currentPlan.dateRange}</p>
                 <p className="text-xs sm:text-sm text-gray-500">Last updated: {currentPlan.lastUpdated}</p>
               </div>
-              <button onClick={() => router.push(`/pdp?view=form&id=${currentPlan.id}`)} className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium text-sm sm:text-base">
-                <Edit2 size={16} />
-                Edit PDP
+              <button
+                disabled={isBusy(currentPlan.id)}
+                onClick={() => openEdit(currentPlan.id)}
+                className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium text-sm sm:text-base disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {rowActionLoading === `edit-${currentPlan.id}` ? (
+                  <>
+                    <Spinner />
+                    Opening edit...
+                  </>
+                ) : (
+                  <>
+                    <Edit2 size={16} />
+                    Edit PDP
+                  </>
+                )}
               </button>
             </div>
 
@@ -346,8 +390,16 @@ export default function PDPDashboard() {
                 </div>
                 <div className="flex items-center gap-2 self-end sm:self-auto">
                   {sectionStatus === 'Completed' && (
-                    <button onClick={(e) => { e.stopPropagation(); router.push(`/pdp?view=form&id=${selectedPlan}&step=${section.step}`) }} className="text-purple-600 hover:text-purple-700 font-medium text-xs sm:text-sm">
-                      Edit
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!selectedPlan || isBusy(selectedPlan)) return;
+                        openEdit(selectedPlan, section.step);
+                      }}
+                      disabled={!selectedPlan || isBusy(selectedPlan)}
+                      className="text-purple-600 hover:text-purple-700 font-medium text-xs sm:text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {selectedPlan && rowActionLoading === `edit-${selectedPlan}` ? "Opening..." : "Edit"}
                     </button>
                   )}
                   <ChevronRight className="text-gray-400" size={16} />
@@ -397,23 +449,54 @@ export default function PDPDashboard() {
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap justify-end">
                     <button
-                      disabled={rowActionLoading === `status-${plan.id}`}
-                      onClick={() => handleUpdateStatus(plan.id, plan.status === "Completed" ? "active" : "completed")}
-                      className="text-blue-600 hover:text-blue-700 font-medium text-xs disabled:opacity-50"
+                      disabled={isBusy(plan.id)}
+                      onClick={() =>
+                        setConfirmStatusPlan({
+                          id: plan.id,
+                          title: plan.title,
+                          nextStatus: plan.status === "Completed" ? "active" : "completed",
+                        })
+                      }
+                      className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {plan.status === "Completed" ? "Mark Active" : "Mark Complete"}
+                      {rowActionLoading === `status-${plan.id}` ? (
+                        <>
+                          <Spinner />
+                          <span className="ml-1">Saving...</span>
+                        </>
+                      ) : (
+                        <>{plan.status === "Completed" ? "Mark Active" : "Mark Complete"}</>
+                      )}
                     </button>
-                  <button onClick={() => router.push(`/pdp?view=detail&id=${plan.id}`)} className="text-purple-600 hover:text-purple-700 font-medium text-xs">
-                    View
-                  </button>
                     <button
-                      disabled={rowActionLoading === `delete-${plan.id}`}
-                      onClick={() => handleDelete(plan.id)}
-                      className="text-red-600 hover:text-red-700 font-medium text-xs disabled:opacity-50"
+                      disabled={isBusy(plan.id)}
+                      onClick={() => openView(plan.id)}
+                      className="inline-flex items-center rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Delete
+                      {rowActionLoading === `view-${plan.id}` ? (
+                        <>
+                          <Spinner />
+                          <span className="ml-1">Opening...</span>
+                        </>
+                      ) : (
+                        <>View</>
+                      )}
+                    </button>
+                    <button
+                      disabled={isBusy(plan.id)}
+                      onClick={() => setConfirmDeletePlan({ id: plan.id, title: plan.title })}
+                      className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {rowActionLoading === `delete-${plan.id}` ? (
+                        <>
+                          <Spinner />
+                          <span className="ml-1">Deleting...</span>
+                        </>
+                      ) : (
+                        <>Delete</>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -475,23 +558,54 @@ export default function PDPDashboard() {
                     </div>
                   </td>
                   <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
-                    <div className="flex justify-end gap-3">
+                    <div className="flex justify-end gap-2 flex-wrap">
                       <button
-                        disabled={rowActionLoading === `status-${plan.id}`}
-                        onClick={() => handleUpdateStatus(plan.id, plan.status === "Completed" ? "active" : "completed")}
-                        className="text-blue-600 hover:text-blue-700 font-medium text-xs sm:text-sm disabled:opacity-50"
+                        disabled={isBusy(plan.id)}
+                        onClick={() =>
+                          setConfirmStatusPlan({
+                            id: plan.id,
+                            title: plan.title,
+                            nextStatus: plan.status === "Completed" ? "active" : "completed",
+                          })
+                        }
+                        className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs sm:text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {plan.status === "Completed" ? "Mark Active" : "Mark Complete"}
+                        {rowActionLoading === `status-${plan.id}` ? (
+                          <>
+                            <Spinner />
+                            <span className="ml-1">Saving...</span>
+                          </>
+                        ) : (
+                          <>{plan.status === "Completed" ? "Mark Active" : "Mark Complete"}</>
+                        )}
                       </button>
-                    <button onClick={() => router.push(`/pdp?view=detail&id=${plan.id}`)} className="text-purple-600 hover:text-purple-700 font-medium text-xs sm:text-sm">
-                      View
-                    </button>
                       <button
-                        disabled={rowActionLoading === `delete-${plan.id}`}
-                        onClick={() => handleDelete(plan.id)}
-                        className="text-red-600 hover:text-red-700 font-medium text-xs sm:text-sm disabled:opacity-50"
+                        disabled={isBusy(plan.id)}
+                        onClick={() => openView(plan.id)}
+                        className="inline-flex items-center rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs sm:text-sm font-semibold text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Delete
+                        {rowActionLoading === `view-${plan.id}` ? (
+                          <>
+                            <Spinner />
+                            <span className="ml-1">Opening...</span>
+                          </>
+                        ) : (
+                          <>View</>
+                        )}
+                      </button>
+                      <button
+                        disabled={isBusy(plan.id)}
+                        onClick={() => setConfirmDeletePlan({ id: plan.id, title: plan.title })}
+                        className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs sm:text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {rowActionLoading === `delete-${plan.id}` ? (
+                          <>
+                            <Spinner />
+                            <span className="ml-1">Deleting...</span>
+                          </>
+                        ) : (
+                          <>Delete</>
+                        )}
                       </button>
                     </div>
                   </td>
@@ -508,7 +622,61 @@ export default function PDPDashboard() {
           </table>
         </div>
 
-       
+        <AlertDialog open={Boolean(confirmDeletePlan)} onOpenChange={(open) => !open && setConfirmDeletePlan(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete PDP plan?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. "{confirmDeletePlan?.title}" will be permanently removed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={Boolean(confirmDeletePlan && isBusy(confirmDeletePlan.id))}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={Boolean(confirmDeletePlan && isBusy(confirmDeletePlan.id))}
+                onClick={() => {
+                  if (!confirmDeletePlan) return;
+                  void handleDelete(confirmDeletePlan.id);
+                  setConfirmDeletePlan(null);
+                }}
+              >
+                Confirm Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={Boolean(confirmStatusPlan)} onOpenChange={(open) => !open && setConfirmStatusPlan(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {confirmStatusPlan?.nextStatus === "completed" ? "Mark this PDP as complete?" : "Mark this PDP as active?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {confirmStatusPlan?.nextStatus === "completed"
+                  ? `The plan "${confirmStatusPlan?.title}" will be moved to completed status.`
+                  : `The plan "${confirmStatusPlan?.title}" will be moved back to active status.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={Boolean(confirmStatusPlan && isBusy(confirmStatusPlan.id))}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={Boolean(confirmStatusPlan && isBusy(confirmStatusPlan.id))}
+                onClick={() => {
+                  if (!confirmStatusPlan) return;
+                  void handleUpdateStatus(confirmStatusPlan.id, confirmStatusPlan.nextStatus);
+                  setConfirmStatusPlan(null);
+                }}
+              >
+                Confirm
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

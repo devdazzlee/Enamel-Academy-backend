@@ -75,6 +75,13 @@ export default function CPDDashboard() {
   const [evidenceStats, setEvidenceStats] = useState({ totalFiles: 0, certificates: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [isRecentViewAllLoading, setIsRecentViewAllLoading] = useState(false);
+
+  const handleRecentViewAll = () => {
+    if (isRecentViewAllLoading) return;
+    setIsRecentViewAllLoading(true);
+    router.push('/cpd-activities-log');
+  };
 
   useEffect(() => {
     let alive = true;
@@ -123,20 +130,35 @@ export default function CPDDashboard() {
         if (!alive) return;
 
         const summaryData = pickData(summaryRaw);
-        const completedHours = getNum(summaryData.hours_completed ?? summaryData.completed_hours ?? summaryData.total_hours_completed, 0);
-        const totalHours = getNum(summaryData.total_required_hours ?? summaryData.total_hours, 100);
-        const verifiedHours = getNum(summaryData.verified_hours ?? summaryData.verified_cpd_hours ?? summaryData.verified_records, 0);
+        const summaryBlock = asObj(summaryData.summary);
+        const requirementsBlock = asObj(summaryData.requirements);
+        const cycleBlock = asObj(summaryData.cycle);
+        const completedHours = getNum(
+          summaryData.hours_completed ?? summaryData.completed_hours ?? summaryData.total_hours_completed ?? summaryBlock.total_completed,
+          0
+        );
+        const totalHours = getNum(
+          summaryData.total_required_hours ?? summaryData.total_hours ?? requirementsBlock.total_hours ?? summaryBlock.target_hours,
+          100
+        );
+        const verifiedHours = getNum(
+          summaryData.verified_hours ?? summaryData.verified_cpd_hours ?? summaryData.verified_records ?? summaryBlock.verified_hours,
+          0
+        );
         const selfDeclaredHours = getNum(
-          summaryData.self_declared_hours ?? summaryData.self_declared,
+          summaryData.self_declared_hours ?? summaryData.self_declared ?? summaryBlock.self_declared_hours,
           Math.max(completedHours - verifiedHours, 0)
         );
-        const evidencePercentage = getNum(summaryData.evidence_coverage ?? summaryData.evidence_percentage, 0);
+        const evidencePercentage = getNum(
+          summaryData.evidence_coverage ?? summaryData.evidence_percentage ?? summaryBlock.evidence_percentage,
+          0
+        );
         setSummary({
           hoursCompleted: completedHours,
           totalHours,
           hoursRemaining: Math.max(totalHours - completedHours, 0),
-          cycleStart: getText(summaryData.cycle_start, 'N/A'),
-          cycleEnd: getText(summaryData.cycle_end, 'N/A'),
+          cycleStart: getText(summaryData.cycle_start ?? cycleBlock.start_date_formatted ?? cycleBlock.start_date, 'N/A'),
+          cycleEnd: getText(summaryData.cycle_end ?? cycleBlock.end_date_formatted ?? cycleBlock.end_date, 'N/A'),
           verifiedHours,
           selfDeclaredHours,
           evidencePercentage,
@@ -191,14 +213,16 @@ export default function CPDDashboard() {
             ? historyData.activities
             : Array.isArray(historyData.items)
               ? historyData.items
+              : Array.isArray(historyData.recent_completions)
+                ? historyData.recent_completions
               : [];
         const recent = (historyRows as unknown[]).slice(0, 4).map((item) => {
           const row = asObj(item);
           const type = getText(row.activity_type ?? row.type, 'External');
           return {
-            title: getText(row.title ?? row.activity_name, 'Untitled activity'),
-            date: formatDate(row.date_completed ?? row.date ?? row.completed_at),
-            hours: getNum(row.hours ?? row.duration_hours, 0),
+            title: getText(row.title ?? row.activity_name ?? row.course_title ?? row.name, 'Untitled activity'),
+            date: formatDate(row.date_completed ?? row.date ?? row.completed_at ?? row.completion_date),
+            hours: getNum(row.hours ?? row.duration_hours ?? row.cpd_hours, 0),
             category: getText(row.gdc_category ?? row.category, 'General'),
             type,
             icon: type.toLowerCase().includes('platform') ? 'award' : 'file',
@@ -370,8 +394,19 @@ export default function CPDDashboard() {
                     <h3 className="text-base sm:text-lg font-semibold text-purple-700">Recent CPD Activity</h3>
                     <p className="text-xs sm:text-sm text-gray-600">Your latest completed activities</p>
                   </div>
-                  <button className="text-purple-600 hover:text-purple-700 font-medium text-xs sm:text-sm">
-                    View All
+                  <button
+                    onClick={handleRecentViewAll}
+                    disabled={isRecentViewAllLoading}
+                    className="text-purple-600 hover:text-purple-700 font-medium text-xs sm:text-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                  >
+                    {isRecentViewAllLoading ? (
+                      <>
+                        <Spinner />
+                        Opening...
+                      </>
+                    ) : (
+                      "View All"
+                    )}
                   </button>
                 </div>
                 <div className="space-y-2 sm:space-y-3">

@@ -7,17 +7,20 @@ import { Footer } from "@/components/footer";
 import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from 'next/navigation';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cpdService } from "@/lib/api/cpd";
+import { rolesService, type DentalRole } from "@/lib/api/roles";
 
 export default function GenerateAuditReport() {
   const router = useRouter();
   const [reportFormat, setReportFormat] = useState('comprehensive');
-  const [dateRange, setDateRange] = useState('Full 5-Year Cycle');
+  const [dateRange, setDateRange] = useState<'full_cycle' | 'last_year' | 'custom'>('full_cycle');
   const [includeOptions, setIncludeOptions] = useState({
     certificates: true,
     evidence: true,
@@ -31,6 +34,12 @@ export default function GenerateAuditReport() {
   const [generateSuccess, setGenerateSuccess] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedRole, setSelectedRole] = useState("dentist");
+  const [roleOptions, setRoleOptions] = useState<DentalRole[]>([]);
+  const [dateRangeLabels, setDateRangeLabels] = useState({
+    fullCycle: "Full 5-Year Cycle",
+    lastYear: "Last Year",
+    custom: "Custom Range",
+  });
   const [complianceData, setComplianceData] = useState({
     hoursCompleted: 0,
     totalHours: 100,
@@ -66,10 +75,11 @@ export default function GenerateAuditReport() {
       setIsLoading(true);
       setLoadError("");
       try {
-        const [summaryRaw, analyticsRaw, requirementsRaw] = await Promise.all([
+        const [summaryRaw, analyticsRaw, requirementsRaw, rolesRaw] = await Promise.all([
           cpdService.summary(),
           cpdService.analytics(),
           cpdService.requirements(selectedRole),
+          rolesService.roles(),
         ]);
         if (!alive) return;
 
@@ -79,19 +89,38 @@ export default function GenerateAuditReport() {
         const analyticsData = (analyticsRoot.data && typeof analyticsRoot.data === "object" ? analyticsRoot.data : analyticsRoot) as Record<string, unknown>;
         const requirementsRoot = (requirementsRaw && typeof requirementsRaw === "object" ? requirementsRaw : {}) as Record<string, unknown>;
         const requirementsData = (requirementsRoot.data && typeof requirementsRoot.data === "object" ? requirementsRoot.data : requirementsRoot) as Record<string, unknown>;
+        const summaryBlock = (summaryData.summary && typeof summaryData.summary === "object"
+          ? summaryData.summary
+          : {}) as Record<string, unknown>;
+        const cycleBlock = (summaryData.cycle && typeof summaryData.cycle === "object"
+          ? summaryData.cycle
+          : {}) as Record<string, unknown>;
+        const reqBlock = (summaryData.requirements && typeof summaryData.requirements === "object"
+          ? summaryData.requirements
+          : {}) as Record<string, unknown>;
+        const parsedRoles = Array.isArray(rolesRaw) ? rolesRaw : [];
+        setRoleOptions(parsedRoles.filter((r) => r?.name));
 
-        const hoursCompleted = getNum(summaryData.hours_completed ?? summaryData.completed_hours, 0);
-        const totalHours = getNum(summaryData.total_required_hours ?? summaryData.total_hours, 100);
+        const cycleStart = getText(summaryData.cycle_start ?? cycleBlock.start_date_formatted ?? cycleBlock.start_date, 'N/A');
+        const cycleEnd = getText(summaryData.cycle_end ?? cycleBlock.end_date_formatted ?? cycleBlock.end_date, 'N/A');
+        setDateRangeLabels({
+          fullCycle: cycleStart !== "N/A" && cycleEnd !== "N/A" ? `Full Cycle (${cycleStart} - ${cycleEnd})` : "Full 5-Year Cycle",
+          lastYear: "Last Year",
+          custom: "Custom Range",
+        });
+
+        const hoursCompleted = getNum(summaryData.hours_completed ?? summaryData.completed_hours ?? summaryBlock.total_completed, 0);
+        const totalHours = getNum(summaryData.total_required_hours ?? summaryData.total_hours ?? reqBlock.total_hours ?? summaryBlock.target_hours, 100);
         const percentage = totalHours > 0 ? Math.round((hoursCompleted / totalHours) * 100) : 0;
-        const totalRecords = getNum(summaryData.total_records ?? summaryData.activities_count, 0);
-        const verified = getNum(summaryData.verified_records ?? summaryData.verified_count, 0);
-        const evidencePercentage = getNum(summaryData.evidence_coverage ?? summaryData.evidence_percentage, 0);
+        const totalRecords = getNum(summaryData.total_records ?? summaryData.activities_count ?? summaryBlock.total_courses, 0);
+        const verified = getNum(summaryData.verified_records ?? summaryData.verified_count ?? summaryData.verified_hours, 0);
+        const evidencePercentage = getNum(summaryData.evidence_coverage ?? summaryData.evidence_percentage ?? summaryBlock.evidence_percentage, 0);
         setComplianceData({
           hoursCompleted,
           totalHours,
           percentage,
-          cycleStart: getText(summaryData.cycle_start, 'N/A'),
-          cycleEnd: getText(summaryData.cycle_end, 'N/A'),
+          cycleStart,
+          cycleEnd,
           hoursRemaining: Math.max(totalHours - hoursCompleted, 0),
           totalRecords,
           verified,
@@ -159,9 +188,9 @@ export default function GenerateAuditReport() {
       evidence: "evidence_zip",
     };
     const dateMap: Record<string, string> = {
-      "Full 5-Year Cycle": "full_cycle",
-      "Last Year": "custom",
-      "Custom Range": "custom",
+      full_cycle: "full_cycle",
+      last_year: "custom",
+      custom: "custom",
     };
     try {
       await cpdService.generateAuditReport({
@@ -380,15 +409,28 @@ export default function GenerateAuditReport() {
               <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">Configure your audit report</p>
               <div className="mb-4">
                 <label className="mb-2 block text-xs sm:text-sm font-medium text-gray-700">Role</label>
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs sm:text-sm"
-                >
-                  <option value="dentist">dentist</option>
-                  <option value="dental_nurse">dental_nurse</option>
-                  <option value="dental_care_professional">dental_care_professional</option>
-                </select>
+                <Select value={selectedRole} onValueChange={setSelectedRole} disabled={isLoading}>
+                  <SelectTrigger className="w-full text-xs sm:text-sm">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent className="w-[var(--radix-select-trigger-width)]">
+                    {(roleOptions.length
+                      ? roleOptions
+                      : [
+                          { id: "dentist", slug: "dentist", name: "Dentist" },
+                          { id: "dental_nurse", slug: "dental_nurse", name: "Dental Nurse" },
+                          { id: "dental_care_professional", slug: "dental_care_professional", name: "Dental Care Professional" },
+                        ]
+                    ).map((role) => {
+                      const value = String(role.slug ?? role.id);
+                      return (
+                        <SelectItem key={value} value={value}>
+                          {role.name}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Report Format */}
@@ -441,36 +483,16 @@ export default function GenerateAuditReport() {
               {/* Date Range */}
               <div className="mb-4 sm:mb-6">
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Date Range</label>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="w-full px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-xs sm:text-sm text-left hover:bg-gray-50 transition-colors">
-                      <span className="flex items-center justify-between">
-                        <span>{dateRange}</span>
-                        <div className="ml-2 h-4 w-4 text-gray-400">▼</div>
-                      </span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-full min-w-[200px]">
-                    <DropdownMenuItem 
-                      onClick={() => setDateRange('Full 5-Year Cycle')}
-                      className={dateRange === 'Full 5-Year Cycle' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      Full 5-Year Cycle
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setDateRange('Last Year')}
-                      className={dateRange === 'Last Year' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      Last Year
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setDateRange('Custom Range')}
-                      className={dateRange === 'Custom Range' ? 'bg-purple-50 text-purple-700' : ''}
-                    >
-                      Custom Range
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Select value={dateRange} onValueChange={(value) => setDateRange(value as 'full_cycle' | 'last_year' | 'custom')}>
+                  <SelectTrigger className="w-full text-xs sm:text-sm">
+                    <SelectValue placeholder="Select date range" />
+                  </SelectTrigger>
+                  <SelectContent className="w-[var(--radix-select-trigger-width)]">
+                    <SelectItem value="full_cycle">{dateRangeLabels.fullCycle}</SelectItem>
+                    <SelectItem value="last_year">{dateRangeLabels.lastYear}</SelectItem>
+                    <SelectItem value="custom">{dateRangeLabels.custom}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Include in Report */}
@@ -481,41 +503,31 @@ export default function GenerateAuditReport() {
                     id="certificates"
                     label="Certificates"
                     checked={includeOptions.certificates}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setIncludeOptions({ ...includeOptions, certificates: e.target.checked })
-                    }
+                    onCheckedChange={(checked) => setIncludeOptions({ ...includeOptions, certificates: checked })}
                   />
                   <CheckboxOption
                     id="evidence"
                     label="Supporting Evidence"
                     checked={includeOptions.evidence}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setIncludeOptions({ ...includeOptions, evidence: e.target.checked })
-                    }
+                    onCheckedChange={(checked) => setIncludeOptions({ ...includeOptions, evidence: checked })}
                   />
                   <CheckboxOption
                     id="reflections"
                     label="Reflections"
                     checked={includeOptions.reflections}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setIncludeOptions({ ...includeOptions, reflections: e.target.checked })
-                    }
+                    onCheckedChange={(checked) => setIncludeOptions({ ...includeOptions, reflections: checked })}
                   />
                   <CheckboxOption
                     id="outcomes"
                     label="Learning Outcomes"
                     checked={includeOptions.outcomes}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setIncludeOptions({ ...includeOptions, outcomes: e.target.checked })
-                    }
+                    onCheckedChange={(checked) => setIncludeOptions({ ...includeOptions, outcomes: checked })}
                   />
                   <CheckboxOption
                     id="verification"
                     label="Platform Verification Statement"
                     checked={includeOptions.verification}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setIncludeOptions({ ...includeOptions, verification: e.target.checked })
-                    }
+                    onCheckedChange={(checked) => setIncludeOptions({ ...includeOptions, verification: checked })}
                   />
                 </div>
               </div>
@@ -644,21 +656,20 @@ function CheckboxOption({
   id,
   label,
   checked,
-  onChange,
+  onCheckedChange,
 }: {
   id: string;
   label: string;
   checked: boolean;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onCheckedChange: (checked: boolean) => void;
 }) {
   return (
     <label htmlFor={id} className="flex items-center space-x-2 sm:space-x-3 cursor-pointer group">
-      <input
-        type="checkbox"
+      <Checkbox
         id={id}
         checked={checked}
-        onChange={onChange}
-        className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500 flex-shrink-0"
+        onCheckedChange={(state) => onCheckedChange(state === true)}
+        className="h-4 w-4 sm:h-5 sm:w-5 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
       />
       <span className="text-xs sm:text-sm text-gray-700 group-hover:text-gray-900">{label}</span>
     </label>

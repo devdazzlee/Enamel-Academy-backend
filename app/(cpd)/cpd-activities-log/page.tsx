@@ -58,37 +58,55 @@ export default function CPDActivitiesLog() {
       setIsLoading(true);
       setLoadError("");
       try {
-        const [historyRaw, analyticsRaw, requirementsRaw] = await Promise.all([
+        const [historyRaw, analyticsRaw, requirementsRaw, summaryRaw] = await Promise.all([
           cpdService.history({ limit: 200, offset: 0 }),
           cpdService.analytics(),
           cpdService.requirements("dentist"),
+          cpdService.summary(),
         ]);
         if (!alive) return;
 
         const historyRoot = (historyRaw && typeof historyRaw === "object" ? historyRaw : {}) as Record<string, unknown>;
         const data = (historyRoot.data && typeof historyRoot.data === "object" ? historyRoot.data : historyRoot) as Record<string, unknown>;
+        const summaryRoot = (summaryRaw && typeof summaryRaw === "object" ? summaryRaw : {}) as Record<string, unknown>;
+        const summaryData = (summaryRoot.data && typeof summaryRoot.data === "object" ? summaryRoot.data : summaryRoot) as Record<string, unknown>;
+        const summaryRecent = Array.isArray(summaryData.recent_activity) ? summaryData.recent_activity : [];
+        const summaryCourses = Array.isArray(summaryData.courses) ? summaryData.courses : [];
         const list = Array.isArray(data.history)
           ? data.history
           : Array.isArray(data.activities)
             ? data.activities
             : Array.isArray(data.items)
               ? data.items
+              : Array.isArray(data.recent_completions)
+                ? data.recent_completions
+                : Array.isArray(data.completed_courses)
+                  ? data.completed_courses
+                  : summaryRecent.length
+                    ? summaryRecent
+                    : summaryCourses.length
+                      ? summaryCourses
               : Array.isArray(historyRaw)
                 ? historyRaw
                 : [];
         const mapped: Activity[] = (list as unknown[]).map((item, idx) => {
           const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
-          const dateRaw = getText(row.date_completed ?? row.date ?? row.completed_at, "");
+          const dateRaw = getText(row.date_completed ?? row.date ?? row.completed_at ?? row.completion_date ?? row.last_activity, "");
+          const inferredType = row.course_id ? "Platform Course" : "External";
+          const statusText =
+            getText(row.status)
+            || (typeof row.completed === "boolean" ? (row.completed ? "Completed" : "In Progress") : "")
+            || "Verified";
           return {
             id: getText(row.id, String(idx + 1)),
-            title: getText(row.title ?? row.activity_name, "Untitled activity"),
+            title: getText(row.title ?? row.activity_name ?? row.course_title ?? row.name, "Untitled activity"),
             description: getText(row.description ?? row.learning_outcomes, "No description provided."),
             date: toDate(dateRaw),
-            hours: getNum(row.hours ?? row.duration_hours, 0),
-            category: getText(row.gdc_category ?? row.category, "General"),
-            type: getText(row.activity_type ?? row.type, "External"),
-            status: getText(row.status, "Verified"),
-            files: getNum(row.evidence_files_count ?? row.files, 0),
+            hours: getNum(row.hours ?? row.duration_hours ?? row.cpd_hours, 0),
+            category: getText(row.gdc_category ?? row.category ?? row.category_name, "General"),
+            type: getText(row.activity_type ?? row.type, inferredType),
+            status: statusText,
+            files: getNum(row.evidence_files_count ?? row.files ?? row.evidence_count, 0),
           };
         });
         setActivities(mapped);

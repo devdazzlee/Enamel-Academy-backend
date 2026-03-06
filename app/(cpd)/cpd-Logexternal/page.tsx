@@ -1,12 +1,24 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Upload, CheckCircle, Info } from 'lucide-react';
+import { format } from "date-fns";
+import { ArrowLeft, CalendarIcon, Upload, CheckCircle, Info } from 'lucide-react';
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as DateCalendar } from "@/components/ui/calendar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useRouter } from 'next/navigation';
 import { cpdService } from "@/lib/api/cpd";
+import { rolesService, type DentalRole } from "@/lib/api/roles";
 
 
 export default function LogExternalCPD() {
@@ -40,6 +52,8 @@ export default function LogExternalCPD() {
   ];
 
   const [gdcCategories, setGdcCategories] = useState<string[]>([]);
+  const [activityTypes, setActivityTypes] = useState<string[]>([]);
+  const [roleOptions, setRoleOptions] = useState<DentalRole[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -48,10 +62,22 @@ export default function LogExternalCPD() {
       setIsLoadingMeta(true);
       setMetaError("");
       try {
-        const raw = await cpdService.requirements(selectedRole);
+        const [rolesRaw, requirementsRaw, historyRaw, summaryRaw] = await Promise.all([
+          rolesService.roles(),
+          cpdService.requirements(selectedRole),
+          cpdService.history({ limit: 200, offset: 0 }),
+          cpdService.summary(),
+        ]);
         if (!alive) return;
-        const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+        const root = (requirementsRaw && typeof requirementsRaw === "object" ? requirementsRaw : {}) as Record<string, unknown>;
         const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+        const historyRoot = (historyRaw && typeof historyRaw === "object" ? historyRaw : {}) as Record<string, unknown>;
+        const historyData = (historyRoot.data && typeof historyRoot.data === "object" ? historyRoot.data : historyRoot) as Record<string, unknown>;
+        const summaryRoot = (summaryRaw && typeof summaryRaw === "object" ? summaryRaw : {}) as Record<string, unknown>;
+        const summaryData = (summaryRoot.data && typeof summaryRoot.data === "object" ? summaryRoot.data : summaryRoot) as Record<string, unknown>;
+        const requirementsObj = (data.requirements && typeof data.requirements === "object"
+          ? data.requirements
+          : {}) as Record<string, unknown>;
 
         const requirementList = Array.isArray(data.requirements)
           ? data.requirements
@@ -63,18 +89,62 @@ export default function LogExternalCPD() {
           : Array.isArray(data.gdc_categories)
             ? data.gdc_categories
             : [];
+        const requirementTypes = Array.isArray(data.activity_types)
+          ? data.activity_types
+          : Array.isArray(data.types)
+            ? data.types
+            : [];
+        const historyRows = Array.isArray(historyData.history)
+          ? historyData.history
+          : Array.isArray(historyData.activities)
+            ? historyData.activities
+            : Array.isArray(historyData.items)
+              ? historyData.items
+              : Array.isArray(historyData.recent_completions)
+                ? historyData.recent_completions
+                : Array.isArray(historyData.completed_courses)
+                  ? historyData.completed_courses
+                  : [];
+        const summaryRecent = Array.isArray(summaryData.recent_activity) ? summaryData.recent_activity : [];
 
         const parsedRequirements = (requirementList as unknown[])
           .map((item) => (typeof item === "string" ? item : getText((item as Record<string, unknown>)?.name ?? (item as Record<string, unknown>)?.title, "")))
           .filter(Boolean);
+        const requirementMetaRows = [
+          typeof requirementsObj.total_hours === "number" ? `Total required hours: ${requirementsObj.total_hours}` : "",
+          typeof requirementsObj.annual_target === "number" ? `Annual target: ${requirementsObj.annual_target}` : "",
+          typeof requirementsObj.cycle_years === "number" ? `CPD cycle: ${requirementsObj.cycle_years} years` : "",
+          getText(requirementsObj.description),
+        ].filter(Boolean);
         const parsedCategories = (categoryList as unknown[])
           .map((item) => (typeof item === "string" ? item : getText((item as Record<string, unknown>)?.name ?? (item as Record<string, unknown>)?.title, "")))
           .filter(Boolean);
+        const parsedTypesFromRequirements = (requirementTypes as unknown[])
+          .map((item) => (typeof item === "string" ? item : getText((item as Record<string, unknown>)?.name ?? (item as Record<string, unknown>)?.title ?? (item as Record<string, unknown>)?.value, "")))
+          .filter(Boolean);
+        const parsedCategoriesFromHistory = (historyRows as unknown[])
+          .map((item) => getText(((item && typeof item === "object" ? item : {}) as Record<string, unknown>).gdc_category ?? ((item && typeof item === "object" ? item : {}) as Record<string, unknown>).category))
+          .filter(Boolean);
+        const parsedTypesFromHistory = (historyRows as unknown[])
+          .map((item) => getText(((item && typeof item === "object" ? item : {}) as Record<string, unknown>).activity_type ?? ((item && typeof item === "object" ? item : {}) as Record<string, unknown>).type))
+          .filter(Boolean);
+        const parsedCategoriesFromSummary = (summaryRecent as unknown[])
+          .map((item) => getText(((item && typeof item === "object" ? item : {}) as Record<string, unknown>).gdc_category ?? ((item && typeof item === "object" ? item : {}) as Record<string, unknown>).category))
+          .filter(Boolean);
+        const parsedTypesFromSummary = (summaryRecent as unknown[])
+          .map((item) => getText(((item && typeof item === "object" ? item : {}) as Record<string, unknown>).activity_type ?? ((item && typeof item === "object" ? item : {}) as Record<string, unknown>).type))
+          .filter(Boolean);
+        const parsedRoleOptions = Array.isArray(rolesRaw) ? rolesRaw.filter((r) => r?.name) : [];
 
-        setGdcRequirements(parsedRequirements);
-        setGdcCategories(parsedCategories);
+        setRoleOptions(parsedRoleOptions);
+        setGdcRequirements(Array.from(new Set([...parsedRequirements, ...requirementMetaRows])));
+        setGdcCategories(Array.from(new Set([...parsedCategories, ...parsedCategoriesFromHistory, ...parsedCategoriesFromSummary])));
+        setActivityTypes(Array.from(new Set([...parsedTypesFromRequirements, ...parsedTypesFromHistory, ...parsedTypesFromSummary])));
       } catch {
         if (!alive) return;
+        setRoleOptions([]);
+        setGdcCategories([]);
+        setActivityTypes([]);
         setMetaError("Unable to load GDC metadata right now.");
       } finally {
         if (alive) setIsLoadingMeta(false);
@@ -87,6 +157,13 @@ export default function LogExternalCPD() {
   }, [selectedRole]);
 
   const categories = useMemo(() => gdcCategories, [gdcCategories]);
+  const typeOptions = useMemo(() => activityTypes, [activityTypes]);
+  const parseDateValue = (value: string) => {
+    if (!value) return undefined;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  };
+  const toApiDate = (value: Date) => format(value, "yyyy-MM-dd");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -225,30 +302,31 @@ export default function LogExternalCPD() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Date Completed *
                     </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Select date"
-                        value={formData.dateCompleted}
-                        onChange={(e) =>
-                          setFormData({ ...formData, dateCompleted: e.target.value })
-                        }
-                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
-                      />
-                      <svg
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-between px-3 sm:px-4 py-2.5 sm:py-3 h-auto font-normal text-sm sm:text-base bg-white hover:bg-white active:bg-white data-[state=open]:bg-white"
+                        >
+                          <span className={formData.dateCompleted ? "text-gray-900" : "text-gray-500"}>
+                            {formData.dateCompleted ? format(parseDateValue(formData.dateCompleted) as Date, "dd/MM/yyyy") : "Select date"}
+                          </span>
+                          <CalendarIcon className="h-4 w-4 text-gray-400" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <DateCalendar
+                          mode="single"
+                          selected={parseDateValue(formData.dateCompleted)}
+                          onSelect={(date) => {
+                            if (!date) return;
+                            setFormData({ ...formData, dateCompleted: toApiDate(date) });
+                          }}
+                          initialFocus
                         />
-                      </svg>
-                    </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -272,15 +350,28 @@ export default function LogExternalCPD() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Role
                     </label>
-                    <select
-                      value={selectedRole}
-                      onChange={(e) => setSelectedRole(e.target.value)}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
-                    >
-                      <option value="dentist">dentist</option>
-                      <option value="dental_nurse">dental_nurse</option>
-                      <option value="dental_care_professional">dental_care_professional</option>
-                    </select>
+                    <Select value={selectedRole} onValueChange={setSelectedRole}>
+                      <SelectTrigger className="w-full px-3 sm:px-4 py-2.5 sm:py-3 h-auto text-sm sm:text-base">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(roleOptions.length
+                          ? roleOptions
+                          : [
+                              { id: "dentist", slug: "dentist", name: "Dentist" },
+                              { id: "dental_nurse", slug: "dental_nurse", name: "Dental Nurse" },
+                              { id: "dental_care_professional", slug: "dental_care_professional", name: "Dental Care Professional" },
+                            ]
+                        ).map((role) => {
+                          const value = String(role.slug ?? role.id);
+                          return (
+                            <SelectItem key={value} value={value}>
+                              {role.name}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -288,40 +379,53 @@ export default function LogExternalCPD() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       GDC Category *
                     </label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) =>
-                        setFormData({ ...formData, category: e.target.value })
-                      }
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
+                    <Select
+                      value={formData.category || undefined}
+                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      disabled={isLoadingMeta}
                     >
-                      <option value="">Select category</option>
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat}>
+                      <SelectTrigger className="w-full px-3 sm:px-4 py-2.5 sm:py-3 h-auto text-sm sm:text-base">
+                        <SelectValue placeholder={isLoadingMeta ? "Loading categories..." : "Select category"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
                           {cat}
-                        </option>
-                      ))}
-                    </select>
+                          </SelectItem>
+                        ))}
+                        {!categories.length && (
+                          <SelectItem value="__no_categories" disabled>
+                            No categories available from API
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Activity Type
                     </label>
-                    <select
-                      value={formData.activityType}
-                      onChange={(e) =>
-                        setFormData({ ...formData, activityType: e.target.value })
-                      }
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
+                    <Select
+                      value={formData.activityType || undefined}
+                      onValueChange={(value) => setFormData({ ...formData, activityType: value })}
+                      disabled={isLoadingMeta}
                     >
-                      <option value="">Select type</option>
-                      <option value="course">Course</option>
-                      <option value="workshop">Workshop</option>
-                      <option value="conference">Conference</option>
-                      <option value="webinar">Webinar</option>
-                      <option value="reading">Reading</option>
-                      <option value="peer_review">Peer Review</option>
-                    </select>
+                      <SelectTrigger className="w-full px-3 sm:px-4 py-2.5 sm:py-3 h-auto text-sm sm:text-base">
+                        <SelectValue placeholder={isLoadingMeta ? "Loading activity types..." : "Select type"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {typeOptions.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                        {!typeOptions.length && (
+                          <SelectItem value="__no_types" disabled>
+                            No activity types available from API
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

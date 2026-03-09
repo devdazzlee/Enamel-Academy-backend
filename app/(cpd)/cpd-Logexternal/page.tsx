@@ -56,18 +56,36 @@ export default function LogExternalCPD() {
   const [activityTypes, setActivityTypes] = useState<string[]>([]);
   const [roleOptions, setRoleOptions] = useState<DentalRole[]>([]);
 
+  // Set initial role from user data
   useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      try {
+        const userRaw = await userService.me().catch(() => null);
+        const userRole = (userRaw?.role as string | undefined) || "";
+        if (!alive) return;
+        if (userRole && !selectedRole) {
+          setSelectedRole(userRole);
+        }
+      } catch {
+        // Silently handle error
+      }
+    };
+    void run();
+    return () => { alive = false; };
+  }, []);
+
+  // Load CPD metadata when role is available
+  useEffect(() => {
+    if (!selectedRole) return;
+    
     let alive = true;
     const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
     const run = async () => {
       setIsLoadingMeta(true);
       setMetaError("");
       try {
-        const userRaw = await userService.me().catch(() => null);
-        const userRole = (userRaw?.role as string | undefined) || "";
-        if (!alive) return;
-        if (userRole && !selectedRole) setSelectedRole(userRole);
-        const roleForReq = userRole || selectedRole || "dentist";
+        const roleForReq = selectedRole || "dentist";
         const [rolesRaw, requirementsRaw, historyRaw, summaryRaw] = await Promise.all([
           rolesService.roles(),
           cpdService.requirements(roleForReq),
@@ -161,6 +179,23 @@ export default function LogExternalCPD() {
       alive = false;
     };
   }, [selectedRole]);
+
+  // Load roles independently
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      try {
+        const rolesRaw = await rolesService.roles();
+        if (!alive) return;
+        const parsedRoleOptions = Array.isArray(rolesRaw) ? rolesRaw.filter((r) => r?.name) : [];
+        setRoleOptions(parsedRoleOptions);
+      } catch {
+        if (!alive) setRoleOptions([]);
+      }
+    };
+    void run();
+    return () => { alive = false; };
+  }, []);
 
   const categories = useMemo(() => gdcCategories, [gdcCategories]);
   const typeOptions = useMemo(() => activityTypes, [activityTypes]);
@@ -369,6 +404,11 @@ export default function LogExternalCPD() {
                             </SelectItem>
                           );
                         })}
+                        {roleOptions.length === 0 && (
+                          <SelectItem value="__no_roles" disabled>
+                            No roles available
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

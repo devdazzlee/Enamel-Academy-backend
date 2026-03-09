@@ -20,12 +20,6 @@ import {
 import { useAuthStore } from "@/lib/stores/auth-store"
 import { rolesService } from "@/lib/api/roles"
 
-const SIGNUP_ALLOWED_ROLES: Array<{ value: string; label: string }> = [
-  { value: "dentist", label: "Dentist" },
-  { value: "dental_nurse", label: "Dental Nurse" },
-  { value: "dental_care_professional", label: "Dental Care Professional" },
-]
-
 export default function SignupPage() {
   const router = useRouter()
   const { register, isLoading } = useAuthStore()
@@ -63,20 +57,9 @@ export default function SignupPage() {
             return { value, label }
           })
           .filter((r) => r.value && r.label)
-        const allowedMap = new Map(mapped.map((r) => [r.value, r.label]))
-        const allowedOnly = SIGNUP_ALLOWED_ROLES
-          .map((role) => ({
-            value: role.value,
-            label: allowedMap.get(role.value) || role.label,
-          }))
-          .filter((role) => allowedMap.has(role.value))
-
-        // Keep signup strict to only three professional roles.
-        setRoleOptions(allowedOnly)
+        setRoleOptions(mapped)
       } catch {
         if (!alive) return
-        // Safe fallback in case roles API fails.
-        setRoleOptions(SIGNUP_ALLOWED_ROLES)
         setRolesError("Unable to load profession list. Please refresh and try again.")
       } finally {
         if (alive) setRolesLoading(false)

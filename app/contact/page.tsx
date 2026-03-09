@@ -33,10 +33,10 @@ export default function ContactPage() {
 
     try {
       await contactService.submit({
-        name: formData.name,
-        email: formData.email,
-        subject: formData.subject,
-        message: formData.message,
+        "your-name": formData.name,
+        "your-email": formData.email,
+        "your-subject": formData.subject,
+        "your-message": formData.message,
       });
       setStatusMessage("Thank you for your message! We'll get back to you soon.");
       setStatusType("success");

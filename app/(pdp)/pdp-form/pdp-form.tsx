@@ -68,8 +68,8 @@ export default function PDPForm() {
     startDate: '',
     endDate: '',
     careerObjectives: [''],
-    currentSkills: [{ skill: '', level: 'Advanced' }],
-    skillsToDevelop: [{ skill: '', target: 'Advanced' }],
+    currentSkills: [{ skill: '', level: '' }],
+    skillsToDevelop: [{ skill: '', target: '' }],
     selectedCourses: [],
     additionalResources: '',
     duration: '',
@@ -181,14 +181,14 @@ export default function PDPForm() {
   const addCurrentSkill = () => {
     setFormData({
       ...formData,
-      currentSkills: [...formData.currentSkills, { skill: '', level: 'Advanced' }]
+      currentSkills: [...formData.currentSkills, { skill: '', level: '' }]
     });
   };
 
   const addSkillToDevelop = () => {
     setFormData({
       ...formData,
-      skillsToDevelop: [...formData.skillsToDevelop, { skill: '', target: 'Advanced' }]
+      skillsToDevelop: [...formData.skillsToDevelop, { skill: '', target: '' }]
     });
   };
 
@@ -355,31 +355,39 @@ export default function PDPForm() {
         const currentSkills = Array.isArray(data.current_skills)
           ? (data.current_skills as Array<Record<string, unknown>>).map((s) => ({
               skill: getText(s?.skill_name),
-              level: getText(s?.current_proficiency, 'Intermediate'),
+              level: getText(s?.current_proficiency),
             }))
-          : [{ skill: '', level: 'Advanced' }];
+          : [{ skill: '', level: '' }];
         const skillsToDevelop = Array.isArray(data.skills_to_develop)
           ? (data.skills_to_develop as Array<Record<string, unknown>>).map((s) => ({
               skill: getText(s?.skill_name),
-              target: getText(s?.target_proficiency, 'Advanced'),
+              target: getText(s?.target_proficiency),
             }))
-          : [{ skill: '', target: 'Advanced' }];
+          : [{ skill: '', target: '' }];
         const milestones = Array.isArray(data.milestones)
           ? (data.milestones as Array<Record<string, unknown>>).map((m) => ({
               quarter: getText(m?.quarter),
               goal: getText(m?.title) || getText(m?.description),
             }))
           : [];
+        const selectedCourses = Array.isArray(data.learning_activities)
+          ? (data.learning_activities as Array<Record<string, unknown>>)
+              .map((a) => getText(a?.activity_name))
+              .filter(Boolean)
+          : [];
+        const additionalResources = getText(data.description);
 
         setFormData((prev) => ({
           ...prev,
           pdpName: getText(data.name),
           startDate: getText(data.start_date),
           endDate: getText(data.end_date),
+          additionalResources,
           careerObjectives: careerObjectives.length ? careerObjectives : [''],
-          currentSkills: currentSkills.length ? currentSkills : [{ skill: '', level: 'Advanced' }],
-          skillsToDevelop: skillsToDevelop.length ? skillsToDevelop : [{ skill: '', target: 'Advanced' }],
+          currentSkills: currentSkills.length ? currentSkills : [{ skill: '', level: '' }],
+          skillsToDevelop: skillsToDevelop.length ? skillsToDevelop : [{ skill: '', target: '' }],
           milestones: milestones.length ? milestones : prev.milestones,
+          selectedCourses: selectedCourses.length ? selectedCourses : prev.selectedCourses,
         }));
       } catch {
         if (!alive) return;
@@ -410,27 +418,27 @@ export default function PDPForm() {
     const editId = searchParams.get("id");
     try {
       const payload = {
-        name: formData.pdpName || "Professional Development Plan",
-        description: formData.additionalResources || "PDP generated from frontend form",
-        status: "active",
+        name: formData.pdpName,
+        description: formData.additionalResources || formData.pdpName,
+        status: "draft",
         year: (formData.startDate?.slice(0, 4) || new Date().getFullYear().toString()),
         start_date: formData.startDate,
         end_date: formData.endDate,
         career_objectives: formData.careerObjectives
           .filter(Boolean)
-          .map((objective, index) => ({ objective, specialty: objective, priority: index + 1 })),
+          .map((objective, index) => ({ objective, priority: index + 1 })),
         current_skills: formData.currentSkills
           .filter((s) => s.skill)
-          .map((s) => ({
+          .map((s, index) => ({
             skill_name: s.skill,
-            current_proficiency: s.level,
-            target_proficiency: s.level,
+            current_proficiency: s.level || undefined,
+            priority: index + 1,
           })),
         skills_to_develop: formData.skillsToDevelop
           .filter((s) => s.skill)
           .map((s, index) => ({
             skill_name: s.skill,
-            target_proficiency: s.target,
+            target_proficiency: s.target || undefined,
             priority: index + 1,
           })),
         milestones: formData.milestones
@@ -441,6 +449,16 @@ export default function PDPForm() {
             quarter: m.quarter,
             completed: false,
           })),
+        learning_activities: formData.selectedCourses
+          .filter(Boolean)
+          .map((title) => ({
+            activity_name: title,
+            activity_type: "course",
+            status: "planned",
+            priority: 1,
+          })),
+        assessment_methods: formData.assessmentMethods.filter(Boolean),
+        success_criteria: formData.successCriteria.filter(Boolean),
       };
 
       const response = editId

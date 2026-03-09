@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { cpdService } from "@/lib/api/cpd";
 import { pdpService } from "@/lib/api/pdp";
 import { certificatesService } from "@/lib/api/certificates";
+import { userService } from "@/lib/api/user";
 
 type CpdSummaryView = {
   hoursCompleted: number;

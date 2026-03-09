@@ -54,8 +54,8 @@ type PDPDetailData = {
     milestonesCompleted: number;
   };
   careerObjectives: string[];
-  currentSkills: Array<{ skill: string; level: string }>;
-  skillsToDevelop: Array<{ skill: string; target: string }>;
+  currentSkills: Array<{ skill: string; level: string; targetLevel: string; priority: number }>;
+  skillsToDevelop: Array<{ skill: string; target: string; priority: number }>;
   courses: Array<{
     title: string;
     duration: string;
@@ -69,9 +69,11 @@ type PDPDetailData = {
     certificateUrl?: string;
     reflection?: string;
   }>;
-  milestones: Array<{ quarter: string; goal: string; status: string }>;
+  milestones: Array<{ quarter: string; goal: string; status: string; dueDate: string; description: string }>;
   achievements: string[];
   reflection: string;
+  reflectionType: string;
+  challenges: string;
 };
 
 export default function PDPDetailView() {
@@ -109,19 +111,24 @@ export default function PDPDetailView() {
     courses: [],
     milestones: [],
     achievements: [],
-    reflection: ''
+    reflection: '',
+    reflectionType: '',
+    challenges: '',
   });
   const [editedPDPData, setEditedPDPData] = useState<PDPDetailData | null>(null);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [specialtyOptions, setSpecialtyOptions] = useState<string[]>([]);
+  const [proficiencyOptions, setProficiencyOptions] = useState<string[]>([]);
   const [componentSyncLoading, setComponentSyncLoading] = useState("");
   const [componentSyncError, setComponentSyncError] = useState("");
   const [componentSyncMessage, setComponentSyncMessage] = useState("");
   const [linkActivityId, setLinkActivityId] = useState("");
   const [linkCourseId, setLinkCourseId] = useState("");
+  const [syncObjectiveSpecialty, setSyncObjectiveSpecialty] = useState("");
+  const [syncObjectivePriority, setSyncObjectivePriority] = useState(1);
 
-  const skillLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
+  const skillLevels = proficiencyOptions.length > 0 ? proficiencyOptions : ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
 
   const handleEdit = () => {
     setEditedPDPData({ ...pdpData });
@@ -143,31 +150,50 @@ export default function PDPDetailView() {
       try {
         await pdpService.update(editedPDPData.id, {
           name: editedPDPData.title,
+          description: editedPDPData.description || undefined,
           status: editedPDPData.status.toLowerCase(),
+          year: editedPDPData.year || undefined,
+          start_date: editedPDPData.startDate || undefined,
+          end_date: editedPDPData.endDate || undefined,
           progress_percentage: editedPDPData.progress,
           career_objectives: editedPDPData.careerObjectives.map((objective, index) => ({
             objective,
-            specialty: objective,
+            specialty: syncObjectiveSpecialty.trim() || undefined,
             priority: index + 1,
           })),
           current_skills: editedPDPData.currentSkills.map((skill) => ({
             skill_name: skill.skill,
             current_proficiency: skill.level,
-            target_proficiency: skill.level,
+            target_proficiency: skill.targetLevel || skill.level,
+            priority: skill.priority ?? 1,
           })),
-          skills_to_develop: editedPDPData.skillsToDevelop.map((skill, index) => ({
+          skills_to_develop: editedPDPData.skillsToDevelop.map((skill) => ({
             skill_name: skill.skill,
             target_proficiency: skill.target,
-            priority: index + 1,
+            priority: skill.priority ?? 1,
           })),
           milestones: editedPDPData.milestones.map((m) => ({
             title: m.goal,
-            description: m.goal,
+            description: m.description || m.goal,
             quarter: m.quarter,
             completed: m.status.toLowerCase() === "completed",
+            due_date: m.dueDate || undefined,
+          })),
+          learning_activities: editedPDPData.courses.map((c) => ({
+            activity_name: c.title,
+            activity_type: c.activityType?.toLowerCase() || "course",
+            duration_hours: Number.parseInt(c.duration, 10) || 0,
+            status: c.status?.toLowerCase() || "planned",
+            priority: c.priority ?? 1,
+            start_date: c.startDate || undefined,
+            course_id: c.courseId || undefined,
           })),
           achievements: editedPDPData.achievements,
-          reflection: { content: editedPDPData.reflection },
+          reflection: {
+            content: editedPDPData.reflection,
+            type: editedPDPData.reflectionType || undefined,
+            challenges: editedPDPData.challenges || undefined,
+          },
         });
         setPdpData(editedPDPData);
         setIsEditing(false);
@@ -197,8 +223,8 @@ export default function PDPDetailView() {
         if (!objective) throw new Error("No objective to sync.");
         await pdpService.addCareerObjective(currentData.id, {
           objective,
-          specialty: objective,
-          priority: 1,
+          specialty: syncObjectiveSpecialty.trim() || undefined,
+          priority: syncObjectivePriority,
         });
         setComponentSyncMessage("Career objective synced.");
       }
@@ -209,7 +235,8 @@ export default function PDPDetailView() {
           skill_name: skill.skill,
           skill_type: "current",
           current_proficiency: skill.level,
-          target_proficiency: skill.level,
+          target_proficiency: skill.targetLevel || skill.level,
+          priority: skill.priority ?? 1,
         });
         setComponentSyncMessage("Current skill synced.");
       }
@@ -220,6 +247,7 @@ export default function PDPDetailView() {
           skill_name: skill.skill,
           skill_type: "develop",
           target_proficiency: skill.target,
+          priority: skill.priority ?? 1,
         });
         setComponentSyncMessage("Skill to develop synced.");
       }
@@ -228,9 +256,11 @@ export default function PDPDetailView() {
         if (!activity) throw new Error("No learning activity to sync.");
         await pdpService.addLearningActivity(currentData.id, {
           activity_name: activity.title,
-          activity_type: "course",
+          activity_type: activity.activityType?.toLowerCase() || "course",
           duration_hours: Number.parseInt(activity.duration, 10) || 0,
           status: activity.status.toLowerCase() || "planned",
+          priority: activity.priority ?? 1,
+          start_date: activity.startDate || undefined,
         });
         setComponentSyncMessage("Learning activity synced.");
       }
@@ -239,9 +269,10 @@ export default function PDPDetailView() {
         if (!milestone) throw new Error("No milestone to sync.");
         await pdpService.addMilestone(currentData.id, {
           title: milestone.goal,
-          description: milestone.goal,
+          description: milestone.description || milestone.goal,
           quarter: milestone.quarter,
           completed: milestone.status.toLowerCase() === "completed",
+          due_date: milestone.dueDate || undefined,
         });
         setComponentSyncMessage("Milestone synced.");
       }
@@ -250,6 +281,8 @@ export default function PDPDetailView() {
         await pdpService.addReflection(currentData.id, {
           content: currentData.reflection,
           achievements: currentData.achievements.join(", "),
+          type: currentData.reflectionType || undefined,
+          challenges: currentData.challenges || undefined,
         });
         setComponentSyncMessage("Reflection synced.");
       }
@@ -405,6 +438,11 @@ export default function PDPDetailView() {
           .map((s) => (typeof s === "string" ? s : typeof s === "object" && s ? String((s as Record<string, unknown>).name ?? (s as Record<string, unknown>).skill_name ?? "") : ""))
           .filter(Boolean);
         setSpecialtyOptions(parsed);
+
+        const apiProficiency = Array.isArray(skillsData.proficiency_levels)
+          ? (skillsData.proficiency_levels as unknown[]).map((v) => (typeof v === "string" ? v : "")).filter(Boolean)
+          : [];
+        if (apiProficiency.length > 0) setProficiencyOptions(apiProficiency);
       } catch {
         if (!alive) return;
         setSpecialtyOptions([]);
@@ -496,13 +534,16 @@ export default function PDPDetailView() {
           currentSkills: Array.isArray(data.current_skills)
             ? (data.current_skills as Array<Record<string, unknown>>).map((s) => ({
                 skill: getText(s.skill_name),
-                level: getText(s.current_proficiency, "Intermediate"),
+                level: getText(s.current_proficiency),
+                targetLevel: getText(s.target_proficiency),
+                priority: getNum(s.priority, 1),
               }))
             : [],
           skillsToDevelop: Array.isArray(data.skills_to_develop)
             ? (data.skills_to_develop as Array<Record<string, unknown>>).map((s) => ({
                 skill: getText(s.skill_name),
-                target: getText(s.target_proficiency, "Advanced"),
+                target: getText(s.target_proficiency),
+                priority: getNum(s.priority, 1),
               }))
             : [],
           courses,
@@ -511,6 +552,8 @@ export default function PDPDetailView() {
                 quarter: getText(m.quarter),
                 goal: getText(m.title) || getText(m.description),
                 status: typeof m.completed === "boolean" ? (m.completed ? "Completed" : "In Progress") : "In Progress",
+                dueDate: getText(m.due_date),
+                description: getText(m.description),
               }))
             : [],
           achievements: Array.isArray(data.achievements)
@@ -520,6 +563,14 @@ export default function PDPDetailView() {
             (data.reflection && typeof data.reflection === "object"
               ? getText((data.reflection as Record<string, unknown>).content)
               : getText(data.reflection)) || "",
+          reflectionType:
+            data.reflection && typeof data.reflection === "object"
+              ? getText((data.reflection as Record<string, unknown>).type)
+              : "",
+          challenges:
+            data.reflection && typeof data.reflection === "object"
+              ? getText((data.reflection as Record<string, unknown>).challenges)
+              : "",
         });
       } catch {
         if (!alive) return;
@@ -651,8 +702,12 @@ export default function PDPDetailView() {
             <button onClick={() => handleComponentSync("reflection")} disabled={componentSyncLoading === "reflection"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Sync Reflection</button>
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <input value={linkActivityId} onChange={(e) => setLinkActivityId(e.target.value)} placeholder="Activity ID" className="rounded-md border px-2 py-1 text-xs" />
-            <input value={linkCourseId} onChange={(e) => setLinkCourseId(e.target.value)} placeholder="Course ID" className="rounded-md border px-2 py-1 text-xs" />
+            <input value={syncObjectiveSpecialty} onChange={(e) => setSyncObjectiveSpecialty(e.target.value)} placeholder="Specialty (for Sync Objective)" className="rounded-md border px-2 py-1 text-xs" />
+            <input type="number" min={1} value={syncObjectivePriority} onChange={(e) => setSyncObjectivePriority(Number(e.target.value) || 1)} placeholder="Priority (objective)" className="rounded-md border px-2 py-1 text-xs" />
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <input value={linkActivityId} onChange={(e) => setLinkActivityId(e.target.value)} placeholder="Activity ID (for Link Course)" className="rounded-md border px-2 py-1 text-xs" />
+            <input value={linkCourseId} onChange={(e) => setLinkCourseId(e.target.value)} placeholder="Course ID (for Link Course)" className="rounded-md border px-2 py-1 text-xs" />
             <button onClick={() => handleComponentSync("linkCourse")} disabled={componentSyncLoading === "linkCourse"} className="rounded-md border px-2 py-1 text-xs text-purple-700 hover:bg-purple-50 disabled:opacity-50">Link Course</button>
           </div>
           {componentSyncError && <p className="mt-2 text-xs text-red-600">{componentSyncError}</p>}

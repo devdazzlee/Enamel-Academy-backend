@@ -7,19 +7,8 @@ import { Check } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { membershipService, type MembershipPlan } from "@/lib/api/membership";
 
-type UiPlan = {
-  id: string | number;
-  type: string;
-  name: string;
-  priceLabel: string;
-  price: string;
-  period?: string;
-  description?: string;
-  features: string[];
-};
-
 export default function PricingPage() {
-  const [plans, setPlans] = useState<UiPlan[]>([]);
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [subscribingId, setSubscribingId] = useState<string | number | null>(null);
@@ -32,29 +21,7 @@ export default function PricingPage() {
       try {
         const apiPlans = await membershipService.plans();
         if (!alive) return;
-        const mapped: UiPlan[] = apiPlans.map((plan: MembershipPlan) => {
-          const priceValue =
-            typeof plan.price === "number"
-              ? `£${plan.price.toFixed(2)}`
-              : typeof plan.price === "string"
-                ? plan.price
-                : "";
-          return {
-            id: plan.id,
-            type: "Subscription",
-            name: plan.name,
-            priceLabel: priceValue ? "Only" : "",
-            price: priceValue || "—",
-            period: plan.interval === "year" || plan.interval === "yearly" ? "per year" : undefined,
-            description: plan.description,
-            features: [
-              "Access to enhanced CPD courses.",
-              "Personal CPD tracker and learning hub.",
-              "Automated PDP tools and GDC-ready reports.",
-            ],
-          };
-        });
-        setPlans(mapped);
+        setPlans(apiPlans);
       } catch {
         if (!alive) return;
         setError("Unable to load membership plans right now.");
@@ -63,15 +30,19 @@ export default function PricingPage() {
       }
     };
     void run();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
-  const handleSubscribe = async (planId: string | number) => {
-    setSubscribingId(planId);
+  const handleSubscribe = async (plan: MembershipPlan) => {
+    setSubscribingId(plan.id);
     try {
-      const url = await membershipService.checkoutUrl(planId);
+      // Use checkout_url from plan data directly if available
+      if (plan.checkout_url) {
+        window.location.href = plan.checkout_url;
+        return;
+      }
+      // Fallback: fetch checkout URL via /membership/checkout/{id}
+      const url = await membershipService.checkoutUrl(plan.id);
       if (url) {
         window.location.href = url;
       } else {
@@ -82,6 +53,19 @@ export default function PricingPage() {
     } finally {
       setSubscribingId(null);
     }
+  };
+
+  const formatPrice = (plan: MembershipPlan): string => {
+    if (plan.formatted_price) return plan.formatted_price;
+    if (typeof plan.price === "number") return `£${plan.price.toFixed(2)}`;
+    if (typeof plan.price === "string") return plan.price;
+    return "—";
+  };
+
+  const formatPeriod = (plan: MembershipPlan): string | undefined => {
+    if (plan.cycle_period && plan.cycle_period !== "0") return `per ${plan.cycle_period}`;
+    if (plan.interval === "year" || plan.interval === "yearly") return "per year";
+    return undefined;
   };
 
   return (
@@ -107,56 +91,65 @@ export default function PricingPage() {
 
         <div className="space-y-4 sm:space-y-6">
           {plans.map((plan) => {
+            const priceStr = formatPrice(plan);
+            const period = formatPeriod(plan);
             return (
               <div
-                key={plan.name}
-                className="bg-card rounded-2xl border border-border overflow-hidden flex flex-col sm:flex-row"
+                key={String(plan.id)}
+                className={`bg-card rounded-2xl border overflow-hidden flex flex-col sm:flex-row relative ${
+                  plan.popular ? "border-primary shadow-md" : "border-border"
+                }`}
               >
+                {/* Popular badge */}
+                {plan.badge && (
+                  <div className="absolute top-3 right-3 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                    {plan.badge}
+                  </div>
+                )}
+
                 {/* Price Card */}
                 <div className="w-full sm:w-64 flex-shrink-0 bg-gradient-to-b from-primary/80 to-primary/40 p-4 sm:p-6 flex flex-col items-center justify-center text-center">
                   <p className="text-xs sm:text-sm text-white/80 mb-1">Pricing</p>
-                  {plan.priceLabel && (
-                    <p className="text-xs text-white/60 mb-2">{plan.priceLabel}</p>
-                  )}
-                  <p className="text-2xl sm:text-4xl font-bold text-white mb-1">
-                    {plan.price}
-                  </p>
-                  {plan.period && <p className="text-xs text-white/60">{plan.period}</p>}
+                  <p className="text-2xl sm:text-4xl font-bold text-white mb-1">{priceStr}</p>
+                  {period && <p className="text-xs text-white/60">{period}</p>}
                 </div>
 
                 {/* Plan Details */}
                 <div className="flex-1 p-4 sm:p-6">
-                  <p className="text-xs text-muted-foreground mb-1">{plan.type}</p>
+                  <p className="text-xs text-muted-foreground mb-1">Subscription</p>
                   <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">{plan.name}</h2>
                   {plan.description && (
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3">
                       {plan.description}
                     </p>
                   )}
-                  
-                  <div className="flex flex-wrap gap-x-3 sm:gap-x-6 gap-y-1 mb-3 sm:mb-4">
-                    {plan.features.map((feature) => (
-                      <div key={feature} className="flex items-center gap-2 text-xs sm:text-sm">
-                        <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
-                        <span className="text-muted-foreground">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
+
+                  {/* Features from API */}
+                  {plan.features.length > 0 && (
+                    <ul className="space-y-1 mb-4">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                          <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
                   <button
-                    onClick={() => handleSubscribe(plan.id)}
+                    onClick={() => handleSubscribe(plan)}
                     disabled={subscribingId === plan.id}
                     className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-primary text-primary-foreground rounded-lg text-xs sm:text-sm font-medium hover:bg-primary/90 transition-colors w-full sm:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {subscribingId === plan.id ? "Redirecting..." : "Subscribe Now"}
+                    {subscribingId === plan.id ? "Redirecting..." : (plan.button_text ?? "Subscribe Now")}
                   </button>
                 </div>
               </div>
-            )
+            );
           })}
         </div>
       </main>
       <Footer />
     </div>
-  )
+  );
 }

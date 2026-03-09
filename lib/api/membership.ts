@@ -6,8 +6,16 @@ export type MembershipPlan = {
   name: string;
   description?: string;
   price?: number | string;
+  formatted_price?: string;
+  billing_amount?: number;
+  cycle_period?: string;
   interval?: string;
   level_id?: string | number;
+  features: string[];
+  popular?: boolean;
+  badge?: string | null;
+  button_text?: string;
+  checkout_url?: string;
 };
 
 export type MembershipInfo = {
@@ -31,8 +39,16 @@ export const membershipService = {
         name: (row.name as string | undefined) ?? "",
         description: row.description as string | undefined,
         price: row.price as number | string | undefined,
+        formatted_price: row.formatted_price as string | undefined,
+        billing_amount: row.billing_amount as number | undefined,
+        cycle_period: row.cycle_period as string | undefined,
         interval: row.interval as string | undefined,
         level_id: (row.level_id as string | number | undefined) ?? undefined,
+        features: Array.isArray(row.features) ? (row.features as string[]).filter((f) => typeof f === "string") : [],
+        popular: Boolean(row.popular),
+        badge: (row.badge as string | null | undefined) ?? null,
+        button_text: (row.button_text as string | undefined) ?? "Subscribe",
+        checkout_url: row.checkout_url as string | undefined,
       };
     }).filter((p) => p.id && p.name);
   },

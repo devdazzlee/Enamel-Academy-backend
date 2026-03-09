@@ -16,11 +16,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { cpdService } from "@/lib/api/cpd";
 import { rolesService, type DentalRole } from "@/lib/api/roles";
+import { userService } from "@/lib/api/user";
 
 export default function GenerateAuditReport() {
   const router = useRouter();
   const [reportFormat, setReportFormat] = useState('comprehensive');
   const [dateRange, setDateRange] = useState<'full_cycle' | 'last_year' | 'custom'>('full_cycle');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [includeOptions, setIncludeOptions] = useState({
     certificates: true,
     evidence: true,
@@ -33,7 +36,7 @@ export default function GenerateAuditReport() {
   const [generateError, setGenerateError] = useState("");
   const [generateSuccess, setGenerateSuccess] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedRole, setSelectedRole] = useState("dentist");
+  const [selectedRole, setSelectedRole] = useState("");
   const [roleOptions, setRoleOptions] = useState<DentalRole[]>([]);
   const [dateRangeLabels, setDateRangeLabels] = useState({
     fullCycle: "Full 5-Year Cycle",
@@ -75,10 +78,15 @@ export default function GenerateAuditReport() {
       setIsLoading(true);
       setLoadError("");
       try {
+        const userRaw = await userService.me().catch(() => null);
+        const userRole = (userRaw?.role as string | undefined) || "";
+        if (!alive) return;
+        if (userRole && !selectedRole) setSelectedRole(userRole);
+        const roleForReq = userRole || selectedRole || "dentist";
         const [summaryRaw, analyticsRaw, requirementsRaw, rolesRaw] = await Promise.all([
           cpdService.summary(),
           cpdService.analytics(),
-          cpdService.requirements(selectedRole),
+          cpdService.requirements(roleForReq),
           rolesService.roles(),
         ]);
         if (!alive) return;
@@ -187,22 +195,57 @@ export default function GenerateAuditReport() {
       spreadsheet: "excel",
       evidence: "evidence_zip",
     };
-    const dateMap: Record<string, string> = {
-      full_cycle: "full_cycle",
-      last_year: "custom",
-      custom: "custom",
-    };
+
+    // Calculate last year date range
+    const now = new Date();
+    const lastYearStart = `${now.getFullYear() - 1}-01-01`;
+    const lastYearEnd = `${now.getFullYear() - 1}-12-31`;
+
+    let apiDateRange: string;
+    let startDate: string | undefined;
+    let endDate: string | undefined;
+
+    if (dateRange === "full_cycle") {
+      apiDateRange = "full_cycle";
+    } else if (dateRange === "last_year") {
+      apiDateRange = "custom";
+      startDate = lastYearStart;
+      endDate = lastYearEnd;
+    } else {
+      apiDateRange = "custom";
+      startDate = customStartDate || undefined;
+      endDate = customEndDate || undefined;
+    }
+
     try {
-      await cpdService.generateAuditReport({
+      const response = await cpdService.generateAuditReport({
         format: formatMap[reportFormat] ?? "pdf",
-        date_range: dateMap[dateRange] ?? "full_cycle",
+        date_range: apiDateRange,
+        start_date: startDate,
+        end_date: endDate,
         include_certificates: includeOptions.certificates,
         include_evidence: includeOptions.evidence,
         include_reflections: includeOptions.reflections,
         include_outcomes: includeOptions.outcomes,
         include_verification: includeOptions.verification,
       });
-      setGenerateSuccess("Audit report request submitted successfully.");
+
+      // Handle download URL from response
+      const resData = (response && typeof response === "object" ? response : {}) as Record<string, unknown>;
+      const dataBlock = (resData.data && typeof resData.data === "object" ? resData.data : resData) as Record<string, unknown>;
+      const downloadUrl = (dataBlock.download_url ?? dataBlock.url ?? dataBlock.file_url) as string | undefined;
+
+      if (downloadUrl) {
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = `audit-report.${formatMap[reportFormat] === "excel" ? "xlsx" : formatMap[reportFormat] === "evidence_zip" ? "zip" : "pdf"}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setGenerateSuccess("Audit report downloaded successfully.");
+      } else {
+        setGenerateSuccess("Audit report generated successfully. Check your email or downloads.");
+      }
     } catch {
       setGenerateError("Failed to generate report. Please try again.");
     } finally {
@@ -414,14 +457,7 @@ export default function GenerateAuditReport() {
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent className="w-[var(--radix-select-trigger-width)]">
-                    {(roleOptions.length
-                      ? roleOptions
-                      : [
-                          { id: "dentist", slug: "dentist", name: "Dentist" },
-                          { id: "dental_nurse", slug: "dental_nurse", name: "Dental Nurse" },
-                          { id: "dental_care_professional", slug: "dental_care_professional", name: "Dental Care Professional" },
-                        ]
-                    ).map((role) => {
+                    {roleOptions.map((role) => {
                       const value = String(role.slug ?? role.id);
                       return (
                         <SelectItem key={value} value={value}>
@@ -493,6 +529,28 @@ export default function GenerateAuditReport() {
                     <SelectItem value="custom">{dateRangeLabels.custom}</SelectItem>
                   </SelectContent>
                 </Select>
+                {dateRange === "custom" && (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Include in Report */}
@@ -564,21 +622,6 @@ export default function GenerateAuditReport() {
       <Footer />
      
     </div>
-  );
-}
-
-function NavLink({ label, active = false }: { label: string; active?: boolean }) {
-  return (
-    <a
-      href="#"
-      className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-        active
-          ? 'bg-purple-50 text-purple-700 font-medium'
-          : 'text-gray-600 hover:text-purple-600 hover:bg-gray-50'
-      }`}
-    >
-      {label}
-    </a>
   );
 }
 

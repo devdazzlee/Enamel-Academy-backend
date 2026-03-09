@@ -8,6 +8,14 @@ export type RegisterPayload = {
   email: string;
   password: string;
   role: string;
+  title?: string;
+  dentalLicenseNumber?: string;
+  dentalSpecialty?: string;
+  dentalClinic?: string;
+  dentalExperienceYears?: string | number;
+  dentalQualifications?: string;
+  dentalRegistrationBody?: string;
+  dentalRegistrationDate?: string;
 };
 
 export type LoginPayload = {
@@ -54,6 +62,14 @@ export const authService = {
       email: payload.email,
       password: payload.password,
       role: payload.role,
+      ...(payload.title && { title: payload.title }),
+      ...(payload.dentalLicenseNumber && { dental_license_number: payload.dentalLicenseNumber }),
+      ...(payload.dentalSpecialty && { dental_specialty: payload.dentalSpecialty }),
+      ...(payload.dentalClinic && { dental_clinic: payload.dentalClinic }),
+      ...(payload.dentalExperienceYears && { dental_experience_years: String(payload.dentalExperienceYears) }),
+      ...(payload.dentalQualifications && { dental_qualifications: payload.dentalQualifications }),
+      ...(payload.dentalRegistrationBody && { dental_registration_body: payload.dentalRegistrationBody }),
+      ...(payload.dentalRegistrationDate && { dental_registration_date: payload.dentalRegistrationDate }),
     });
     const token = extractToken(response.data);
     if (!token) throw new Error("Register succeeded but token was not found in response");

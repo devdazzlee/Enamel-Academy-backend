@@ -19,6 +19,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { cpdService } from "@/lib/api/cpd";
 import { rolesService, type DentalRole } from "@/lib/api/roles";
+import { userService } from "@/lib/api/user";
 
 
 export default function LogExternalCPD() {
@@ -40,7 +41,7 @@ export default function LogExternalCPD() {
   const [metaError, setMetaError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
-  const [selectedRole, setSelectedRole] = useState("dentist");
+  const [selectedRole, setSelectedRole] = useState("");
 
   const [gdcRequirements, setGdcRequirements] = useState<string[]>([]);
 
@@ -62,9 +63,14 @@ export default function LogExternalCPD() {
       setIsLoadingMeta(true);
       setMetaError("");
       try {
+        const userRaw = await userService.me().catch(() => null);
+        const userRole = (userRaw?.role as string | undefined) || "";
+        if (!alive) return;
+        if (userRole && !selectedRole) setSelectedRole(userRole);
+        const roleForReq = userRole || selectedRole || "dentist";
         const [rolesRaw, requirementsRaw, historyRaw, summaryRaw] = await Promise.all([
           rolesService.roles(),
-          cpdService.requirements(selectedRole),
+          cpdService.requirements(roleForReq),
           cpdService.history({ limit: 200, offset: 0 }),
           cpdService.summary(),
         ]);
@@ -183,7 +189,7 @@ export default function LogExternalCPD() {
         date_completed: formData.dateCompleted,
         hours: formData.cpdHours,
         gdc_category: formData.category,
-        activity_type: formData.activityType || "external",
+        activity_type: formData.activityType || "",
         learning_outcomes: formData.learningOutcomes,
         reflection: formData.reflection,
         apply_learning: formData.application,
@@ -355,14 +361,7 @@ export default function LogExternalCPD() {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(roleOptions.length
-                          ? roleOptions
-                          : [
-                              { id: "dentist", slug: "dentist", name: "Dentist" },
-                              { id: "dental_nurse", slug: "dental_nurse", name: "Dental Nurse" },
-                              { id: "dental_care_professional", slug: "dental_care_professional", name: "Dental Care Professional" },
-                            ]
-                        ).map((role) => {
+                        {roleOptions.map((role) => {
                           const value = String(role.slug ?? role.id);
                           return (
                             <SelectItem key={value} value={value}>
@@ -594,17 +593,3 @@ export default function LogExternalCPD() {
   );
 }
 
-function NavLink({ label, active = false }: { label: string; active?: boolean }) {
-  return (
-    <a
-      href="#"
-      className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-        active
-          ? 'bg-purple-50 text-purple-700 font-medium'
-          : 'text-gray-600 hover:text-purple-600 hover:bg-gray-50'
-      }`}
-    >
-      {label}
-    </a>
-  );
-}

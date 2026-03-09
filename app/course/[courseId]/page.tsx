@@ -66,7 +66,7 @@ type LessonStep = {
   title: string
   description: string
   videoUrl: string
-  topics: Array<{ title: string; duration: string }>
+  topics: Array<{ id?: string; title: string; duration: string }>
 }
 
 const decodeHtmlEntities = (input: string): string => {
@@ -108,12 +108,14 @@ const extractVideoUrl = (html: unknown): string => {
 }
 
 const feedbackCriteria = [
-  "The course aims and objectives were met",
-  "The course was clear and easy to understand",
-  "The course meets SMART objectives",
-  "The training experience was enjoyable",
-  "The course met my learning expectations",
-  "The course links to my personal development plan",
+  "Overall Course Experience",
+  "Content Quality & Clarity",
+  "Instructor Effectiveness",
+  "Course Difficulty Level",
+  "Time Commitment & Pacing",
+  "Course Materials Quality",
+  "Support & Accessibility",
+  "Relevance to Practice",
 ]
 
 // ─── Component ─────────────────────────────────────────────────────
@@ -191,6 +193,21 @@ export default function CoursePlayerPage() {
   const [feedbackStatusNote, setFeedbackStatusNote] = useState("")
   const [isCourseCompletedByApi, setIsCourseCompletedByApi] = useState(false)
   const [isCertificateAvailable, setIsCertificateAvailable] = useState(false)
+
+  // Fire-and-forget progress tracking helper
+  const trackCourseProgress = (stepIndex: number, progressPercentage: number, completed = false) => {
+    const lessonStep = lessonSteps[stepIndex - 1]
+    const lessonId = lessonStep?.id ? Number(lessonStep.id) || undefined : undefined
+    coursesService.trackProgress(courseId, {
+      lesson_id: lessonId,
+      step_index: stepIndex,
+      progress_percentage: progressPercentage,
+      completed,
+    }).catch(() => {/* ignore tracking errors */})
+    if (completed && lessonId) {
+      coursesService.markLessonComplete(courseId, lessonId).catch(() => {/* ignore */})
+    }
+  }
 
   // Fetch course data from API
   useEffect(() => {
@@ -565,6 +582,8 @@ export default function CoursePlayerPage() {
               fromKey("difficulty_level"),
               fromKey("time_commitment"),
               fromKey("materials_quality"),
+              fromKey("support"),
+              fromKey("relevance"),
             ]
             if (prefill.some((x) => x > 0)) setRatings(prefill)
             const comment = typeof feedback.comment === "string" ? feedback.comment : ""
@@ -672,6 +691,7 @@ export default function CoursePlayerPage() {
       const videoUrl = extractVideoUrl(section?.html_content)
       const topics = Array.isArray(section?.topics)
         ? section.topics.map((t: any) => ({
+            id: t?.id !== undefined ? String(t.id) : undefined,
             title: sanitizeApiText(t?.title, ""),
             duration: sanitizeApiText(t?.duration, "Not specified"),
           })).filter((t) => t.title)
@@ -917,10 +937,10 @@ export default function CoursePlayerPage() {
           difficulty_level: ratings[3] ?? 0,
           time_commitment: ratings[4] ?? 0,
           materials_quality: ratings[5] ?? 0,
-          support: ratings[5] ?? 0,
-          relevance: ratings[4] ?? 0,
+          support: ratings[6] ?? 0,
+          relevance: ratings[7] ?? 0,
         },
-        comment: feedbackComment.trim() || "No additional comments.",
+        comment: feedbackComment.trim() || "",
       })
 
       setFeedbackSubmitted(true)
@@ -1219,9 +1239,10 @@ export default function CoursePlayerPage() {
           </button>
 
           {isLastPage ? (
-                <button 
+                <button
               onClick={() => {
                 if (consentChecked) {
+                  trackCourseProgress(learnPages.length, 100, true)
                   setLearnCompleted(true)
                   setActiveSection("assess")
                   setShowResults(false)
@@ -1242,7 +1263,21 @@ export default function CoursePlayerPage() {
             </button>
           ) : (
             <button
-              onClick={() => setLearnPage(learnPage + 1)}
+              onClick={() => {
+                const nextPage = learnPage + 1
+                const progressPct = Math.round((nextPage / learnPages.length) * 100)
+                trackCourseProgress(nextPage, progressPct)
+                // Mark each topic in the current lesson step as complete
+                if (learnPage >= 1 && learnPage <= lessonSteps.length) {
+                  const currentStep = lessonSteps[learnPage - 1]
+                  currentStep?.topics.forEach((topic) => {
+                    if (topic.id) {
+                      coursesService.markTopicComplete(courseId, topic.id).catch(() => {/* ignore */})
+                    }
+                  })
+                }
+                setLearnPage(nextPage)
+              }}
               className="px-4 sm:px-5 py-2 sm:py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
             >
               Next

@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
-import { rolesService, type Permission } from "@/lib/api/roles";
+import { rolesService, type DentalRole, type Permission } from "@/lib/api/roles";
 
 type ToggleRow = {
   id: string;
@@ -117,10 +117,13 @@ function IconLock(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export default function ManagePermissionsPage() {
-  const [selectedRole, setSelectedRole] = useState("dentist");
+  const [roles, setRoles] = useState<DentalRole[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState("");
   const [rolePermissions, setRolePermissions] = useState<Permission[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [permissionsError, setPermissionsError] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
   const emailRows: ToggleRow[] = useMemo(
     () => [
       {
@@ -197,7 +200,48 @@ export default function ManagePermissionsPage() {
     setToggles((p) => ({ ...p, [id]: next }));
   }
 
+  function handleSavePreferences() {
+    try {
+      localStorage.setItem("user_preferences", JSON.stringify(toggles));
+      setSaveMessage("Preferences saved successfully.");
+    } catch {
+      setSaveMessage("Failed to save preferences.");
+    }
+    setTimeout(() => setSaveMessage(""), 3000);
+  }
+
+  function handleCancelPreferences() {
+    const init: Record<string, boolean> = {};
+    [...emailRows, ...privacyRows].forEach((r) => (init[r.id] = r.defaultOn));
+    setToggles(init);
+    setSaveMessage("");
+  }
+
+  // Fetch available roles from API
   React.useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      setRolesLoading(true);
+      try {
+        const fetchedRoles = await rolesService.roles();
+        if (!alive) return;
+        setRoles(fetchedRoles);
+        if (fetchedRoles.length > 0) {
+          setSelectedRole(String(fetchedRoles[0].slug ?? fetchedRoles[0].id));
+        }
+      } catch {
+        if (!alive) return;
+      } finally {
+        if (alive) setRolesLoading(false);
+      }
+    };
+    void run();
+    return () => { alive = false; };
+  }, []);
+
+  // Fetch permissions for selected role
+  React.useEffect(() => {
+    if (!selectedRole) return;
     let alive = true;
     const run = async () => {
       setPermissionsLoading(true);
@@ -215,9 +259,7 @@ export default function ManagePermissionsPage() {
       }
     };
     void run();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [selectedRole]);
 
   return (
@@ -315,7 +357,7 @@ export default function ManagePermissionsPage() {
 
           <div className="mt-4 sm:mt-6 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white">
             <div className="flex items-center gap-3 border-b border-[#e5e7eb] bg-white px-4 sm:px-6 py-3 sm:py-4">
-              <div className="font-semibold text-[#1a1a1a] text-sm sm:text-base">Role Permissions (API)</div>
+              <div className="font-semibold text-[#1a1a1a] text-sm sm:text-base">Role Permissions</div>
             </div>
             <div className="px-4 sm:px-6 py-4">
               <label htmlFor="role-picker" className="mb-2 block text-sm text-[#6b7280]">
@@ -325,11 +367,19 @@ export default function ManagePermissionsPage() {
                 id="role-picker"
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/30"
+                disabled={rolesLoading}
+                className="w-full rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/30 disabled:opacity-60"
               >
-                <option value="dentist">dentist</option>
-                <option value="dental_nurse">dental_nurse</option>
-                <option value="dental_care_professional">dental_care_professional</option>
+                {rolesLoading && <option value="">Loading roles...</option>}
+                {!rolesLoading && roles.length === 0 && <option value="">No roles available</option>}
+                {roles.map((role) => {
+                  const value = String(role.slug ?? role.id);
+                  return (
+                    <option key={value} value={value}>
+                      {role.name}
+                    </option>
+                  );
+                })}
               </select>
               {permissionsLoading && <p className="mt-3 text-sm text-[#6b7280]">Loading permissions...</p>}
               {permissionsError && <p className="mt-3 text-sm text-red-600">{permissionsError}</p>}
@@ -355,17 +405,24 @@ export default function ManagePermissionsPage() {
           <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
             <button
               type="button"
+              onClick={handleSavePreferences}
               className="w-full sm:flex-1 rounded-xl bg-[#8b5cf6] px-4 sm:px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#7c3aed] active:bg-[#6d28d9] transition-colors"
             >
               Save Preferences
             </button>
             <button
               type="button"
+              onClick={handleCancelPreferences}
               className="w-full sm:w-[120px] rounded-xl border border-[#e5e7eb] bg-white px-4 sm:px-6 py-3 text-sm font-medium text-[#1a1a1a] hover:bg-[#f9fafb] transition-colors"
             >
               Cancel
             </button>
           </div>
+          {saveMessage && (
+            <p className={`mt-2 text-sm ${saveMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
+              {saveMessage}
+            </p>
+          )}
 
           {/* Privacy Notice */}
           <div className="mt-4 sm:mt-6 rounded-2xl border border-blue-200 bg-blue-50 px-4 sm:px-6 py-4 sm:py-5">

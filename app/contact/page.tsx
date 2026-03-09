@@ -5,6 +5,7 @@ import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Phone, Mail, MapPin, Send, Clock, MessageSquare, User, FileText } from "lucide-react";
 import { contactService } from "@/lib/api/contact";
+import { toast } from "@/hooks/use-toast";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -38,10 +39,19 @@ export default function ContactPage() {
         subject: formData.subject,
         message: formData.message,
       });
+      toast({
+        title: "Message sent",
+        description: "Thank you for your message! We'll get back to you soon.",
+      });
       setStatusMessage("Thank you for your message! We'll get back to you soon.");
       setStatusType("success");
       setFormData({ name: "", email: "", subject: "", message: "" });
     } catch {
+      toast({
+        variant: "destructive",
+        title: "Message not sent",
+        description: "We couldn't send your message right now. Please try again in a moment.",
+      });
       setStatusMessage("We couldn't send your message right now. Please try again in a moment.");
       setStatusType("error");
     } finally {

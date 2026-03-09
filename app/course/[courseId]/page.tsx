@@ -29,6 +29,7 @@ import { authApi } from "@/lib/api/http"
 import { coursesService } from "@/lib/api/courses"
 import { assignmentService } from "@/lib/api/assignments"
 import { certificatesService } from "@/lib/api/certificates"
+import { API_PATHS } from "@/lib/api/endpoints"
 import ReactPlayer from "react-player"
 
 type Section = "about" | "learn" | "assess" | "evaluate"
@@ -328,7 +329,7 @@ export default function CoursePlayerPage() {
         setAssessmentMetaError("")
         const optionalApiErrors: string[] = []
         const [courseResponse, assessmentsResponse, assignmentsResponse, quizzesResponse, quizStatsResponse, assignmentStatsResponse] = await Promise.all([
-          authApi.get(`/wp-json/reactapi/v1/courses/?id=${courseId}`),
+          authApi.get(API_PATHS.courses.details, { params: { id: courseId } }),
           assignmentService.courseAssessments(courseId).catch((error) => {
             optionalApiErrors.push(getApiErrorMessage(error))
             return null
@@ -894,7 +895,7 @@ export default function CoursePlayerPage() {
   }
 
   const refreshCompletionStatus = async (): Promise<{ completed: boolean; certificateAvailable: boolean }> => {
-    const courseRes = await authApi.get(`/wp-json/reactapi/v1/courses/?id=${courseId}`)
+    const courseRes = await authApi.get(API_PATHS.courses.details, { params: { id: courseId } })
     const courseRoot = (courseRes.data && typeof courseRes.data === "object" ? courseRes.data : {}) as Record<string, unknown>
     const courseData = (courseRoot.data && typeof courseRoot.data === "object" ? courseRoot.data : {}) as Record<string, unknown>
     const courseObj = (courseData.course && typeof courseData.course === "object" ? courseData.course : {}) as Record<string, unknown>

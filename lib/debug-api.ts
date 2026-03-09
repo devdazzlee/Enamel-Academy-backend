@@ -28,7 +28,7 @@ export const debugAuth = {
     }
     try {
       // Call a protected endpoint that doesn’t affect data
-      const res = await authApi.get("/wp-json/reactapi/v1/user");
+      const res = await authApi.get(API_PATHS.user.me);
       console.log("[debug] Token injection success:", res.status, res.data);
     } catch (e) {
       console.error("[debug] Token injection failed:", e);
@@ -42,7 +42,7 @@ export const debugAuth = {
     const originalToken = tokenStorage.get();
     tokenStorage.set("invalid-token");
     try {
-      await authApi.get("/wp-json/reactapi/v1/user");
+      await authApi.get(API_PATHS.user.me);
     } catch {
       // Expected to fail
     }

@@ -22,6 +22,7 @@ import { coursesService, type ApiCourse, type LibraryCourse } from "@/lib/api/co
 import { dashboardService, type ContinueLearningCourse, type RecommendedCourse } from "@/lib/api/dashboard"
 import { pdpService } from "@/lib/api/pdp"
 import { authApi } from "@/lib/api/http";
+import { API_PATHS } from "@/lib/api/endpoints"
 import { Spinner } from "@/components/ui/spinner";
 import ReactPlayer from "react-player";
 
@@ -261,7 +262,7 @@ export function CourseDetailClient() {
           try {
             const dashCourse = await dashboardService.courseById(data.id)
             if (alive) setDashboardCourse(dashCourse)
-            const dashRaw = await authApi.get(`/wp-json/reactapi/v1/dashboard/courses/${data.id}`)
+            const dashRaw = await authApi.get(API_PATHS.dashboard.courseById(data.id))
             if (alive) setDashboardDetail(normalizeDashboardDetail(dashRaw.data))
           } catch {
             if (alive) {
@@ -272,7 +273,7 @@ export function CourseDetailClient() {
         }
         // Store the full API response to access curriculum and related courses
         // Use the same endpoint to get the full response structure
-        const response = await authApi.get("/wp-json/reactapi/v1/courses/", {
+        const response = await authApi.get(API_PATHS.courses.details, {
           params: isNumericId ? { id: courseIdOrSlug } : { slug: courseIdOrSlug },
         })
         if (response.data?.success && alive) {

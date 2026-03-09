@@ -7,6 +7,7 @@ import { RouteGuard } from "@/components/route-guard"
 import "@/lib/debug-api" // Import to expose debug helpers
 import { AppProvider } from "@/lib/app-context"
 import { Analytics } from "@vercel/analytics/next"
+import { Toaster } from "@/components/ui/toaster"
 
 const rubik = localFont({
   variable: "--font-rubik",
@@ -49,6 +50,7 @@ export default function RootLayout({
         <AppProvider>
           <AuthHydrator />
           <RouteGuard>{children}</RouteGuard>
+          <Toaster />
         </AppProvider>
         <Analytics />
       </body>

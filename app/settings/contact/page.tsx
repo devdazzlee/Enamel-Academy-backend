@@ -5,6 +5,8 @@ import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { ArrowLeft, Mail, Phone, MessageSquare, Send, Check } from "lucide-react";
 import Link from "next/link";
+import { contactService } from "@/lib/api/contact";
+import { toast } from "@/hooks/use-toast";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -15,14 +17,38 @@ export default function ContactPage() {
     category: "general"
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitted(true);
-    setTimeout(() => {
-      setIsSubmitted(false);
+    setIsSubmitting(true);
+    setIsSubmitted(false);
+
+    try {
+      await contactService.submit({
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: `Category: ${formData.category}\n\n${formData.message}`,
+      });
+      toast({
+        title: "Message sent",
+        description: "Thank you for your message! We'll respond within 24 hours.",
+      });
+      setIsSubmitted(true);
       setFormData({ name: "", email: "", subject: "", message: "", category: "general" });
-    }, 3000);
+      setTimeout(() => {
+        setIsSubmitted(false);
+      }, 3000);
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Message not sent",
+        description: "We couldn't send your message right now. Please try again in a moment.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -145,10 +171,11 @@ export default function ContactPage() {
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[#8b5cf6] text-white rounded-lg font-medium hover:bg-[#7c3aed] transition-colors flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-[#8b5cf6] text-white rounded-lg font-medium hover:bg-[#7c3aed] transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:pointer-events-none"
                 >
                   <Send className="h-5 w-5" />
-                  Send Message
+                  {isSubmitting ? "Sending..." : "Send Message"}
                 </button>
               </form>
             </div>

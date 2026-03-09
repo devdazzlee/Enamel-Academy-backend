@@ -1,7 +1,12 @@
 import { publicApi } from "@/lib/api/http";
 import { API_PATHS } from "@/lib/api/endpoints";
 
-export type ContactFormPayload = Record<string, string>;
+export type ContactFormPayload = {
+  name: string;
+  email: string;
+  subject: string;
+  message?: string;
+};
 
 export const contactService = {
   async forms(): Promise<unknown> {
@@ -14,4 +19,3 @@ export const contactService = {
     return response.data;
   },
 };
-

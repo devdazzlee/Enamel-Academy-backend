@@ -311,7 +311,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"your-name\": \"John Smith\",\n    \"your-email\": \"john.smith@example.com\",\n    \"your-subject\": \"Question about dental courses\",\n    \"your-message\": \"I would like to know more about your advanced endodontics course. When does it start?\"\n}"
+              "raw": "{\n    \"name\": \"John Smith\",\n    \"email\": \"john.smith@example.com\",\n    \"subject\": \"Question about dental courses\",\n    \"message\": \"I would like to know more about your advanced endodontics course. When does it start?\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/wp-json/reactapi/v1/contact/save",
@@ -343,7 +343,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"your-name\": \"Jane Doe\",\n    \"your-email\": \"jane.doe@example.com\",\n    \"your-subject\": \"Membership inquiry\",\n    \"your-message\": \"I'm interested in the yearly membership plan. Can you provide more details?\"\n}"
+              "raw": "{\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane.doe@example.com\",\n    \"subject\": \"Membership inquiry\",\n    \"message\": \"I'm interested in the yearly membership plan. Can you provide more details?\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/wp-json/reactapi/v1/contact/save",

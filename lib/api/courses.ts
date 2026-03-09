@@ -167,6 +167,22 @@ export type OngoingCoursesResult = {
   summary: OngoingCoursesSummary;
 };
 
+export type MyCoursesParams = {
+  status?: string;
+  page?: number;
+  per_page?: number;
+  sort?: string;
+};
+
+export type CourseProgressPayload = {
+  lesson_id?: number;
+  topic_id?: number;
+  step_index?: number;
+  watched_seconds?: number;
+  progress_percentage?: number;
+  completed?: boolean;
+};
+
 export type EnrollResult = {
   success: boolean;
   message?: string;
@@ -612,6 +628,13 @@ export const coursesService = {
     return normalizeOngoing(response.data);
   },
 
+  async myCourses(params?: MyCoursesParams): Promise<ApiCourse[]> {
+    const response = await authApi.get(API_PATHS.courses.myCourses, {
+      params,
+    });
+    return normalizeCourses(response.data);
+  },
+
   async categories(): Promise<ApiCategory[]> {
     const response = await authApi.get(API_PATHS.courses.categories);
     const payload = response.data as Record<string, unknown> | unknown[];
@@ -717,6 +740,21 @@ export const coursesService = {
 
   async getFeedback(courseId: string | number): Promise<unknown> {
     const response = await authApi.get(API_PATHS.courses.feedback(courseId));
+    return response.data;
+  },
+
+  async trackProgress(courseId: string | number, payload: CourseProgressPayload): Promise<unknown> {
+    const response = await authApi.post(API_PATHS.courses.progress(courseId), payload);
+    return response.data;
+  },
+
+  async markLessonComplete(courseId: string | number, lessonId: string | number): Promise<unknown> {
+    const response = await authApi.post(API_PATHS.courses.lessonComplete(courseId, lessonId));
+    return response.data;
+  },
+
+  async markTopicComplete(courseId: string | number, topicId: string | number): Promise<unknown> {
+    const response = await authApi.post(API_PATHS.courses.topicComplete(courseId, topicId));
     return response.data;
   },
 };

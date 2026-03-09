@@ -1,9 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
-import { Phone, Mail, MapPin, Send, Clock, MessageSquare, User, FileText } from "lucide-react"
+import { useState } from "react";
+import { Navigation } from "@/components/navigation";
+import { Footer } from "@/components/footer";
+import { Phone, Mail, MapPin, Send, Clock, MessageSquare, User, FileText } from "lucide-react";
+import { contactService } from "@/lib/api/contact";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -11,28 +12,42 @@ export default function ContactPage() {
     email: "",
     subject: "",
     message: ""
-  })
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusType, setStatusType] = useState<"success" | "error" | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
-    }))
-  }
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    alert("Thank you for your message! We'll get back to you soon.")
-    setFormData({ name: "", email: "", subject: "", message: "" })
-    setIsSubmitting(false)
-  }
+    e.preventDefault();
+    setIsSubmitting(true);
+    setStatusMessage(null);
+    setStatusType(null);
+
+    try {
+      await contactService.submit({
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message,
+      });
+      setStatusMessage("Thank you for your message! We'll get back to you soon.");
+      setStatusType("success");
+      setFormData({ name: "", email: "", subject: "", message: "" });
+    } catch {
+      setStatusMessage("We couldn't send your message right now. Please try again in a moment.");
+      setStatusType("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#e8e8e8]">
@@ -130,6 +145,18 @@ export default function ContactPage() {
             <div className="lg:col-span-2">
               <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Send us a message</h2>
+
+                {statusMessage && (
+                  <div
+                    className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
+                      statusType === "success"
+                        ? "border-green-200 bg-green-50 text-green-800"
+                        : "border-red-200 bg-red-50 text-red-800"
+                    }`}
+                  >
+                    {statusMessage}
+                  </div>
+                )}
                 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

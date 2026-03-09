@@ -1,87 +1,88 @@
-"use client"
+"use client";
 
-import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
-import { Check } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react";
+import { Navigation } from "@/components/navigation";
+import { Footer } from "@/components/footer";
+import { Check } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { membershipService, type MembershipPlan } from "@/lib/api/membership";
 
-const plans = [
-  {
-    type: "Team Subscription",
-    name: "You and your Team",
-    priceLabel: "From",
-    price: "£2.92",
-    priceSuffix: "+VAT",
-    period: "per user / per month",
-    description: "Unlimited access to the Essentials range of enhanced CPD courses and practice management features",
-    features: [
-      "Invite self employed team members to your practice.",
-      "View your team members certificates.",
-      "Assign courses to your team members.",
-      "Access to practice management Learning Hub.",
-      "Personal CPD Tracker and Learning Hub.",
-      "Automated Personal Development Plan features.",
-      "GDC Reports and Annual Statements.",
-    ],
-    buttonText: "Subscribe Now",
-    highlighted: true,
-  },
-  {
-    type: "Individual Subscription",
-    name: "Essentials",
-    priceLabel: "Only",
-    price: "£42.00*",
-    period: "per year",
-    description: "Unlimited access to the Essentials range of enhanced CPD courses.",
-    features: [
-      "Instant access to 230+ CPD courses.",
-      "Personal CPD Tracker and Learning Hub.",
-      "Automated Personal Development Plan features.",
-      "GDC Reports and Annual Statements.",
-      "Your subscription will automatically renew every twelve months.",
-    ],
-    buttonText: "Subscribe Now",
-  },
-  {
-    type: "Individual Subscription",
-    name: "Pro",
-    priceLabel: "Only",
-    price: "£142.00*",
-    period: "per year",
-    description: "Unlimited access to our entire clinical Courses",
-    features: [
-      "Instant access to 230+ Essentials CPD courses.",
-      "Instant access to 100+ Pro CPD courses.",
-      "Personal CPD Tracker and Learning Hub.",
-      "Automated Personal Development Plan features.",
-      "GDC Reports and Annual Statements.",
-      "Your subscription will automatically renew every twelve months.",
-    ],
-    buttonText: "Subscribe Now",
-  },
-  {
-    type: "Individual Courses",
-    name: "Pay as you go",
-    priceLabel: "Prices from",
-    price: "£4.99 - £36",
-    period: "individual courses only",
-    description: "Pay as you go, buying the online verifiable CPD courses that you need, when you need them",
-    features: [
-      "Pay as you go, buying the online Enhanced CPD courses that you need, when you need them.",
-      "Take courses whenever and wherever you want.",
-      "Courses written by industry experts.",
-      "New courses added every month.",
-    ],
-    buttonText: "Subscribe Now",
-  },
-]
+type UiPlan = {
+  id: string | number;
+  type: string;
+  name: string;
+  priceLabel: string;
+  price: string;
+  period?: string;
+  description?: string;
+  features: string[];
+};
 
 export default function PricingPage() {
-  const router = useRouter()
+  const [plans, setPlans] = useState<UiPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [subscribingId, setSubscribingId] = useState<string | number | null>(null);
 
-  const handleSubscribe = (planName: string) => {
-    router.push('/payment')
-  }
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const apiPlans = await membershipService.plans();
+        if (!alive) return;
+        const mapped: UiPlan[] = apiPlans.map((plan: MembershipPlan) => {
+          const priceValue =
+            typeof plan.price === "number"
+              ? `£${plan.price.toFixed(2)}`
+              : typeof plan.price === "string"
+                ? plan.price
+                : "";
+          return {
+            id: plan.id,
+            type: "Subscription",
+            name: plan.name,
+            priceLabel: priceValue ? "Only" : "",
+            price: priceValue || "—",
+            period: plan.interval === "year" || plan.interval === "yearly" ? "per year" : undefined,
+            description: plan.description,
+            features: [
+              "Access to enhanced CPD courses.",
+              "Personal CPD tracker and learning hub.",
+              "Automated PDP tools and GDC-ready reports.",
+            ],
+          };
+        });
+        setPlans(mapped);
+      } catch {
+        if (!alive) return;
+        setError("Unable to load membership plans right now.");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const handleSubscribe = async (planId: string | number) => {
+    setSubscribingId(planId);
+    try {
+      const url = await membershipService.checkoutUrl(planId);
+      if (url) {
+        window.location.href = url;
+      } else {
+        setError("Checkout link not available for this plan.");
+      }
+    } catch {
+      setError("Unable to start checkout. Please try again.");
+    } finally {
+      setSubscribingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -91,6 +92,18 @@ export default function PricingPage() {
           <span className="text-primary">Pric</span>
           <span className="text-muted-foreground">ing</span>
         </h1>
+
+        {loading && (
+          <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner />
+            Loading membership plans...
+          </div>
+        )}
+        {error && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs sm:text-sm text-amber-800">
+            {error}
+          </div>
+        )}
 
         <div className="space-y-4 sm:space-y-6">
           {plans.map((plan) => {
@@ -102,19 +115,24 @@ export default function PricingPage() {
                 {/* Price Card */}
                 <div className="w-full sm:w-64 flex-shrink-0 bg-gradient-to-b from-primary/80 to-primary/40 p-4 sm:p-6 flex flex-col items-center justify-center text-center">
                   <p className="text-xs sm:text-sm text-white/80 mb-1">Pricing</p>
-                  <p className="text-xs text-white/60 mb-2">{plan.priceLabel}</p>
+                  {plan.priceLabel && (
+                    <p className="text-xs text-white/60 mb-2">{plan.priceLabel}</p>
+                  )}
                   <p className="text-2xl sm:text-4xl font-bold text-white mb-1">
                     {plan.price}
-                    {plan.priceSuffix && <span className="text-sm sm:text-lg">{plan.priceSuffix}</span>}
                   </p>
-                  <p className="text-xs text-white/60">{plan.period}</p>
+                  {plan.period && <p className="text-xs text-white/60">{plan.period}</p>}
                 </div>
 
                 {/* Plan Details */}
                 <div className="flex-1 p-4 sm:p-6">
                   <p className="text-xs text-muted-foreground mb-1">{plan.type}</p>
                   <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">{plan.name}</h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">{plan.description}</p>
+                  {plan.description && (
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                      {plan.description}
+                    </p>
+                  )}
                   
                   <div className="flex flex-wrap gap-x-3 sm:gap-x-6 gap-y-1 mb-3 sm:mb-4">
                     {plan.features.map((feature) => (
@@ -125,11 +143,12 @@ export default function PricingPage() {
                     ))}
                   </div>
 
-                  <button 
-                    onClick={() => handleSubscribe(plan.name)}
-                    className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-primary text-primary-foreground rounded-lg text-xs sm:text-sm font-medium hover:bg-primary/90 transition-colors w-full sm:w-auto justify-center"
+                  <button
+                    onClick={() => handleSubscribe(plan.id)}
+                    disabled={subscribingId === plan.id}
+                    className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-primary text-primary-foreground rounded-lg text-xs sm:text-sm font-medium hover:bg-primary/90 transition-colors w-full sm:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {plan.buttonText}
+                    {subscribingId === plan.id ? "Redirecting..." : "Subscribe Now"}
                   </button>
                 </div>
               </div>

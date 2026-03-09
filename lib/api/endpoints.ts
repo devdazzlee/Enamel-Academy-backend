@@ -28,12 +28,18 @@ export const API_PATHS = {
     details: "/wp-json/reactapi/v1/courses/",
     list: "/wp-json/reactapi/v1/courses",
     ongoing: "/wp-json/reactapi/v1/courses/ongoing",
+    myCourses: "/wp-json/reactapi/v1/courses/my-courses",
     categories: "/wp-json/reactapi/v1/courses/categories",
     filters: "/wp-json/reactapi/v1/courses/filters",
     enroll: (id: string | number) => `/wp-json/reactapi/v1/courses/enroll/${id}`,
     reflection: (id: string | number) => `/wp-json/reactapi/v1/courses/${id}/reflection`,
     reflections: (id: string | number) => `/wp-json/reactapi/v1/courses/${id}/reflections`,
     feedback: (id: string | number) => `/wp-json/reactapi/v1/courses/${id}/feedback`,
+    progress: (courseId: string | number) => `/wp-json/reactapi/v1/courses/${courseId}/progress`,
+    lessonComplete: (courseId: string | number, lessonId: string | number) =>
+      `/wp-json/reactapi/v1/courses/${courseId}/lessons/${lessonId}/complete`,
+    topicComplete: (courseId: string | number, topicId: string | number) =>
+      `/wp-json/reactapi/v1/courses/${courseId}/topics/${topicId}/complete`,
   },
   dental: {
     roles: "/wp-json/reactapi/v1/dental/roles",
@@ -76,6 +82,22 @@ export const API_PATHS = {
     requirements: (role: string) => `/wp-json/reactapi/v1/cpd/requirements/${role}`,
     logExternal: "/wp-json/reactapi/v1/cpd/log-external",
     generateAuditReport: "/wp-json/reactapi/v1/cpd/generate-audit-report",
+  },
+  membership: {
+    plans: "/wp-json/reactapi/v1/membership/plans",
+    current: "/wp-json/reactapi/v1/membership/current",
+    checkout: (levelId: string | number) => `/wp-json/reactapi/v1/membership/checkout/${levelId}`,
+    cancel: "/wp-json/reactapi/v1/membership/cancel",
+  },
+  payment: {
+    config: "/wp-json/reactapi/v1/payment/config",
+    createCheckout: "/wp-json/reactapi/v1/payment/create-checkout",
+    history: "/wp-json/reactapi/v1/payment/history",
+    session: (sessionId: string) => `/wp-json/reactapi/v1/payment/session/${sessionId}`,
+  },
+  contact: {
+    save: "/wp-json/reactapi/v1/contact/save",
+    forms: "/wp-json/reactapi/v1/contact/forms",
   },
   testApi: "/wp-json/reactapi/v1/TESTApi",
 } as const;

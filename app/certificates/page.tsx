@@ -7,11 +7,15 @@ import { CertificateModal } from "@/components/certificate-modal"
 import { Search, ChevronDown, Download, Calendar, Clock, Award, Filter, FileText, Eye, ChevronRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Spinner } from "@/components/ui/spinner"
+import { Skeleton } from "@/components/ui/skeleton"
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { certificatesService } from "@/lib/api/certificates";
+import { userService } from "@/lib/api/user";
+import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 const columnFilters = [
   { label: "Date", active: true },
@@ -35,6 +39,7 @@ type CertificateRow = {
   status: string;
   format: string;
   certificateUrl: string;
+  downloadUrl?: string;
   score: number;
   instructor: string;
   courseId: number | null;
@@ -42,6 +47,7 @@ type CertificateRow = {
 };
 
 export default function CertificatesPage() {
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("")
   const [activeFilters, setActiveFilters] = useState(columnFilters)
@@ -57,6 +63,29 @@ export default function CertificatesPage() {
   const [verifyingCertId, setVerifyingCertId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState("")
   const [actionError, setActionError] = useState("")
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+
+  // Fetch current user ID for verification
+  useEffect(() => {
+    let alive = true
+    const run = async () => {
+      try {
+        const user = await userService.me()
+        if (!alive) return
+        // Convert user ID to number if it's a string
+        const userId = user.id 
+          ? (typeof user.id === 'number' ? user.id : Number(user.id) || null)
+          : null
+        setCurrentUserId(userId)
+      } catch (error) {
+        console.error("Failed to fetch user ID:", error)
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -96,9 +125,15 @@ export default function CertificatesPage() {
           const cpdHours = getNum(row.cpd_hours ?? row.cpdHours, 0)
           const minutes = getNum(row.time_taken_minutes ?? row.minutes, 0)
           const completionDate = getText(row.completion_date ?? row.completed_at ?? row.date, "")
+          
+          // Use API field names: course_title, certificate_title, certificate_url, etc.
+          const courseTitle = getText(row.course_title ?? row.courseTitle, "")
+          const certificateTitle = getText(row.certificate_title ?? row.certificateTitle, "")
+          const title = certificateTitle || courseTitle || getText(row.title, "Untitled certificate")
+          
           return {
-            id: getText(row.id, `CERT-${index + 1}`),
-            title: getText(row.title, "Untitled certificate"),
+            id: getText(row.id ?? row.certificate_id ?? row.certificateId, `CERT-${index + 1}`),
+            title: title,
             category: getText(row.category, "General"),
             type: getText(row.type, "CPD"),
             date: completionDate || new Date().toISOString().slice(0, 10),
@@ -107,7 +142,8 @@ export default function CertificatesPage() {
             cpdHours,
             status: getText(row.status, "Completed"),
             format: getText(row.format, "Online"),
-            certificateUrl: getText(row.certificate_url, "#"),
+            certificateUrl: getText(row.certificate_url ?? row.certificateUrl, "#"),
+            downloadUrl: getText(row.download_url ?? row.downloadUrl, ""),
             score: getNum(row.score ?? row.assessment_score, 0),
             instructor: getText(row.instructor, "Not specified"),
             courseId: getNum(row.course_id ?? row.courseId ?? row.related_course_id, 0) || null,
@@ -271,11 +307,16 @@ export default function CertificatesPage() {
     setActionMessage("")
     setActionError("")
     setViewingCertId(certId)
-    let shouldOpenModal = false
     const certificate = certificatesData.find(cert => cert.id === certId)
     if (certificate) {
       try {
-        if (certificate.courseId) {
+        // Use the certificate_url directly from API data
+        if (certificate.certificateUrl && certificate.certificateUrl !== "#") {
+          // Open the actual certificate URL from API in a new tab
+          window.open(certificate.certificateUrl, "_blank", "noopener,noreferrer")
+          setActionMessage("Certificate opened from API.")
+        } else if (certificate.courseId) {
+          // Fallback: try to get certificate URL from API
           const [availabilityRes, previewRes, detailRes] = await Promise.all([
             certificatesService.checkAvailability(certificate.courseId),
             certificatesService.preview(certificate.courseId),
@@ -292,25 +333,24 @@ export default function CertificatesPage() {
           )
           if (!isAvailable) {
             setActionError("Certificate is not available yet for this course.")
+            setViewingCertId(null)
             return
           }
           const previewUrl = getRemotePreviewUrl(previewRes) || getRemotePreviewUrl(detailRes)
-          setSelectedCertificate({
-            ...certificate,
-            certificateUrl: previewUrl || certificate.certificateUrl,
-          })
-          setActionMessage("Certificate details loaded from API.")
-          shouldOpenModal = true
+          if (previewUrl) {
+            // Open the certificate URL from API in a new tab
+            window.open(previewUrl, "_blank", "noopener,noreferrer")
+            setActionMessage("Certificate opened from API.")
         } else {
-          setSelectedCertificate(certificate)
-          shouldOpenModal = true
+            setActionError("Certificate URL not available.")
+          }
+        } else {
+          setActionError("Certificate URL not available.")
         }
-      } catch {
-      setSelectedCertificate(certificate)
-        shouldOpenModal = true
-        setActionError("Could not fetch certificate preview details from API. Showing available data.")
+      } catch (error) {
+        console.error("Error viewing certificate:", error)
+        setActionError("Could not open certificate. Please try again.")
       } finally {
-        if (shouldOpenModal) setIsModalOpen(true)
         setViewingCertId(null)
       }
     } else {
@@ -329,6 +369,27 @@ export default function CertificatesPage() {
     }
 
     try {
+      // First, try to use download_url from the API data if available
+      if (certificate.downloadUrl && certificate.downloadUrl !== "") {
+        // Use the download URL directly from API
+        window.open(certificate.downloadUrl, "_blank", "noopener,noreferrer")
+        setActionMessage("Certificate download opened from API.")
+        setDownloadingCertId(null)
+        return
+      }
+      
+      // Fallback: use certificate_url with download parameter
+      if (certificate.certificateUrl && certificate.certificateUrl !== "#") {
+        const downloadUrl = certificate.certificateUrl.includes("download=1") 
+          ? certificate.certificateUrl 
+          : `${certificate.certificateUrl}${certificate.certificateUrl.includes("?") ? "&" : "?"}download=1`
+        window.open(downloadUrl, "_blank", "noopener,noreferrer")
+        setActionMessage("Certificate download opened from API.")
+        setDownloadingCertId(null)
+        return
+      }
+      
+      // Fallback: try to get download URL from API
       if (certificate.courseId) {
         const [availabilityRes, detailRes] = await Promise.all([
           certificatesService.checkAvailability(certificate.courseId),
@@ -345,21 +406,27 @@ export default function CertificatesPage() {
         )
         if (!isAvailable) {
           setActionError("Certificate is not available yet for this course.")
+          setDownloadingCertId(null)
           return
         }
 
         const remoteUrl = getRemotePreviewUrl(detailRes)
         if (remoteUrl) {
-          window.open(remoteUrl, "_blank", "noopener,noreferrer")
+          // Add download parameter if not present
+          const downloadUrl = remoteUrl.includes("download=1") ? remoteUrl : `${remoteUrl}${remoteUrl.includes("?") ? "&" : "?"}download=1`
+          window.open(downloadUrl, "_blank", "noopener,noreferrer")
           setActionMessage("Certificate download opened from API.")
+          setDownloadingCertId(null)
           return
         }
       }
-    } catch {
+    } catch (error) {
+      console.error("Error downloading certificate:", error)
       setActionError("Could not fetch certificate file from API. Falling back to generated PDF.")
-    } finally {
-      setDownloadingCertId(null)
     }
+    
+    // Only fall back to PDF generation if API URLs are not available
+    // Continue with PDF generation fallback (existing code below)
 
     // Create a temporary certificate element for download
     const tempDiv = document.createElement('div')
@@ -477,19 +544,50 @@ export default function CertificatesPage() {
     setActionError("")
     setVerifyingCertId(certId)
     const certificate = certificatesData.find((cert) => cert.id === certId)
-    if (!certificate || !certificate.courseId || !certificate.userId) {
-      setActionError("Certificate verification data is incomplete (course/user id missing).")
+    
+    // Use currentUserId from state (fetched from userService.me())
+    const userId = currentUserId || certificate?.userId
+    
+    if (!certificate || !certificate.courseId) {
+      setActionError("Certificate verification data is incomplete (course id missing).")
+      toast({
+        title: "Verification Failed",
+        description: "Certificate verification data is incomplete (course id missing).",
+        variant: "destructive",
+      })
       setVerifyingCertId(null)
       return
     }
+    
+    if (!userId) {
+      setActionError("User ID not available. Please try again.")
+      toast({
+        title: "Verification Failed",
+        description: "User ID not available. Please try again.",
+        variant: "destructive",
+      })
+      setVerifyingCertId(null)
+      return
+    }
+    
     try {
       await certificatesService.verify({
         course_id: certificate.courseId,
-        user_id: certificate.userId,
+        user_id: userId,
       })
       setActionMessage("Certificate verified successfully.")
-    } catch {
+      toast({
+        title: "Verification Successful",
+        description: "Certificate has been verified successfully.",
+      })
+    } catch (error) {
+      console.error("Certificate verification error:", error)
       setActionError("Certificate verification failed. Please try again.")
+      toast({
+        title: "Verification Failed",
+        description: "Certificate verification failed. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setVerifyingCertId(null)
     }
@@ -503,6 +601,22 @@ export default function CertificatesPage() {
         <div className="bg-gradient-to-r from-[#8b5cf6] to-[#a855f7] rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8">
           <h1 className="text-xl sm:text-2xl font-semibold text-white">Training and Certificates</h1>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4 sm:mt-6">
+            {isLoading ? (
+              <>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-white/20 backdrop-blur-sm rounded-xl p-3 sm:p-4">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <Skeleton className="h-6 w-6 sm:h-8 sm:w-8 rounded-md bg-white/30" />
+                      <div className="flex-1">
+                        <Skeleton className="h-3 w-20 mb-2 bg-white/30" />
+                        <Skeleton className="h-6 w-16 bg-white/30" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <>
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
                 <Award className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
@@ -530,6 +644,8 @@ export default function CertificatesPage() {
                 </div>
               </div>
             </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -570,7 +686,7 @@ export default function CertificatesPage() {
                     <span>{selectedCategory ? selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1) : "All Categories"}</span>
                     <ChevronDown className="h-4 w-4" />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56 bg-white border border-[#e5e7eb] rounded-lg shadow-md">
+                  <DropdownMenuContent className="w-full min-w-[var(--radix-dropdown-menu-trigger-width)] bg-white border border-[#e5e7eb] rounded-lg shadow-md">
                     <DropdownMenuLabel className="text-xs sm:text-sm text-[#6b7280] px-3 py-2">Select Category</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
@@ -599,7 +715,7 @@ export default function CertificatesPage() {
                     <span>{sortBy.charAt(0).toUpperCase() + sortBy.slice(1)}</span>
                     <ChevronDown className="h-4 w-4" />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56 bg-white border border-[#e5e7eb] rounded-lg shadow-md">
+                  <DropdownMenuContent className="w-full min-w-[var(--radix-dropdown-menu-trigger-width)] bg-white border border-[#e5e7eb] rounded-lg shadow-md" align="start">
                     <DropdownMenuLabel className="text-xs sm:text-sm text-[#6b7280] px-3 py-2">Sort By</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
@@ -684,7 +800,31 @@ export default function CertificatesPage() {
 
         {/* Mobile Card View */}
         <div className="md:hidden space-y-3">
-          {filteredAndSortedData.map((certificate) => (
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl border border-[#e5e7eb] p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0 flex-1">
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-1/2 mb-1" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                    <Skeleton className="h-6 w-12 rounded-md" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+              </div>
+            ))
+          ) : (
+            filteredAndSortedData.map((certificate) => (
             <div key={certificate.id} className="bg-white rounded-xl border border-[#e5e7eb] p-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="min-w-0 flex-1">
@@ -743,7 +883,8 @@ export default function CertificatesPage() {
                 </span>
               </div>
             </div>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Desktop Table View */}
@@ -780,7 +921,25 @@ export default function CertificatesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e5e7eb]">
-                {filteredAndSortedData.map((certificate) => (
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>
+                      {activeFilters.filter(f => f.active).map((filter) => (
+                        <td key={filter.label} className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
+                          <Skeleton className="h-4 w-24" />
+                        </td>
+                      ))}
+                      <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-6 w-12 rounded-md" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  filteredAndSortedData.map((certificate) => (
                   <tr key={certificate.id} className="hover:bg-[#f9f5ff] transition-colors">
                     {activeFilters.filter(f => f.active).map((filter) => (
                       <td key={filter.label} className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
@@ -869,7 +1028,8 @@ export default function CertificatesPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -894,6 +1054,9 @@ export default function CertificatesPage() {
           certificate={selectedCertificate}
         />
       )}
+      
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   )
 }

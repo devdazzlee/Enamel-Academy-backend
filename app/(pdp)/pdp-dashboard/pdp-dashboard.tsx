@@ -14,6 +14,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -296,18 +297,37 @@ export default function PDPDashboard() {
         </div>
 
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-xs text-gray-500">Total PDPs</p>
-            <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-xs text-gray-500">Active PDPs</p>
-            <p className="text-xl font-bold text-blue-700">{stats.active}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-xs text-gray-500">Completed PDPs</p>
-            <p className="text-xl font-bold text-green-700">{stats.completed}</p>
-          </div>
+          {isLoading ? (
+            <>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <Skeleton className="h-3 w-20 mb-2" />
+                <Skeleton className="h-7 w-12" />
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <Skeleton className="h-3 w-20 mb-2" />
+                <Skeleton className="h-7 w-12" />
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <Skeleton className="h-3 w-20 mb-2" />
+                <Skeleton className="h-7 w-12" />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Total PDPs</p>
+                <p className="text-xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Active PDPs</p>
+                <p className="text-xl font-bold text-blue-700">{stats.active}</p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-500">Completed PDPs</p>
+                <p className="text-xl font-bold text-green-700">{stats.completed}</p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Current Plan Card */}

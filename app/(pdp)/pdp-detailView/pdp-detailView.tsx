@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import jsPDF from "jspdf";
 import { toPng } from "html-to-image";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { pdpService } from "@/lib/api/pdp";
 
 type PDPDetailData = {
@@ -679,17 +680,67 @@ export default function PDPDetailView() {
       </div>
 
       <div ref={printAreaRef} id="pdp-print-area" className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-        {isLoading && (
-          <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
-            <Spinner />
-            Loading PDP details...
-          </div>
-        )}
         {loadError && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
             {loadError}
           </div>
         )}
+        {isLoading ? (
+          <>
+            {/* Skeleton for Header Info */}
+            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border border-gray-200 p-3">
+                    <Skeleton className="h-4 w-16 mb-2" />
+                    <Skeleton className="h-5 w-24 mb-1" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                ))}
+              </div>
+              <Skeleton className="h-20 w-full rounded-lg" />
+            </div>
+            {/* Skeleton for Progress Bar */}
+            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-200">
+              <div className="flex justify-between items-center mb-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-12" />
+              </div>
+              <Skeleton className="h-3 w-full rounded-full mb-4" />
+              <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="rounded-md bg-gray-50 border border-gray-200 p-2">
+                    <Skeleton className="h-3 w-16 mb-1" />
+                    <Skeleton className="h-4 w-8" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Skeleton for Sections */}
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-lg shadow-sm p-4 sm:p-8 mb-4 sm:mb-6 border border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3 sm:mb-4">
+                      <div>
+                        <Skeleton className="h-6 w-48 mb-2" />
+                        <Skeleton className="h-4 w-64" />
+                      </div>
+                      <Skeleton className="h-6 w-24 rounded-full" />
+                    </div>
+                    <div className="space-y-2">
+                      {Array.from({ length: 3 }).map((_, j) => (
+                        <Skeleton key={j} className="h-16 w-full rounded-lg" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>
+        ) : (
+          <>
         <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3">
           <p className="text-sm font-semibold text-gray-900">PDP Component API Actions</p>
           <p className="text-xs text-gray-600 mb-2">Sync individual PDP component endpoints from this page.</p>
@@ -1317,6 +1368,8 @@ export default function PDPDetailView() {
             </div>
           </div>
         </div>
+          </>
+        )}
 
         {/* Mobile Edit Modal */}
         {isMobileModalOpen && (

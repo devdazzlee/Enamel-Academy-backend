@@ -26,8 +26,13 @@ export function CourseFilters({ onFiltersChange }: { onFiltersChange: (filters: 
     let alive = true
     const run = async () => {
       setIsLoading(true)
+      const startTime = Date.now()
       try {
-        const [cats, fltrs, rls] = await Promise.all([coursesService.categories(), coursesService.filters(), rolesService.roles()])
+        const [cats, fltrs, rls] = await Promise.all([
+          coursesService.categories(),
+          coursesService.filters(),
+          rolesService.roles()
+        ])
         if (!alive) return
         setCategories(cats)
         setFilters(fltrs)
@@ -38,6 +43,11 @@ export function CourseFilters({ onFiltersChange }: { onFiltersChange: (filters: 
         setFilters({})
         setRoles([])
       } finally {
+        if (!alive) return
+        // Ensure skeleton shows for at least 500ms
+        const elapsed = Date.now() - startTime
+        const remaining = Math.max(0, 500 - elapsed)
+        await new Promise(resolve => setTimeout(resolve, remaining))
         if (!alive) return
         setIsLoading(false)
       }
@@ -124,7 +134,7 @@ export function CourseFilters({ onFiltersChange }: { onFiltersChange: (filters: 
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
           {Array.from({ length: 8 }).map((_, index) => (
-            <Skeleton key={index} className="h-10 w-full" />
+            <div key={`filter-skeleton-${index}`} className="h-10 w-full bg-gray-300 animate-pulse rounded-md border border-gray-200" />
           ))}
         </div>
       ) : (

@@ -80,6 +80,8 @@ export default function CoursePlay() {
   const [duration, setDuration] = useState(0);
   const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
   const [completedLessonIds, setCompletedLessonIds] = useState<Set<string | number>>(new Set());
+  const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState('');
 
   const [courseTitle, setCourseTitle] = useState('');
   const [lessons, setLessons] = useState<ApiLesson[]>([]);
@@ -119,6 +121,110 @@ export default function CoursePlay() {
 
   const currentLesson = lessons[currentLessonIdx];
 
+  // Helper function to extract numeric ID from string or number
+  const extractNumericId = useCallback((id: string | number | undefined): number | undefined => {
+    if (id === undefined || id === null) return undefined
+    if (typeof id === 'number' && !isNaN(id) && id > 0) return id
+    if (typeof id === 'string') {
+      // Try to extract number from strings like "lesson-1" or "123"
+      const numMatch = id.match(/\d+/)
+      if (numMatch) {
+        const num = Number(numMatch[0])
+        return !isNaN(num) && num > 0 ? num : undefined
+      }
+      // Try direct conversion
+      const num = Number(id)
+      return !isNaN(num) && num > 0 ? num : undefined
+    }
+    return undefined
+  }, []);
+
+  // Helper function to track progress with topic_id
+  const trackProgressWithTopic = useCallback(async (
+    lessonId: string | number,
+    topicId?: string | number,
+    watchedSeconds?: number,
+    progressPercentage?: number,
+    completed = false
+  ) => {
+    if (!courseId || currentLessonIdx < 0) return;
+    
+    const lessonIdNum = extractNumericId(lessonId);
+    const topicIdNum = topicId ? extractNumericId(topicId) : undefined;
+    const stepIndex = currentLessonIdx + 1; // step_index is 1-based
+    
+    // Build payload with only valid values
+    const payload: Record<string, unknown> = {
+      step_index: stepIndex,
+      progress_percentage: Math.max(0, Math.min(100, progressPercentage ?? 0)),
+      completed: completed ?? false,
+    };
+
+    if (lessonIdNum !== undefined) {
+      payload.lesson_id = lessonIdNum;
+    }
+
+    if (topicIdNum !== undefined) {
+      payload.topic_id = topicIdNum;
+    }
+
+    if (watchedSeconds !== undefined && watchedSeconds !== null && watchedSeconds >= 0) {
+      payload.watched_seconds = Math.round(watchedSeconds);
+    }
+    
+    try {
+      await coursesService.trackProgress(courseId, payload as any);
+      console.log('[Track] Successfully tracked progress');
+      
+      // Mark lesson complete ONLY ONCE per lesson (if we have valid lesson ID and haven't marked it before)
+      // Note: We rely on the existing completedLessonIds state from the component
+      // This function is called from useEffect which tracks lesson changes, so it should only fire once per lesson
+      if (lessonIdNum) {
+        try {
+          console.log('[Track] Marking lesson complete:', { courseId, lessonId: lessonIdNum });
+          await coursesService.markLessonComplete(courseId, lessonIdNum);
+          console.log('[Track] Successfully marked lesson complete');
+        } catch (error) {
+          console.error('[Track] Failed to mark lesson complete:', error);
+        }
+      }
+      
+      // Mark topic complete ONLY ONCE per topic (if we have valid topic ID)
+      // Note: This is called when lesson changes, so each topic should only be marked once
+      if (topicIdNum) {
+        try {
+          console.log('[Track] Marking topic complete:', { courseId, topicId: topicIdNum });
+          await coursesService.markTopicComplete(courseId, topicIdNum);
+          console.log('[Track] Successfully marked topic complete');
+        } catch (error) {
+          console.error('[Track] Failed to mark topic complete:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to track progress:', error);
+    }
+  }, [courseId, currentLessonIdx, extractNumericId]);
+
+  // Track progress when lesson changes (on every step)
+  useEffect(() => {
+    if (!courseId || !currentLesson) return;
+    
+    // Track progress when lesson is first loaded
+    const lessonId = currentLesson.id;
+    const firstTopicId = currentLesson.topics.length > 0 ? currentLesson.topics[0].id : undefined;
+    const overallProgress = lessons.length > 0 
+      ? Math.round((completedLessonIds.size / lessons.length) * 100) 
+      : 0;
+    
+    trackProgressWithTopic(
+      lessonId,
+      firstTopicId,
+      0, // watched_seconds starts at 0 for new lesson
+      overallProgress,
+      false
+    );
+  }, [currentLessonIdx, courseId, currentLesson, trackProgressWithTopic, completedLessonIds.size, lessons.length]);
+
   // Video time tracking — fire-and-forget every 30 seconds
   useEffect(() => {
     const video = videoRef.current;
@@ -130,13 +236,18 @@ export default function CoursePlay() {
       if (courseId && video.duration > 0 && video.currentTime - lastTracked >= 30) {
         lastTracked = video.currentTime;
         const videoPct = Math.round((video.currentTime / video.duration) * 100);
-        coursesService.trackProgress(courseId, {
-          lesson_id: typeof currentLesson.id === 'number' ? currentLesson.id : Number(currentLesson.id) || undefined,
-          step_index: currentLessonIdx,
-          watched_seconds: Math.round(video.currentTime),
-          progress_percentage: videoPct,
-          completed: false,
-        }).catch(() => {/* ignore */});
+        const overallProgress = lessons.length > 0 
+          ? Math.round((completedLessonIds.size / lessons.length) * 100) 
+          : 0;
+        const firstTopicId = currentLesson.topics.length > 0 ? currentLesson.topics[0].id : undefined;
+        
+        trackProgressWithTopic(
+          currentLesson.id,
+          firstTopicId,
+          Math.round(video.currentTime),
+          overallProgress,
+          false
+        );
       }
     };
     const updateDuration = () => setDuration(video.duration);
@@ -147,32 +258,57 @@ export default function CoursePlay() {
       video.removeEventListener('timeupdate', updateTime);
       video.removeEventListener('loadedmetadata', updateDuration);
     };
-  }, [currentLessonIdx, courseId, currentLesson]);
+  }, [currentLessonIdx, courseId, currentLesson, trackProgressWithTopic, completedLessonIds.size, lessons.length]);
 
-  const markLessonComplete = useCallback(() => {
-    if (!currentLesson || completedLessonIds.has(currentLesson.id)) return;
-    setCompletedLessonIds((prev) => new Set([...prev, currentLesson.id]));
-    if (courseId) {
-      const lessonId = currentLesson.id;
-      const progressPct = Math.round(((completedLessonIds.size + 1) / lessons.length) * 100);
-      // POST /courses/{id}/progress
-      coursesService.trackProgress(courseId, {
-        lesson_id: typeof lessonId === 'number' ? lessonId : Number(lessonId) || undefined,
-        step_index: currentLessonIdx,
-        watched_seconds: Math.round(duration),
-        progress_percentage: progressPct,
-        completed: true,
-      }).catch(() => {/* ignore */});
-      // POST /courses/{id}/lessons/{id}/complete
-      coursesService.markLessonComplete(courseId, lessonId).catch(() => {/* ignore */});
-      // POST /courses/{id}/topics/{id}/complete — for each topic in this lesson
-      currentLesson.topics.forEach((topic) => {
-        if (topic.id) {
-          coursesService.markTopicComplete(courseId, topic.id).catch(() => {/* ignore */});
-        }
+  const markLessonComplete = useCallback(async () => {
+    if (!currentLesson || completedLessonIds.has(currentLesson.id) || isMarkingComplete) return;
+    
+    setIsMarkingComplete(true);
+    try {
+      setCompletedLessonIds((prev) => new Set([...prev, currentLesson.id]));
+      
+      if (courseId) {
+        const lessonId = currentLesson.id;
+        const progressPct = Math.round(((completedLessonIds.size + 1) / lessons.length) * 100);
+        const firstTopicId = currentLesson.topics.length > 0 ? currentLesson.topics[0].id : undefined;
+        
+        // Track progress with topic_id
+        await trackProgressWithTopic(
+          lessonId,
+          firstTopicId,
+          Math.round(duration),
+          progressPct,
+          true
+        );
+        
+        // Mark lesson complete
+        await coursesService.markLessonComplete(courseId, lessonId);
+        
+        // Mark all topics in this lesson as complete
+        const topicPromises = currentLesson.topics
+          .filter(topic => topic.id)
+          .map(topic => coursesService.markTopicComplete(courseId, topic.id!));
+        
+        await Promise.all(topicPromises);
+        
+        // Show success message
+        setCompletionMessage(`Lesson "${currentLesson.title}" marked as complete!`);
+        setTimeout(() => setCompletionMessage(''), 3000);
+      }
+    } catch (error) {
+      // Revert completion state on error
+      setCompletedLessonIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(currentLesson.id);
+        return newSet;
       });
+      console.error('Failed to mark lesson complete:', error);
+      setCompletionMessage('Failed to mark lesson complete. Please try again.');
+      setTimeout(() => setCompletionMessage(''), 3000);
+    } finally {
+      setIsMarkingComplete(false);
     }
-  }, [courseId, currentLesson, currentLessonIdx, completedLessonIds, lessons.length, duration]);
+  }, [courseId, currentLesson, currentLessonIdx, completedLessonIds, lessons.length, duration, isMarkingComplete, trackProgressWithTopic]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -203,6 +339,23 @@ export default function CoursePlay() {
   };
 
   const handleLessonChange = (idx: number) => {
+    // Track progress when changing lessons (on every step change)
+    if (courseId && currentLesson) {
+      const currentProgressPct = duration > 0 ? Math.round((currentTime / duration) * 100) : 0;
+      const overallProgress = lessons.length > 0 
+        ? Math.round((completedLessonIds.size / lessons.length) * 100) 
+        : 0;
+      const firstTopicId = currentLesson.topics.length > 0 ? currentLesson.topics[0].id : undefined;
+      
+      trackProgressWithTopic(
+        currentLesson.id,
+        firstTopicId,
+        Math.round(currentTime),
+        overallProgress,
+        false
+      );
+    }
+    
     setCurrentLessonIdx(idx);
     setIsPlaying(false);
     setCurrentTime(0);
@@ -268,6 +421,17 @@ export default function CoursePlay() {
           </div>
         </div>
       </div>
+
+      {/* Completion Message */}
+      {completionMessage && (
+        <div className={`px-6 py-3 text-center text-sm ${
+          completionMessage.includes('Failed') 
+            ? 'bg-red-50 text-red-700 border-b border-red-200' 
+            : 'bg-green-50 text-green-700 border-b border-green-200'
+        }`}>
+          {completionMessage}
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -377,9 +541,17 @@ export default function CoursePlay() {
                   ) : (
                     <button
                       onClick={markLessonComplete}
-                      className="px-4 py-2 text-sm font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition"
+                      disabled={isMarkingComplete}
+                      className="px-4 py-2 text-sm font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      Mark Complete
+                      {isMarkingComplete ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                          Marking...
+                        </>
+                      ) : (
+                        'Mark Complete'
+                      )}
                     </button>
                   )}
                 </div>

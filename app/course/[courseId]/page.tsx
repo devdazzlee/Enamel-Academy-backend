@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState, useEffect } from "react"
+import React, { useMemo, useState, useEffect, useCallback } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
@@ -194,21 +194,10 @@ export default function CoursePlayerPage() {
   const [feedbackStatusNote, setFeedbackStatusNote] = useState("")
   const [isCourseCompletedByApi, setIsCourseCompletedByApi] = useState(false)
   const [isCertificateAvailable, setIsCertificateAvailable] = useState(false)
-
-  // Fire-and-forget progress tracking helper
-  const trackCourseProgress = (stepIndex: number, progressPercentage: number, completed = false) => {
-    const lessonStep = lessonSteps[stepIndex - 1]
-    const lessonId = lessonStep?.id ? Number(lessonStep.id) || undefined : undefined
-    coursesService.trackProgress(courseId, {
-      lesson_id: lessonId,
-      step_index: stepIndex,
-      progress_percentage: progressPercentage,
-      completed,
-    }).catch(() => {/* ignore tracking errors */})
-    if (completed && lessonId) {
-      coursesService.markLessonComplete(courseId, lessonId).catch(() => {/* ignore */})
-    }
-  }
+  
+  // Track completed lessons and topics to avoid marking them complete multiple times
+  const [completedLessonIds, setCompletedLessonIds] = useState<Set<number>>(new Set())
+  const [completedTopicIds, setCompletedTopicIds] = useState<Set<number>>(new Set())
 
   // Fetch course data from API
   useEffect(() => {
@@ -706,6 +695,109 @@ export default function CoursePlayerPage() {
       }
     })
   ), [curriculumSections])
+
+  // Helper to extract numeric ID from string or number (used in multiple places)
+  const extractNumericId = useCallback((id: string | number | undefined): number | undefined => {
+    if (id === undefined || id === null) return undefined
+    if (typeof id === 'number' && !isNaN(id)) return id
+    if (typeof id === 'string') {
+      // Try to extract number from strings like "lesson-1" or "123"
+      const numMatch = id.match(/\d+/)
+      if (numMatch) {
+        const num = Number(numMatch[0])
+        return !isNaN(num) ? num : undefined
+      }
+      // Try direct conversion
+      const num = Number(id)
+      return !isNaN(num) ? num : undefined
+    }
+    return undefined
+  }, [])
+
+  // Fire-and-forget progress tracking helper - tracks on every step
+  const trackCourseProgress = useCallback(async (stepIndex: number, progressPercentage: number, completed = false, watchedSeconds?: number) => {
+    // Validate inputs - require at least courseId and valid stepIndex
+    if (!courseId || !stepIndex || stepIndex < 1) {
+      console.log('[Track] Skipping - invalid inputs:', { courseId, stepIndex })
+      return
+    }
+
+    try {
+      const lessonStep = lessonSteps[stepIndex - 1]
+      // Allow tracking even if lessonStep doesn't exist (for overview page, etc.)
+
+      const lessonId = lessonStep ? extractNumericId(lessonStep.id) : undefined
+      const topicId = lessonStep?.topics && lessonStep.topics.length > 0 
+        ? extractNumericId(lessonStep.topics[0].id)
+        : undefined
+      
+      // Build payload - always include step_index and progress_percentage
+      const payload: Record<string, unknown> = {
+        step_index: stepIndex,
+        progress_percentage: Math.max(0, Math.min(100, progressPercentage ?? 0)),
+        completed: completed ?? false,
+      }
+
+      // Only add lesson_id if we have a valid numeric ID
+      if (lessonId !== undefined && lessonId !== null && !isNaN(lessonId) && lessonId > 0) {
+        payload.lesson_id = lessonId
+      }
+
+      // Only add topic_id if we have a valid numeric ID
+      if (topicId !== undefined && topicId !== null && !isNaN(topicId) && topicId > 0) {
+        payload.topic_id = topicId
+      }
+
+      if (watchedSeconds !== undefined && watchedSeconds !== null && watchedSeconds >= 0) {
+        payload.watched_seconds = Math.round(watchedSeconds)
+      }
+      
+      // Always call track API - even if lesson_id/topic_id are missing, step_index is required
+      console.log('[Track] Calling trackProgress API:', { courseId, payload })
+      await coursesService.trackProgress(courseId, payload as any)
+      console.log('[Track] Successfully tracked progress')
+      
+      // Mark lesson complete ONLY ONCE per lesson (if we have valid ID and haven't marked it before)
+      if (lessonId && lessonStep && !completedLessonIds.has(lessonId)) {
+        try {
+          console.log('[Track] Marking lesson complete (first time):', { courseId, lessonId })
+          await coursesService.markLessonComplete(courseId, lessonId)
+          setCompletedLessonIds(prev => new Set([...prev, lessonId]))
+          console.log('[Track] Successfully marked lesson complete')
+        } catch (error) {
+          console.error('[Track] Failed to mark lesson complete:', error)
+        }
+      } else if (lessonId && completedLessonIds.has(lessonId)) {
+        console.log('[Track] Skipping lesson complete - already marked:', { courseId, lessonId })
+      }
+      
+      // Mark topics complete ONLY ONCE per topic (if we have valid IDs and haven't marked them before)
+      if (lessonStep?.topics && lessonStep.topics.length > 0) {
+        const topicPromises = lessonStep.topics
+          .filter(topic => topic.id)
+          .map(async (topic) => {
+            const topicIdNum = extractNumericId(topic.id)
+            if (topicIdNum && !completedTopicIds.has(topicIdNum)) {
+              try {
+                console.log('[Track] Marking topic complete (first time):', { courseId, topicId: topicIdNum })
+                await coursesService.markTopicComplete(courseId, topicIdNum)
+                setCompletedTopicIds(prev => new Set([...prev, topicIdNum]))
+                console.log('[Track] Successfully marked topic complete')
+              } catch (error) {
+                console.error('[Track] Failed to mark topic complete:', error)
+              }
+            } else if (topicIdNum && completedTopicIds.has(topicIdNum)) {
+              console.log('[Track] Skipping topic complete - already marked:', { courseId, topicId: topicIdNum })
+            }
+          })
+        
+        await Promise.all(topicPromises)
+      }
+    } catch (error) {
+      console.error('Failed to track course progress:', error)
+    }
+  }, [courseId, lessonSteps, completedLessonIds, completedTopicIds, extractNumericId])
+
   const objectives = Array.isArray(courseContent?.learning_objectives) ? courseContent.learning_objectives : []
   const features = Array.isArray(courseContent?.features) ? courseContent.features : []
   const topics = lessonSteps.flatMap((step) => step.topics.map((t) => t.title))
@@ -799,6 +891,34 @@ export default function CoursePlayerPage() {
     },
   ]), [courseDescription, courseDetails.objectives, lessonSteps, resources])
 
+  // Track progress on every step change (learnPage change)
+  useEffect(() => {
+    if (activeSection === "learn" && learnPage > 0 && learnPages.length > 0) {
+      // Calculate progress based on completed steps and current position
+      // learnPages includes: [0] Course Overview, [1+] Lessons
+      // So actual lesson steps are from index 1 onwards
+      const actualLessonSteps = learnPages.length - 1 // Exclude overview page
+      const currentLessonIndex = learnPage - 1 // Convert to 0-based index
+      
+      // Calculate progress: (current lesson index / total lesson steps) * 100
+      // This gives incremental progress as user moves through lessons
+      const progressPct = actualLessonSteps > 0 
+        ? Math.round((currentLessonIndex / actualLessonSteps) * 100)
+        : 0
+      
+      // Track on every step change - including overview page (learnPage = 1)
+      console.log('[Track] useEffect triggered - tracking progress:', { 
+        learnPage, 
+        progressPct, 
+        activeSection,
+        currentLessonIndex,
+        actualLessonSteps,
+        completedLessons: completedLessonIds.size
+      })
+      trackCourseProgress(learnPage, progressPct, false, 0)
+    }
+  }, [learnPage, activeSection, learnPages.length, completedLessonIds, trackCourseProgress, extractNumericId, lessonSteps])
+
   useEffect(() => {
     if (!resumeLessonParam || resumeApplied || lessonSteps.length === 0) return
     const target = resumeLessonParam.toLowerCase()
@@ -888,6 +1008,22 @@ export default function CoursePlayerPage() {
     if (target === "evaluate" && !assessmentCompleted) {
       setNavGuardMessage("Pass the assessment before opening Evaluate.")
       return
+    }
+
+    // Track progress when navigating between sections
+    if (target === "assess" && learnCompleted && lessonSteps.length > 0) {
+      // Track completion of learn section - use the last lesson step
+      const lastStepIndex = lessonSteps.length
+      trackCourseProgress(lastStepIndex, 100, true)
+    } else if (target === "evaluate" && assessmentCompleted && lessonSteps.length > 0) {
+      // Track completion of assess section - use the last lesson step
+      const lastStepIndex = lessonSteps.length
+      const assessProgressPct = 100; // Assessment completed
+      trackCourseProgress(lastStepIndex, assessProgressPct, true)
+    } else if (target === "learn" && learnPage > 0 && learnPage <= lessonSteps.length) {
+      // Track current learn progress when returning to learn
+      const progressPct = Math.round((learnPage / learnPages.length) * 100)
+      trackCourseProgress(learnPage, progressPct)
     }
 
     setActiveSection(target)
@@ -1243,7 +1379,10 @@ export default function CoursePlayerPage() {
                 <button
               onClick={() => {
                 if (consentChecked) {
-                  trackCourseProgress(learnPages.length, 100, true)
+                  // Track completion using the last lesson step index
+                  if (lessonSteps.length > 0) {
+                    trackCourseProgress(lessonSteps.length, 100, true)
+                  }
                   setLearnCompleted(true)
                   setActiveSection("assess")
                   setShowResults(false)
@@ -1267,15 +1406,9 @@ export default function CoursePlayerPage() {
               onClick={() => {
                 const nextPage = learnPage + 1
                 const progressPct = Math.round((nextPage / learnPages.length) * 100)
-                trackCourseProgress(nextPage, progressPct)
-                // Mark each topic in the current lesson step as complete
-                if (learnPage >= 1 && learnPage <= lessonSteps.length) {
-                  const currentStep = lessonSteps[learnPage - 1]
-                  currentStep?.topics.forEach((topic) => {
-                    if (topic.id) {
-                      coursesService.markTopicComplete(courseId, topic.id).catch(() => {/* ignore */})
-                    }
-                  })
+                // Only track if nextPage is within valid lesson steps range
+                if (nextPage <= lessonSteps.length) {
+                  trackCourseProgress(nextPage, progressPct)
                 }
                 setLearnPage(nextPage)
               }}

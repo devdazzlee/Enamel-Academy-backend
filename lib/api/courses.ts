@@ -177,6 +177,7 @@ export type MyCoursesParams = {
 export type CourseProgressPayload = {
   lesson_id?: number;
   topic_id?: number;
+  quiz_id?: number;
   step_index?: number;
   watched_seconds?: number;
   progress_percentage?: number;

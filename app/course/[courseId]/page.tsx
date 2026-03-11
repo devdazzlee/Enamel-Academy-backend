@@ -23,7 +23,8 @@ import {
   XCircle,
   Menu,
   X,
-  FileText
+  FileText,
+  Download
 } from "lucide-react"
 import { authApi } from "@/lib/api/http"
 import { coursesService } from "@/lib/api/courses"
@@ -43,6 +44,7 @@ interface Answer {
 type AssessmentQuestion = {
   id: number
   question: string
+  description?: string
   options: string[]
   correctAnswer: number
   explanation: string
@@ -106,6 +108,11 @@ const extractVideoUrl = (html: unknown): string => {
   const decoded = decodeHtmlEntities(html)
   const directMatch = decoded.match(/https?:\/\/[^\s<>"']+/i)
   return directMatch ? directMatch[0] : ""
+}
+
+const pickString = (value: unknown, fallback = ""): string => {
+  if (typeof value === "string" && value.trim()) return value.trim()
+  return fallback
 }
 
 const feedbackCriteria = [
@@ -194,6 +201,8 @@ export default function CoursePlayerPage() {
   const [feedbackStatusNote, setFeedbackStatusNote] = useState("")
   const [isCourseCompletedByApi, setIsCourseCompletedByApi] = useState(false)
   const [isCertificateAvailable, setIsCertificateAvailable] = useState(false)
+  const [certificateUrl, setCertificateUrl] = useState<string>("")
+  const [certificateDownloadUrl, setCertificateDownloadUrl] = useState<string>("")
   
   // Track completed lessons and topics to avoid marking them complete multiple times
   // Use refs instead of state to prevent infinite loops in useEffect
@@ -207,10 +216,12 @@ export default function CoursePlayerPage() {
   // Initialize with empty array - will be updated when lessonSteps is defined
   const lessonStepsRef = useRef<any[]>([])
 
-  // Fetch course data from API
-  useEffect(() => {
+  // Helper function to convert unknown to Record - used in multiple places
     const toRecord = (value: unknown): Record<string, unknown> =>
       value && typeof value === "object" ? (value as Record<string, unknown>) : {}
+
+  // Fetch course data from API
+  useEffect(() => {
     const toArrayFromRoot = (payload: unknown, keys: string[]) => {
       const root = toRecord(payload)
       const data = toRecord(root.data)
@@ -220,8 +231,6 @@ export default function CoursePlayerPage() {
       }
       return [] as unknown[]
     }
-    const pickString = (value: unknown, fallback = "") =>
-      sanitizeApiText(value, fallback)
     const toIdString = (row: Record<string, unknown>) => {
       const possible = [row.id, row.quiz_id, row.assignment_id, row.slug]
       const found = possible.find((v) => typeof v === "string" || typeof v === "number")
@@ -374,6 +383,7 @@ export default function CoursePlayerPage() {
                 ? q.options.map((o) => sanitizeApiText(o, ""))
                 : []
               const question = sanitizeApiText(q.question, "")
+              const description = sanitizeApiText(q.description, "")
               if (!question || options.length < 2) return null
               const correctAnswer = typeof q.correct_answer_index === "number"
                 ? q.correct_answer_index
@@ -383,6 +393,7 @@ export default function CoursePlayerPage() {
               return {
                 id: typeof q.id === "number" ? q.id : index + 1,
                 question,
+                description: description && description !== question ? description : undefined,
                 options,
                 correctAnswer,
                 explanation: sanitizeApiText(
@@ -393,33 +404,12 @@ export default function CoursePlayerPage() {
             })
             .filter(Boolean) as AssessmentQuestion[]
           
-          // Only set quiz questions if API returns questions - no hardcoded fallback
-          setQuizQuestions(apiQuestions)
+          // Don't set quiz questions here - we'll set them after extracting from quizzes API
+          // setQuizQuestions(apiQuestions) - moved to after quiz extraction
 
           const rootResources = toResourceArray(toRecord(data.data))
           const courseResources = toResourceArray(toRecord(data.data.course))
           const curriculumResources = extractCurriculumResources(data.data.curriculum)
-          let certificatePreviewUrl = ""
-          try {
-            const previewPayload = await certificatesService.preview(courseId)
-            const previewRoot = toRecord(previewPayload)
-            const previewData = toRecord(previewRoot.data)
-            certificatePreviewUrl = pickString(
-              previewData.preview_url
-              ?? previewData.previewUrl
-              ?? previewData.certificate_url
-              ?? previewData.certificateUrl
-              ?? previewData.url
-              ?? previewRoot.preview_url
-              ?? previewRoot.previewUrl
-              ?? previewRoot.certificate_url
-              ?? previewRoot.certificateUrl
-              ?? previewRoot.url,
-              ""
-            )
-          } catch {
-            certificatePreviewUrl = ""
-          }
 
           const rawResources = [...rootResources, ...courseResources]
             .map((item, idx) => normalizeResource(item, idx))
@@ -428,13 +418,7 @@ export default function CoursePlayerPage() {
           const deduped = withCurriculum.filter((item, index, arr) =>
             arr.findIndex((x) => x.title === item.title && (x.url ?? "") === (item.url ?? "")) === index
           )
-          const apiResources = certificatePreviewUrl
-            ? deduped.map((item) =>
-                item.url || !item.title.toLowerCase().includes("certificate")
-                  ? item
-                  : { ...item, url: certificatePreviewUrl }
-              )
-            : deduped
+          const apiResources = deduped
 
           if (apiResources.length > 0) {
             setResources(apiResources)
@@ -473,6 +457,114 @@ export default function CoursePlayerPage() {
           })
           setAssignmentItems(mappedAssignments)
           setQuizItems(mappedQuizzes)
+
+          // Extract questions from quizzes API response
+          // Always try to extract from quizzes, but prioritize quizzes if assessments didn't provide questions
+          if (quizList.length > 0) {
+            const quizQuestionsFromApi: AssessmentQuestion[] = []
+            for (const quizItem of quizList) {
+              const quiz = toRecord(quizItem)
+              const questions = Array.isArray(quiz.questions) ? quiz.questions : []
+              for (const q of questions) {
+                const question = toRecord(q)
+                const rawTitle = pickString(question.title, "")
+                const rawDescription = pickString(question.description, "")
+                const sanitizedTitle = sanitizeApiText(rawTitle, "")
+                const sanitizedDescription = sanitizeApiText(rawDescription, "")
+
+                // API sends title as a label (e.g. "Question 1") and description as the actual question text.
+                // Use description as the primary question if it contains meaningful content.
+                const descriptionIsLabel = /^question\s*\d*$/i.test(sanitizedDescription.trim())
+                const titleIsLabel = /^question\s*\d*$/i.test(sanitizedTitle.trim())
+
+                let questionText: string
+                let questionLabel: string | undefined
+
+                if (sanitizedDescription && !descriptionIsLabel) {
+                  // Description has the real question → use it as primary
+                  questionText = sanitizedDescription
+                  questionLabel = titleIsLabel ? undefined : sanitizedTitle || undefined
+                } else if (sanitizedTitle && !titleIsLabel) {
+                  // Title has the real question
+                  questionText = sanitizedTitle
+                  questionLabel = undefined
+                } else {
+                  // Both are labels or empty — use whichever is available
+                  questionText = sanitizedTitle || sanitizedDescription || ""
+                  questionLabel = undefined
+                }
+
+                if (!questionText) continue
+
+                // Extract options
+                let options: string[] = []
+                if (Array.isArray(question.options)) {
+                  options = question.options.map((opt: unknown) => {
+                    if (typeof opt === "string") return sanitizeApiText(opt, "")
+                    if (typeof opt === "object" && opt !== null) {
+                      const optObj = opt as Record<string, unknown>
+                      return sanitizeApiText(optObj.label ?? optObj.text ?? optObj.option ?? optObj.value ?? "", "")
+                    }
+                    return ""
+                  }).filter((opt: string) => opt.length > 0)
+                }
+
+                // If no options, detect yes/no from question text or type
+                if (options.length === 0) {
+                  const combined = `${sanitizedTitle} ${sanitizedDescription}`.toLowerCase()
+                  if ((combined.includes("yes") && combined.includes("no")) || question.type === "single") {
+                    options = ["Yes", "No"]
+                  }
+                }
+
+                // Extract correct answer
+                let correctAnswer = 0
+                if (Array.isArray(question.correct_answers) && question.correct_answers.length > 0) {
+                  const firstCorrect = question.correct_answers[0]
+                  if (typeof firstCorrect === "number") {
+                    correctAnswer = firstCorrect
+                  } else if (typeof firstCorrect === "string") {
+                    const idx = options.findIndex(opt => opt.toLowerCase() === firstCorrect.toLowerCase())
+                    if (idx >= 0) correctAnswer = idx
+                  } else if (typeof firstCorrect === "object" && firstCorrect !== null) {
+                    const co = firstCorrect as Record<string, unknown>
+                    const cv = co.value ?? co.answer ?? co.label
+                    if (typeof cv === "number") correctAnswer = cv
+                    else if (typeof cv === "string") {
+                      const idx = options.findIndex(opt => opt.toLowerCase() === cv.toLowerCase())
+                      if (idx >= 0) correctAnswer = idx
+                    }
+                  }
+                } else if (typeof question.correct_answer === "number") {
+                  correctAnswer = question.correct_answer
+                } else if (typeof question.correct_answer_index === "number") {
+                  correctAnswer = question.correct_answer_index
+                }
+
+                // Only add if it has at least 2 options
+                if (options.length >= 2) {
+                  quizQuestionsFromApi.push({
+                    id: typeof question.id === "number" ? question.id : quizQuestionsFromApi.length + 1,
+                    question: questionText,
+                    description: questionLabel,
+                    options,
+                    correctAnswer,
+                    explanation: sanitizeApiText(question.explanation ?? question.feedback ?? "", "Review the course content and retry this question."),
+                  })
+                }
+              }
+            }
+            
+            // Prioritize quizzes over assessments
+            if (quizQuestionsFromApi.length > 0) {
+              setQuizQuestions(quizQuestionsFromApi)
+            } else if (apiQuestions.length > 0) {
+              setQuizQuestions(apiQuestions)
+            }
+          } else if (apiQuestions.length > 0) {
+            // If no quizzes but assessments have questions, use them
+            setQuizQuestions(apiQuestions)
+          }
 
           const quizStatsRoot = toRecord(quizStatsResponse)
           const quizStatsData = toRecord(quizStatsRoot.data)
@@ -577,12 +669,36 @@ export default function CoursePlayerPage() {
           }
 
           try {
-            const certAvailability = await certificatesService.checkAvailability(courseId)
-            const certRoot = (certAvailability && typeof certAvailability === "object" ? certAvailability : {}) as Record<string, unknown>
+            const certResponse = await certificatesService.getCourseCertificate(courseId)
+            const certRoot = (certResponse && typeof certResponse === "object" ? certResponse : {}) as Record<string, unknown>
             const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
-            setIsCertificateAvailable(Boolean(certData.available))
+            // Certificate is available if success is true and data exists
+            const available = Boolean(certRoot.success) && Boolean(certData.certificate_url || certData.certificateUrl)
+            setIsCertificateAvailable(available)
+            // Store certificate URLs from API
+            if (available) {
+              const apiCertificateUrl = pickString(certData.certificate_url ?? certData.certificateUrl, "")
+              const apiDownloadUrl = pickString(certData.download_url ?? certData.downloadUrl, "")
+              setCertificateUrl(apiCertificateUrl)
+              setCertificateDownloadUrl(apiDownloadUrl)
+              // Update resources with certificate URL from API
+              if (apiCertificateUrl) {
+                setResources((prevResources) =>
+                  prevResources.map((item) =>
+                    item.title.toLowerCase().includes("certificate") && !item.url
+                      ? { ...item, url: apiCertificateUrl }
+                      : item
+                  )
+                )
+              }
+            } else {
+              setCertificateUrl("")
+              setCertificateDownloadUrl("")
+            }
           } catch {
             setIsCertificateAvailable(false)
+            setCertificateUrl("")
+            setCertificateDownloadUrl("")
           }
         } else {
           setError("Course not found")
@@ -653,6 +769,99 @@ export default function CoursePlayerPage() {
             ? attemptsRoot.attempts
             : []
       setQuizAttemptsSummary(`${attempts.length} attempt(s) loaded for quiz ${quizId}.`)
+
+      // Extract questions from quiz details
+      const questions = Array.isArray(detailData.questions) ? detailData.questions : []
+      if (questions.length > 0) {
+        const quizQuestionsFromDetail: AssessmentQuestion[] = []
+        for (const q of questions) {
+          const question = toRecord(q)
+          const rawTitle = pickString(question.title, "")
+          const rawDescription = pickString(question.description, "")
+          const sanitizedTitle = sanitizeApiText(rawTitle, "")
+          const sanitizedDescription = sanitizeApiText(rawDescription, "")
+
+          // API sends title as a label (e.g. "Question 1") and description as the actual question text.
+          const descriptionIsLabel = /^question\s*\d*$/i.test(sanitizedDescription.trim())
+          const titleIsLabel = /^question\s*\d*$/i.test(sanitizedTitle.trim())
+
+          let questionText: string
+          let questionLabel: string | undefined
+
+          if (sanitizedDescription && !descriptionIsLabel) {
+            questionText = sanitizedDescription
+            questionLabel = titleIsLabel ? undefined : sanitizedTitle || undefined
+          } else if (sanitizedTitle && !titleIsLabel) {
+            questionText = sanitizedTitle
+            questionLabel = undefined
+          } else {
+            questionText = sanitizedTitle || sanitizedDescription || ""
+            questionLabel = undefined
+          }
+
+          if (!questionText) continue
+
+          // Extract options
+          let options: string[] = []
+          if (Array.isArray(question.options)) {
+            options = question.options.map((opt: unknown) => {
+              if (typeof opt === "string") return sanitizeApiText(opt, "")
+              if (typeof opt === "object" && opt !== null) {
+                const optObj = opt as Record<string, unknown>
+                return sanitizeApiText(optObj.label ?? optObj.text ?? optObj.option ?? optObj.value ?? "", "")
+              }
+              return ""
+            }).filter((opt: string) => opt.length > 0)
+          }
+
+          // If no options, detect yes/no from question text or type
+          if (options.length === 0) {
+            const combined = `${sanitizedTitle} ${sanitizedDescription}`.toLowerCase()
+            if ((combined.includes("yes") && combined.includes("no")) || question.type === "single") {
+              options = ["Yes", "No"]
+            }
+          }
+
+          // Extract correct answer
+          let correctAnswer = 0
+          if (Array.isArray(question.correct_answers) && question.correct_answers.length > 0) {
+            const firstCorrect = question.correct_answers[0]
+            if (typeof firstCorrect === "number") {
+              correctAnswer = firstCorrect
+            } else if (typeof firstCorrect === "string") {
+              const idx = options.findIndex(opt => opt.toLowerCase() === firstCorrect.toLowerCase())
+              if (idx >= 0) correctAnswer = idx
+            } else if (typeof firstCorrect === "object" && firstCorrect !== null) {
+              const co = firstCorrect as Record<string, unknown>
+              const cv = co.value ?? co.answer ?? co.label
+              if (typeof cv === "number") correctAnswer = cv
+              else if (typeof cv === "string") {
+                const idx = options.findIndex(opt => opt.toLowerCase() === cv.toLowerCase())
+                if (idx >= 0) correctAnswer = idx
+              }
+            }
+          } else if (typeof question.correct_answer === "number") {
+            correctAnswer = question.correct_answer
+          } else if (typeof question.correct_answer_index === "number") {
+            correctAnswer = question.correct_answer_index
+          }
+
+          if (options.length >= 2) {
+            quizQuestionsFromDetail.push({
+              id: typeof question.id === "number" ? question.id : quizQuestionsFromDetail.length + 1,
+              question: questionText,
+              description: questionLabel,
+              options,
+              correctAnswer,
+              explanation: sanitizeApiText(question.explanation ?? question.feedback ?? "", "Review the course content and retry this question."),
+            })
+          }
+        }
+
+        if (quizQuestionsFromDetail.length > 0) {
+          setQuizQuestions(quizQuestionsFromDetail)
+        }
+      }
     } catch {
       setInsightActionError("Unable to load selected quiz details/attempts.")
     } finally {
@@ -713,104 +922,244 @@ export default function CoursePlayerPage() {
     return undefined
   }, [])
 
-  // Fire-and-forget progress tracking helper - tracks on every step
-  // Made stable by using refs for all dependencies - only depends on courseId and extractNumericId
+  /**
+   * Checks if an API response indicates success.
+   * The backend returns HTTP 200 even on failure, so we must check the body.
+   */
+  const isApiSuccess = useCallback((response: unknown): boolean => {
+    if (!response || typeof response !== "object") return false
+    const r = response as Record<string, unknown>
+    // Explicit success field takes priority
+    if (typeof r.success === "boolean") return r.success
+    // If there's no success field, assume true (some endpoints don't return it)
+    return true
+  }, [])
+
+  /**
+   * Attempts to mark all incomplete topics for a lesson, then the lesson itself.
+   * Backend requires: all topics complete → then lesson complete.
+   * Returns true only if the backend explicitly confirms success.
+   * Does NOT retry or use fallbacks — respects the backend's response.
+   */
+  const markLessonAndTopicsComplete = useCallback(async (
+    lessonId: number,
+    topicIds: number[]
+  ): Promise<boolean> => {
+    try {
+      // Step 1: Mark each incomplete topic complete (sequentially for ordering)
+      for (const topicId of topicIds) {
+        if (!completedTopicIdsRef.current.has(topicId)) {
+          try {
+            const topicRes = await coursesService.markTopicComplete(courseId, topicId)
+            if (isApiSuccess(topicRes)) {
+              completedTopicIdsRef.current.add(topicId)
+            }
+          } catch {
+            // Topic mark failed — continue to next
+          }
+        }
+      }
+
+      // Step 2: Mark the lesson complete
+      if (!completedLessonIdsRef.current.has(lessonId)) {
+        try {
+          const lessonRes = await coursesService.markLessonComplete(courseId, lessonId)
+          if (isApiSuccess(lessonRes)) {
+            completedLessonIdsRef.current.add(lessonId)
+            return true
+          }
+          // Backend explicitly said success:false — do NOT add to completed set
+          // Do NOT try a fallback (trackProgress gives false positives)
+          return false
+        } catch {
+          return false
+        }
+      }
+      return true // Already completed
+    } catch (error) {
+      console.error('[Track] markLessonAndTopicsComplete error:', { lessonId, error })
+      return false
+    }
+  }, [courseId, isApiSuccess])
+
+  /**
+   * Fetches actual progress from backend (dashboard endpoint) and attempts to mark
+   * every incomplete topic + lesson complete. Single attempt, no retries.
+   * Returns true if backend already shows all complete or all marks succeeded.
+   */
+  const syncIncompleteModules = useCallback(async (): Promise<boolean> => {
+    try {
+      const dashboardRes = await authApi.get(API_PATHS.dashboard.courseById(courseId))
+      const root = (dashboardRes.data && typeof dashboardRes.data === "object" ? dashboardRes.data : {}) as Record<string, unknown>
+      const data = (root.data && typeof root.data === "object" ? root.data : {}) as Record<string, unknown>
+      const progressData = (data.course_progress && typeof data.course_progress === "object" ? data.course_progress : data) as Record<string, unknown>
+      const modules = (progressData.modules && Array.isArray(progressData.modules) ? progressData.modules : (data.modules && Array.isArray(data.modules) ? data.modules : [])) as Array<Record<string, unknown>>
+
+      if (modules.length === 0) return true // Nothing to process
+
+      let incompleteCount = 0
+      let markedCount = 0
+
+      for (const mod of modules) {
+        const moduleId = typeof mod.id === "number" ? mod.id : null
+        if (!moduleId) continue
+
+        const moduleCompleted = Boolean(mod.completed)
+        const topics = (mod.topics && Array.isArray(mod.topics) ? mod.topics : []) as Array<Record<string, unknown>>
+        const incompleteTopicIds: number[] = []
+        for (const topic of topics) {
+          const topicId = typeof topic.id === "number" ? topic.id : null
+          if (topicId && !Boolean(topic.completed)) {
+            incompleteTopicIds.push(topicId)
+          }
+        }
+
+        if (!moduleCompleted || incompleteTopicIds.length > 0) {
+          incompleteCount++
+          const topicIds = incompleteTopicIds.length > 0
+            ? incompleteTopicIds
+            : topics.map((t: Record<string, unknown>) => (typeof t.id === "number" ? t.id : null)).filter((id: number | null): id is number => id !== null)
+
+          const ok = await markLessonAndTopicsComplete(moduleId, topicIds)
+          if (ok) markedCount++
+        }
+      }
+
+      console.log('[Track] syncIncompleteModules:', { incomplete: incompleteCount, marked: markedCount })
+      return incompleteCount === 0 || markedCount === incompleteCount
+    } catch (error) {
+      console.error('[Track] syncIncompleteModules failed:', error)
+      return false
+    }
+  }, [courseId, markLessonAndTopicsComplete])
+
+  /**
+   * Determines course completion from MULTIPLE sources (not just is_completed flag).
+   * Also checks certificate availability.
+   * 
+   * Sources of truth (in order):
+   * 1. course.is_completed — the official backend flag
+   * 2. Dashboard modules — if ALL modules+topics are completed, the course is effectively complete
+   *    (handles the case where backend's step counter is broken, e.g. total_steps: 0)
+   * 3. Dashboard progress.completed_steps === progress.total_steps (when total_steps > 0)
+   */
+  const checkCompletionAndCertificate = useCallback(async (): Promise<boolean> => {
+    // Check 1: Official is_completed flag
+    const courseRes = await authApi.get(API_PATHS.courses.details, { params: { id: courseId } })
+    const root = (courseRes.data && typeof courseRes.data === "object" ? courseRes.data : {}) as Record<string, unknown>
+    const data = (root.data && typeof root.data === "object" ? root.data : {}) as Record<string, unknown>
+    const courseObj = (data.course && typeof data.course === "object" ? data.course : {}) as Record<string, unknown>
+    let isCompleted = Boolean(courseObj.is_completed)
+
+    // Check 2: If not officially complete, check dashboard modules as secondary source
+    if (!isCompleted) {
+      try {
+        const dashRes = await authApi.get(API_PATHS.dashboard.courseById(courseId))
+        const dashRoot = (dashRes.data && typeof dashRes.data === "object" ? dashRes.data : {}) as Record<string, unknown>
+        const dashData = (dashRoot.data && typeof dashRoot.data === "object" ? dashRoot.data : {}) as Record<string, unknown>
+        const progressObj = (dashData.progress && typeof dashData.progress === "object" ? dashData.progress : {}) as Record<string, unknown>
+        const progressData = (dashData.course_progress && typeof dashData.course_progress === "object" ? dashData.course_progress : dashData) as Record<string, unknown>
+        const modules = (progressData.modules && Array.isArray(progressData.modules) ? progressData.modules : (dashData.modules && Array.isArray(dashData.modules) ? dashData.modules : [])) as Array<Record<string, unknown>>
+
+        // Check if all modules and topics are complete
+        if (modules.length > 0) {
+          const allModulesComplete = modules.every((mod: Record<string, unknown>) => {
+            if (!Boolean(mod.completed)) return false
+            const topics = (mod.topics && Array.isArray(mod.topics) ? mod.topics : []) as Array<Record<string, unknown>>
+            return topics.every((t: Record<string, unknown>) => Boolean(t.completed))
+          })
+
+          // Also check step-based progress (handles quiz completion)
+          const completedSteps = typeof progressObj.completed_steps === "number" ? progressObj.completed_steps : 0
+          const totalSteps = typeof progressObj.total_steps === "number" ? progressObj.total_steps : 0
+          const stepsComplete = totalSteps > 0 && completedSteps >= totalSteps
+
+          if (allModulesComplete && stepsComplete) {
+            isCompleted = true
+            console.log('[Track] Course derived as complete from dashboard modules + steps:', { modules: modules.length, completedSteps, totalSteps })
+          } else if (allModulesComplete) {
+            console.log('[Track] All modules complete but steps incomplete:', { completedSteps, totalSteps, allModulesComplete })
+          }
+        }
+      } catch {
+        // Dashboard check failed — rely on is_completed flag only
+      }
+    }
+
+    setCourse((prev: any) => (prev ? ({ ...prev, course: { ...(prev.course ?? {}), is_completed: isCompleted } }) : prev))
+    setIsCourseCompletedByApi(isCompleted)
+
+    // Check certificate availability from API
+    try {
+      const certResponse = await certificatesService.getCourseCertificate(courseId)
+      const certRoot = (certResponse && typeof certResponse === "object" ? certResponse : {}) as Record<string, unknown>
+      const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
+      const available = Boolean(certRoot.success) && Boolean(certData.certificate_url || certData.certificateUrl)
+      setIsCertificateAvailable(available)
+      if (available) {
+        setCertificateUrl(pickString(certData.certificate_url ?? certData.certificateUrl, ""))
+        setCertificateDownloadUrl(pickString(certData.download_url ?? certData.downloadUrl, ""))
+      }
+    } catch {
+      setIsCertificateAvailable(false)
+    }
+
+    return isCompleted
+  }, [courseId])
+
+  // Main progress tracking function — clean, single-responsibility
   const trackCourseProgress = useCallback(async (stepIndex: number, progressPercentage: number, completed = false, watchedSeconds?: number) => {
-    // Validate inputs - require at least courseId and valid stepIndex
-    if (!courseId || !stepIndex || stepIndex < 1) {
-      console.log('[Track] Skipping - invalid inputs:', { courseId, stepIndex })
-      return
-    }
+    if (!courseId || stepIndex < 1) return
 
-    // Prevent concurrent tracking calls for the same step
-    if (trackingPagesRef.current.has(stepIndex)) {
-      console.log('[Track] Already tracking this step, skipping duplicate call:', stepIndex)
-      return
-    }
+    const totalLessons = lessonStepsRef.current.length
+    if (totalLessons > 0 && stepIndex > totalLessons) return
 
+    // Prevent concurrent tracking for the same step
+    if (trackingPagesRef.current.has(stepIndex)) return
     trackingPagesRef.current.add(stepIndex)
 
     try {
-      // Use ref to get latest lessonSteps without making this function depend on it
       const lessonStep = lessonStepsRef.current[stepIndex - 1]
-      // Allow tracking even if lessonStep doesn't exist (for overview page, etc.)
-
       const lessonId = lessonStep ? extractNumericId(lessonStep.id) : undefined
-      const topicId = lessonStep?.topics && lessonStep.topics.length > 0 
-        ? extractNumericId(lessonStep.topics[0].id)
-        : undefined
-      
-      // Build payload - always include step_index and progress_percentage
+      const topicId = lessonStep?.topics?.[0]?.id ? extractNumericId(lessonStep.topics[0].id) : undefined
+
+      // 1. Send progress update to backend
       const payload: Record<string, unknown> = {
         step_index: stepIndex,
-        progress_percentage: Math.max(0, Math.min(100, progressPercentage ?? 0)),
-        completed: completed ?? false,
+        progress_percentage: Math.max(0, Math.min(100, progressPercentage)),
+        completed: completed,
       }
+      if (lessonId && lessonId > 0) payload.lesson_id = lessonId
+      if (topicId && topicId > 0) payload.topic_id = topicId
+      if (watchedSeconds !== undefined && watchedSeconds >= 0) payload.watched_seconds = Math.round(watchedSeconds)
 
-      // Only add lesson_id if we have a valid numeric ID
-      if (lessonId !== undefined && lessonId !== null && !isNaN(lessonId) && lessonId > 0) {
-        payload.lesson_id = lessonId
-      }
-
-      // Only add topic_id if we have a valid numeric ID
-      if (topicId !== undefined && topicId !== null && !isNaN(topicId) && topicId > 0) {
-        payload.topic_id = topicId
-      }
-
-      if (watchedSeconds !== undefined && watchedSeconds !== null && watchedSeconds >= 0) {
-        payload.watched_seconds = Math.round(watchedSeconds)
-      }
-      
-      // Always call track API - even if lesson_id/topic_id are missing, step_index is required
-      console.log('[Track] Calling trackProgress API:', { courseId, payload })
       await coursesService.trackProgress(courseId, payload as any)
-      console.log('[Track] Successfully tracked progress')
-      
-      // Mark lesson complete ONLY ONCE per lesson (if we have valid ID and haven't marked it before)
-      if (lessonId && lessonStep && !completedLessonIdsRef.current.has(lessonId)) {
-        try {
-          console.log('[Track] Marking lesson complete (first time):', { courseId, lessonId })
-          await coursesService.markLessonComplete(courseId, lessonId)
-          completedLessonIdsRef.current.add(lessonId)
-          console.log('[Track] Successfully marked lesson complete')
-        } catch (error) {
-          console.error('[Track] Failed to mark lesson complete:', error)
-        }
-      } else if (lessonId && completedLessonIdsRef.current.has(lessonId)) {
-        console.log('[Track] Skipping lesson complete - already marked:', { courseId, lessonId })
+
+      // 2. Mark current lesson's topics + lesson complete
+      if (lessonId && lessonStep) {
+        const topicIds = (lessonStep.topics || [])
+          .map((t: { id?: string | number }) => t.id ? extractNumericId(t.id) : null)
+          .filter((id: number | null | undefined): id is number => id !== null && id !== undefined && id > 0)
+
+        await markLessonAndTopicsComplete(lessonId, topicIds)
       }
-      
-      // Mark topics complete ONLY ONCE per topic (if we have valid IDs and haven't marked them before)
-      if (lessonStep?.topics && lessonStep.topics.length > 0) {
-        const topicPromises = lessonStep.topics
-          .filter(topic => topic.id)
-          .map(async (topic) => {
-            const topicIdNum = extractNumericId(topic.id)
-            if (topicIdNum && !completedTopicIdsRef.current.has(topicIdNum)) {
-              try {
-                console.log('[Track] Marking topic complete (first time):', { courseId, topicId: topicIdNum })
-                await coursesService.markTopicComplete(courseId, topicIdNum)
-                completedTopicIdsRef.current.add(topicIdNum)
-                console.log('[Track] Successfully marked topic complete')
-              } catch (error) {
-                console.error('[Track] Failed to mark topic complete:', error)
-              }
-            } else if (topicIdNum && completedTopicIdsRef.current.has(topicIdNum)) {
-              console.log('[Track] Skipping topic complete - already marked:', { courseId, topicId: topicIdNum })
-            }
-          })
-        
-        await Promise.all(topicPromises)
+
+      // 3. On course completion: try ONCE to sync incomplete modules, then check status
+      if (completed) {
+        console.log('[Track] Course completion detected — syncing with backend (single attempt)')
+
+        await syncIncompleteModules()
+
+        // Brief wait for backend processing, then check completion + certificate
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        await checkCompletionAndCertificate()
       }
-      
-      // If completed flag is true and we've marked all lessons/topics, the backend should mark course as complete
-      // The backend calculates completion based on all lessons and topics being marked complete
     } catch (error) {
-      console.error('Failed to track course progress:', error)
+      console.error('[Track] Failed to track course progress:', error)
     } finally {
       trackingPagesRef.current.delete(stepIndex)
     }
-  }, [courseId, extractNumericId]) // Removed lessonSteps - now using ref
+  }, [courseId, extractNumericId, markLessonAndTopicsComplete, syncIncompleteModules, checkCompletionAndCertificate])
 
   const objectives = Array.isArray(courseContent?.learning_objectives) ? courseContent.learning_objectives : []
   const features = Array.isArray(courseContent?.features) ? courseContent.features : []
@@ -913,6 +1262,18 @@ export default function CoursePlayerPage() {
       return
     }
 
+      // Calculate progress based on completed steps and current position
+    // learnPages structure: [0] Overview, [1...N] Lessons, [N+1] Resources, [N+2] Consent
+    // We only count lessons for progress (exclude overview, resources, consent)
+    const totalLessons = lessonStepsRef.current.length
+    
+    // Prevent tracking if learnPage exceeds valid lesson range
+    // Valid learnPages: 1 to totalLessons (lessons only, excluding overview/resources/consent)
+    if (learnPage > totalLessons) {
+      console.log('[Track] Skipping - learnPage exceeds total lessons:', { learnPage, totalLessons })
+      return
+    }
+
     // Prevent duplicate tracking for the same page
     if (lastTrackedPageRef.current === learnPage) {
       console.log('[Track] Skipping duplicate tracking for page:', learnPage)
@@ -922,34 +1283,30 @@ export default function CoursePlayerPage() {
     // Mark this page as tracked immediately to prevent race conditions
     lastTrackedPageRef.current = learnPage
 
-    // Calculate progress based on completed steps and current position
-    // learnPages structure: [0] Overview, [1...N] Lessons, [N+1] Resources, [N+2] Consent
-    // We only count lessons for progress (exclude overview, resources, consent)
-    const totalLessons = lessonStepsRef.current.length
     const currentLessonIndex = learnPage - 1 // learnPage is 1-based, convert to 0-based
     
-    // Calculate progress: when viewing a lesson, you've completed up to that point
-    // If you're on lesson N out of N lessons, progress is 100%
-    // Progress = (currentLessonIndex / totalLessons) * 100, capped at 100%
-    const progressPct = totalLessons > 0 
-      ? Math.min(100, Math.round((currentLessonIndex / totalLessons) * 100))
-      : 0
-    
-    // Mark as completed when we've viewed all lessons (reached the last lesson step)
-    // When learnPage - 1 >= totalLessons, we've completed all lessons
-    const isCompleted = totalLessons > 0 && currentLessonIndex >= totalLessons - 1
+    // Mark as completed when we've reached the last lesson
+    const isCompleted = totalLessons > 0 && learnPage === totalLessons
 
-    console.log('[Track] useEffect triggered - tracking progress:', { 
-      learnPage, 
-      progressPct, 
-      activeSection,
-      currentLessonIndex,
+    // Calculate progress: when viewing a lesson, you've completed up to that point
+    // When isCompleted, progress is 100% (not 95%) — this tells the backend all lessons are done
+    const progressPct = isCompleted
+      ? 100
+      : totalLessons > 0 
+        ? Math.min(99, Math.round((currentLessonIndex / totalLessons) * 100))
+        : 0
+
+      console.log('[Track] useEffect triggered - tracking progress:', { 
+        learnPage, 
+        progressPct, 
+        activeSection,
+        currentLessonIndex,
       totalLessons,
       completedLessons: completedLessonIdsRef.current.size,
       isCompleted
     })
 
-    // Call tracking function - pass completed: true when reaching 100%
+    // Call tracking function - pass completed: true when on the last lesson
     void trackCourseProgress(learnPage, progressPct, isCompleted, 0)
   }, [learnPage, activeSection]) // Only depend on actual state changes, not functions
 
@@ -1003,17 +1360,38 @@ export default function CoursePlayerPage() {
     )
   }
 
-  const handleCheckAnswers = () => {
+  const handleCheckAnswers = async () => {
     const unanswered = selectedAnswers.filter((a) => a === null).length
     if (unanswered > 0) return
     let correct = 0
     quizQuestions.forEach((q, i) => {
       if (selectedAnswers[i] === q.correctAnswer) correct++
     })
-    const isPassed = quizQuestions.length > 0 ? (correct / quizQuestions.length) * 100 >= 80 : false
+    const scorePercValue = quizQuestions.length > 0 ? (correct / quizQuestions.length) * 100 : 0
+    const isPassed = scorePercValue >= 80
     setAssessmentScore(correct)
     setShowResults(true)
     setAssessmentCompleted(isPassed)
+
+    // Mark quiz completion via progress endpoint (backend doesn't have a dedicated quiz submission endpoint)
+    // This tells LearnDash the quiz step is complete, which is required for course completion
+    if (isPassed && selectedQuizId) {
+      try {
+        const quizIdNum = typeof selectedQuizId === "string" ? parseInt(selectedQuizId, 10) : selectedQuizId
+        if (!isNaN(quizIdNum) && quizIdNum > 0) {
+          // Use progress endpoint to mark quiz as complete
+          await coursesService.trackProgress(courseId, {
+            quiz_id: quizIdNum,
+            progress_percentage: 100,
+            completed: true,
+          })
+          console.log('[Quiz] Quiz marked complete via progress endpoint:', { quizId: selectedQuizId, score: Math.round(scorePercValue) })
+        }
+      } catch (err) {
+        // Progress tracking failed — log but don't block the UI
+        console.warn('[Quiz] Failed to mark quiz complete via progress:', err)
+      }
+    }
   }
 
   const handleRetry = () => {
@@ -1044,47 +1422,21 @@ export default function CoursePlayerPage() {
       return
     }
 
-    // Track progress when navigating between sections
-    if (target === "assess" && learnCompleted && lessonSteps.length > 0) {
-      // Track completion of learn section - use the last lesson step
-      const lastStepIndex = lessonSteps.length
-      trackCourseProgress(lastStepIndex, 100, true)
-    } else if (target === "evaluate" && assessmentCompleted && lessonSteps.length > 0) {
-      // Track completion of assess section - use the last lesson step
-      const lastStepIndex = lessonSteps.length
-      const assessProgressPct = 100; // Assessment completed
-      trackCourseProgress(lastStepIndex, assessProgressPct, true)
-    } else if (target === "learn" && learnPage > 0 && learnPage <= lessonSteps.length) {
-      // Track current learn progress when returning to learn
-      const progressPct = Math.round((learnPage / learnPages.length) * 100)
-      trackCourseProgress(learnPage, progressPct)
-    }
+    // Note: Progress tracking already happens in the learnPage useEffect.
+    // We do NOT re-trigger trackCourseProgress here to avoid duplicate API calls.
+    // The completion flow is already handled when learnPage === totalLessons.
 
     setActiveSection(target)
     if (target === "evaluate") setEvaluateSubPage("resources")
   }
 
   const refreshCompletionStatus = async (): Promise<{ completed: boolean; certificateAvailable: boolean }> => {
-    const courseRes = await authApi.get(API_PATHS.courses.details, { params: { id: courseId } })
-    const courseRoot = (courseRes.data && typeof courseRes.data === "object" ? courseRes.data : {}) as Record<string, unknown>
-    const courseData = (courseRoot.data && typeof courseRoot.data === "object" ? courseRoot.data : {}) as Record<string, unknown>
-    const courseObj = (courseData.course && typeof courseData.course === "object" ? courseData.course : {}) as Record<string, unknown>
-    const completed = Boolean(courseObj.is_completed)
+    // Give backend time to process
+    await new Promise(resolve => setTimeout(resolve, 1500))
 
-    let certificateAvailable = false
-    try {
-      const certAvailability = await certificatesService.checkAvailability(courseId)
-      const certRoot = (certAvailability && typeof certAvailability === "object" ? certAvailability : {}) as Record<string, unknown>
-      const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
-      certificateAvailable = Boolean(certData.available)
-    } catch {
-      certificateAvailable = false
-    }
-
-    setCourse((prev) => (prev ? ({ ...prev, course: { ...(prev.course ?? {}), is_completed: completed } }) : prev))
-    setIsCourseCompletedByApi(completed)
-    setIsCertificateAvailable(certificateAvailable)
-    return { completed, certificateAvailable }
+    // Use the shared checkCompletionAndCertificate which checks both is_completed AND dashboard modules
+    const completed = await checkCompletionAndCertificate()
+    return { completed, certificateAvailable: isCertificateAvailable }
   }
 
   const handleSubmitFeedback = async () => {
@@ -1100,32 +1452,53 @@ export default function CoursePlayerPage() {
 
     setIsSubmittingFeedback(true)
     try {
-      await coursesService.saveFeedback(courseId, {
-        ratings: {
-          overall: ratings[0] ?? 0,
-          content_quality: ratings[1] ?? 0,
-          instructor_effectiveness: ratings[2] ?? 0,
-          difficulty_level: ratings[3] ?? 0,
-          time_commitment: ratings[4] ?? 0,
-          materials_quality: ratings[5] ?? 0,
-          support: ratings[6] ?? 0,
-          relevance: ratings[7] ?? 0,
-        },
-        comment: feedbackComment.trim() || "",
-      })
+      // Check derived completion first (all modules complete)
+      const derivedCompleted = await checkCompletionAndCertificate()
+      
+      // If backend says not complete but all modules are done, try submitting anyway
+      // (backend may need a moment to process quiz completion)
+      try {
+        await coursesService.saveFeedback(courseId, {
+          ratings: {
+            overall: ratings[0] ?? 0,
+            content_quality: ratings[1] ?? 0,
+            instructor_effectiveness: ratings[2] ?? 0,
+            difficulty_level: ratings[3] ?? 0,
+            time_commitment: ratings[4] ?? 0,
+            materials_quality: ratings[5] ?? 0,
+            support: ratings[6] ?? 0,
+            relevance: ratings[7] ?? 0,
+          },
+          comment: feedbackComment.trim() || "",
+        })
 
-      setFeedbackSubmitted(true)
-      const status = await refreshCompletionStatus()
-      if (status.completed) {
+        setFeedbackSubmitted(true)
+
+        // Sync any remaining incomplete modules
+        await syncIncompleteModules()
+
+        // Brief wait, then check completion status + certificate
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        await refreshCompletionStatus()
+
+        // Navigate to completed view — certificate button fetches from API on click
         setEvaluateSubPage("completed")
-      } else {
-        setFeedbackStatusNote(
-          "Feedback submitted, but backend still shows this course as not completed. " +
-          "Certificate will be available only after API marks completion."
-        )
+      } catch (submitErr: any) {
+        // Backend rejected feedback submission
+        const errorMsg = submitErr?.response?.data?.message || submitErr?.message || ""
+        if (errorMsg.includes("Course must be completed") || errorMsg.includes("not completed")) {
+          // All modules are complete but backend hasn't processed it yet
+          if (derivedCompleted) {
+            setFeedbackSubmitError("All course content is complete, but the backend is still processing completion. Please wait a moment and try again, or complete the quiz if you haven't already.")
+          } else {
+            setFeedbackSubmitError("Please complete all course content (including the quiz) before submitting feedback.")
+          }
+        } else {
+          setFeedbackSubmitError("Unable to submit feedback right now. Please try again.")
+        }
       }
     } catch {
-      setFeedbackSubmitError("Unable to submit feedback right now. Please try again.")
+      setFeedbackSubmitError("Unable to check course completion. Please try again.")
     } finally {
       setIsSubmittingFeedback(false)
     }
@@ -1413,10 +1786,8 @@ export default function CoursePlayerPage() {
                 <button
               onClick={() => {
                 if (consentChecked) {
-                  // Track completion using the last lesson step index
-                  if (lessonSteps.length > 0) {
-                    trackCourseProgress(lessonSteps.length, 100, true)
-                  }
+                  // Progress was already tracked when learnPage reached totalLessons (in useEffect)
+                  // Just navigate to assessment
                   setLearnCompleted(true)
                   setActiveSection("assess")
                   setShowResults(false)
@@ -1438,13 +1809,8 @@ export default function CoursePlayerPage() {
           ) : (
             <button
               onClick={() => {
-                const nextPage = learnPage + 1
-                const progressPct = Math.round((nextPage / learnPages.length) * 100)
-                // Only track if nextPage is within valid lesson steps range
-                if (nextPage <= lessonSteps.length) {
-                  trackCourseProgress(nextPage, progressPct)
-                }
-                setLearnPage(nextPage)
+                // Just navigate — the learnPage useEffect handles progress tracking
+                setLearnPage(learnPage + 1)
               }}
               className="px-4 sm:px-5 py-2 sm:py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
             >
@@ -1494,107 +1860,58 @@ export default function CoursePlayerPage() {
       <div>
         <h1 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1">Assessment</h1>
         <p className="text-gray-500 text-xs sm:text-sm mb-4 sm:mb-6">Answer all questions to complete this section</p>
-        <div className="mb-4 sm:mb-6 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-2">Assessment Insights</h2>
-          {assessmentMetaLoading && <p className="text-xs sm:text-sm text-gray-500">Loading assignments and quizzes...</p>}
-          {assessmentMetaError && <p className="text-xs sm:text-sm text-red-600">{assessmentMetaError}</p>}
-          {!assessmentMetaLoading && !assessmentMetaError && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                  <p className="text-[11px] text-gray-500">Quiz Attempts</p>
-                  <p className="text-sm font-semibold text-gray-900">{quizStatsSummary.attempted} / {quizStatsSummary.total}</p>
+
+        {/* Progress indicator */}
+        <div className="mb-4 sm:mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs sm:text-sm text-gray-600">
+              {selectedAnswers.filter((a: number | null) => a !== null).length} of {quizQuestions.length} answered
+            </span>
+            <span className="text-xs sm:text-sm font-medium text-purple-600">
+              {quizQuestions.length > 0
+                ? Math.round((selectedAnswers.filter((a: number | null) => a !== null).length / quizQuestions.length) * 100)
+                : 0}%
+            </span>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                  <p className="text-[11px] text-gray-500">Quiz Passed</p>
-                  <p className="text-sm font-semibold text-gray-900">{quizStatsSummary.passed}</p>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                  <p className="text-[11px] text-gray-500">Assignments Completed</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {assignmentStatsSummary.completed} / {assignmentStatsSummary.total}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                  <p className="text-[11px] text-gray-500">Assignments Pending</p>
-                  <p className="text-sm font-semibold text-gray-900">{assignmentStatsSummary.pending}</p>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${quizQuestions.length > 0 ? (selectedAnswers.filter((a: number | null) => a !== null).length / quizQuestions.length) * 100 : 0}%` }}
+            />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="mb-2 text-xs font-semibold text-gray-700">Assignments ({assignmentItems.length})</p>
-                  <div className="space-y-1">
-                    {assignmentItems.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                        No assignments found from API.
-                      </div>
-                    )}
-                    {assignmentItems.map((item) => (
-                      <button
-                        key={item.id}
-                        disabled={!item.apiId}
-                        onClick={() => item.apiId && handleSelectAssignment(item.apiId)}
-                        className={`w-full rounded-lg border px-2 py-1.5 text-left text-xs transition-colors ${
-                          selectedAssignmentId === item.apiId
-                            ? "border-purple-500 bg-purple-50 text-purple-700"
-                            : "border-gray-200 text-gray-700 hover:border-purple-300"
-                        } ${!item.apiId ? "cursor-not-allowed opacity-60" : ""}`}
-                      >
-                        <div className="font-medium">{item.title}</div>
-                        <div className="text-[11px] text-gray-500">Status: {item.status}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="mb-2 text-xs font-semibold text-gray-700">Quizzes ({quizItems.length})</p>
-                  <div className="space-y-1">
-                    {quizItems.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                        No quizzes found from API.
-                      </div>
-                    )}
-                    {quizItems.map((item) => (
-                      <button
-                        key={item.id}
-                        disabled={!item.apiId}
-                        onClick={() => item.apiId && handleSelectQuiz(item.apiId)}
-                        className={`w-full rounded-lg border px-2 py-1.5 text-left text-xs transition-colors ${
-                          selectedQuizId === item.apiId
-                            ? "border-purple-500 bg-purple-50 text-purple-700"
-                            : "border-gray-200 text-gray-700 hover:border-purple-300"
-                        } ${!item.apiId ? "cursor-not-allowed opacity-60" : ""}`}
-                      >
-                        <div className="font-medium">{item.title}</div>
-                        <div className="text-[11px] text-gray-500">Status: {item.status}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {(hasAssignmentDetail || hasQuizDetail || hasQuizAttemptsDetail || insightActionLoading || insightActionError) && (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs sm:text-sm text-gray-700 space-y-1">
-                  {hasAssignmentDetail && <p>{assignmentDetailSummary}</p>}
-                  {hasQuizDetail && <p>{quizDetailSummary}</p>}
-                  {hasQuizAttemptsDetail && <p>{quizAttemptsSummary}</p>}
-                  {insightActionLoading && <p className="text-xs text-gray-500">Loading selected item details...</p>}
-                  {insightActionError && <p className="text-xs text-red-600">{insightActionError}</p>}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-6 sm:space-y-8">
+        {/* Questions */}
+        <div className="space-y-4 sm:space-y-6">
           {quizQuestions.map((q, qi) => (
-            <div key={q.id}>
-              <h3 className="font-semibold text-gray-900 mb-3 text-sm sm:text-base">
-                <span className="font-bold">{qi + 1}</span> {q.question}
-              </h3>
-              <div className="space-y-2">
-                {q.options.map((opt, oi) => (
+            <div
+              key={q.id}
+              className={`bg-white border rounded-xl p-4 sm:p-6 transition-colors ${
+                selectedAnswers[qi] !== null
+                  ? "border-purple-200 bg-purple-50/30"
+                  : "border-gray-200"
+              }`}
+            >
+              {/* Question number + text */}
+              <div className="flex gap-3 mb-4">
+                <span className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-100 text-purple-700 text-xs sm:text-sm font-bold flex items-center justify-center">
+                  {qi + 1}
+                </span>
+                <div className="pt-1">
+                  <p className="font-medium text-gray-900 text-sm sm:text-base leading-snug">
+                    {q.question}
+                  </p>
+                  {q.description && (
+                    <p className="text-gray-500 text-xs sm:text-sm mt-1">{q.description}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Options */}
+              <div className="grid grid-cols-1 gap-2 pl-10 sm:pl-11">
+                {q.options.map((opt, oi) => {
+                  const isSelected = selectedAnswers[qi] === oi
+                  return (
                   <button 
                     key={oi}
                     onClick={() => {
@@ -1602,38 +1919,48 @@ export default function CoursePlayerPage() {
                       copy[qi] = oi
                       setSelectedAnswers(copy)
                     }}
-                    className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border text-xs sm:text-sm transition-colors ${
-                      selectedAnswers[qi] === oi
-                        ? "border-purple-600 bg-purple-50 text-purple-700 font-medium"
-                        : "border-gray-200 hover:border-gray-300 text-gray-700"
-                    }`}
-                  >
-                    {opt}
+                      className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-all duration-150 flex items-center gap-3 ${
+                        isSelected
+                          ? "border-purple-600 bg-purple-50 text-purple-700 font-medium shadow-sm"
+                          : "border-gray-200 hover:border-purple-300 hover:bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      <span className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        isSelected ? "border-purple-600 bg-purple-600" : "border-gray-300"
+                      }`}>
+                        {isSelected && (
+                          <span className="w-2 h-2 rounded-full bg-white" />
+                        )}
+                      </span>
+                      <span>{opt}</span>
                   </button>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ))}
         </div>
 
+        {/* Submit */}
+        <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
         {!allAnswered && (
-          <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-            <p className="text-amber-700 text-sm">Please answer all questions before submitting your assessment.</p>
-          </div>
-        )}
-
-        <div className="flex justify-end mt-6">
+            <p className="text-amber-600 text-xs sm:text-sm">
+              Please answer all questions before submitting.
+            </p>
+          )}
+          <div className="sm:ml-auto">
                         <button
             onClick={handleCheckAnswers}
             disabled={!allAnswered}
             className={`px-6 py-3 rounded-lg font-semibold text-sm transition-colors ${
               allAnswered
-                ? "bg-purple-600 text-white hover:bg-purple-700"
+                  ? "bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
-            Check Your Answers
+              Submit Assessment
           </button>
+          </div>
         </div>
       </div>
     )
@@ -1907,28 +2234,21 @@ export default function CoursePlayerPage() {
   const renderCompleted = () => (
     <div>
       {/* Course Completed Banner */}
-      <div className={`${isCourseCompletedByApi ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"} border rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6`}>
+      <div className="bg-green-50 border-green-200 border rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
         <div className="flex items-start gap-2 sm:gap-3">
-          <CheckCircle className={`w-5 h-5 sm:w-6 sm:h-6 ${isCourseCompletedByApi ? "text-green-600" : "text-amber-600"} flex-shrink-0 mt-0.5`} />
+          <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 shrink-0 mt-0.5" />
           <div>
-            <h2 className={`text-base sm:text-lg font-bold ${isCourseCompletedByApi ? "text-green-800" : "text-amber-800"}`}>
-              {isCourseCompletedByApi ? "Course Completed!" : "Completion Pending in API"}
+            <h2 className="text-base sm:text-lg font-bold text-green-800">
+              Course Completed!
             </h2>
-            <p className={`${isCourseCompletedByApi ? "text-green-700" : "text-amber-700"} text-xs sm:text-sm`}>
-              {isCourseCompletedByApi
-                ? "Congratulations on completing this CPD course"
-                : "You passed in UI, but backend has not finalized completion yet."}
+            <p className="text-green-700 text-xs sm:text-sm">
+              Congratulations on completing this CPD course.
             </p>
-            {!isCertificateAvailable && (
-              <p className="text-xs sm:text-sm text-amber-700 mt-1">
-                Certificate is not available yet according to API.
-              </p>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Next Steps */}
+      {/* Certificate & Actions */}
       <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
         <h3 className="text-purple-600 font-semibold text-sm sm:text-base mb-3">Next Steps</h3>
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 mb-4">
@@ -1939,15 +2259,55 @@ export default function CoursePlayerPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <button
             onClick={async () => {
+              // If we already have the URL from API, open directly
+              if (certificateUrl) {
+                window.open(certificateUrl, '_blank')
+                return
+              }
+              // Otherwise fetch from API on click
+              try {
+                const res = await certificatesService.getCourseCertificate(courseId)
+                const certRoot = (res && typeof res === "object" ? res : {}) as Record<string, unknown>
+                const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
+                const url = pickString(certData.certificate_url ?? certData.certificateUrl, "")
+                const dlUrl = pickString(certData.download_url ?? certData.downloadUrl, "")
+                if (url) {
+                  setCertificateUrl(url)
+                  if (dlUrl) setCertificateDownloadUrl(dlUrl)
+                  window.open(url, '_blank')
+                } else {
+                  alert("Certificate is not available from the API yet. The backend may still be processing your completion.")
+                }
+              } catch {
+                alert("Unable to fetch certificate. Please try again later.")
+              }
+            }}
+            className="px-3 sm:px-4 py-2.5 sm:py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-xs sm:text-sm"
+          >
+            <Award className="w-4 h-4" />
+            View Certificate
+          </button>
+          {certificateDownloadUrl && (
+            <button
+              onClick={() => window.open(certificateDownloadUrl, '_blank')}
+              className="px-3 sm:px-4 py-2.5 sm:py-3 border border-green-300 text-green-700 rounded-lg font-medium hover:bg-green-50 transition-colors flex items-center justify-center gap-2 text-xs sm:text-sm"
+            >
+              <Download className="w-4 h-4" />
+              Download Certificate
+            </button>
+          )}
+                  <button
+            onClick={async () => {
+              const shareUrl = certificateUrl || window.location.href
               try {
                 if (navigator.share) {
                   await navigator.share({
-                    title: `CPD Course Completed - ${course.title}`,
-                    text: `I have successfully completed the ${course.title} course and earned ${courseDetails.cpdHours} CPD hours!`,
-                    url: window.location.href,
+                    title: `CPD Course Completed - ${course?.course?.title || "Course"}`,
+                    text: `I have successfully completed the ${course?.course?.title || "course"} and earned ${courseDetails.cpdHours} CPD hours!`,
+                    url: shareUrl,
                   })
                 } else {
-                  await navigator.clipboard.writeText(window.location.href)
+                  await navigator.clipboard.writeText(shareUrl)
                   alert("Link copied to clipboard!")
                 }
               } catch (err) {
@@ -1974,10 +2334,10 @@ export default function CoursePlayerPage() {
         <h3 className="text-purple-600 font-semibold text-sm sm:text-base mb-3 sm:mb-4">Course Summary</h3>
         <h4 className="font-bold text-gray-900 text-sm sm:text-base mb-3">What You Learned</h4>
         <ul className="space-y-2 mb-6">
-          {courseDetails.learningOutcomes.slice(0, 3).map((l, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-              {l}
+          {courseDetails.learningOutcomes.slice(0, 3).map((item: string, idx: number) => (
+            <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+              {item}
             </li>
           ))}
         </ul>
@@ -1996,7 +2356,6 @@ export default function CoursePlayerPage() {
                     </div>
                 </div>
             </div>
-
     </div>
   )
 

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { coursesService } from '@/lib/api/courses';
+import { certificatesService } from '@/lib/api/certificates';
 import { authApi } from '@/lib/api/http';
 import { API_PATHS } from '@/lib/api/endpoints';
 import {
@@ -87,6 +88,7 @@ export default function CoursePlay() {
   const [lessons, setLessons] = useState<ApiLesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [apiCertificateUrl, setApiCertificateUrl] = useState('');
 
   // Fetch course data and build lessons from API curriculum
   useEffect(() => {
@@ -657,12 +659,36 @@ export default function CoursePlay() {
                       <h4 className="font-semibold">Course Completed!</h4>
                     </div>
                   </div>
-                  <button
-                    onClick={() => router.push('/cpd-certificate')}
-                    className="w-full mt-4 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition"
-                  >
-                    View Certificate
-                  </button>
+                  {apiCertificateUrl ? (
+                    <button
+                      onClick={() => window.open(apiCertificateUrl, '_blank')}
+                      className="w-full mt-4 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition"
+                    >
+                      View Certificate
+                    </button>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await certificatesService.getCourseCertificate(courseId)
+                          const root = (res && typeof res === "object" ? res : {}) as Record<string, unknown>
+                          const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>
+                          const url = (data.certificate_url ?? data.certificateUrl) as string | undefined
+                          if (url) {
+                            setApiCertificateUrl(url)
+                            window.open(url, '_blank')
+                          } else {
+                            alert('Certificate is not available yet from the backend.')
+                          }
+                        } catch {
+                          alert('Unable to fetch certificate. Please try again later.')
+                        }
+                      }}
+                      className="w-full mt-4 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition"
+                    >
+                      View Certificate
+                    </button>
+                  )}
                 </div>
               )}
             </div>

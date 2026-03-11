@@ -37,6 +37,8 @@ function CPDCertificateContent() {
     provider: "Enamel CPD",
     certificateNumber: "N/A",
     statusText: "Course completed successfully",
+    certificateViewUrl: "",   // from API certificate_url
+    certificateDownloadUrl: "", // from API download_url
   });
 
   useEffect(() => {
@@ -122,22 +124,51 @@ function CPDCertificateContent() {
         const courseCert = courseCertRaw.status === "fulfilled" && courseCertRaw.value ? certFromPayload(courseCertRaw.value) : {};
         const cert = Object.keys(courseCert).length ? courseCert : fallbackCert;
 
-        const courseDetails = courseRaw.status === "fulfilled" && courseRaw.value ? toObj(courseRaw.value) : {};
-        const rawId = cert.id ?? cert.certificate_id ?? cert.number;
+        // Extract course details from coursesService.details() for CPD hours etc.
+        const courseRawObj = courseRaw.status === "fulfilled" && courseRaw.value ? toObj(courseRaw.value) : {};
+        const courseRawData = toObj(courseRawObj.data);
+        const courseObj = toObj(courseRawData.course ?? courseRawData);
+
+        // Certificate API response fields (from /certificates/course/{id}):
+        // certificate_id, certificate_title, course_title, user_name,
+        // certificate_url, download_url, is_completed, completion_date
+        const rawId = cert.certificate_id ?? cert.id ?? cert.number;
         const certId = typeof rawId === "string" || typeof rawId === "number" ? String(rawId) : "";
         const rawScore = toNum(cert.score ?? cert.assessment_score, -1);
 
+        // Use user_name from certificate API if available, fall back to user profile
+        const certUserName = toText(cert.user_name ?? cert.userName, "");
+        const finalUserName = certUserName || userName;
+
+        // Course title: prefer certificate API's course_title, then certificate_title, then course details
+        const finalCourseTitle = toText(
+          cert.course_title ?? cert.certificate_title ?? cert.title ?? courseObj.title ?? courseRawObj.title,
+          "Course"
+        );
+
+        // CPD hours: from course details API (cpd_points field) since certificate API doesn't include it
+        const finalCpdHours = toNum(
+          cert.cpd_hours ?? cert.hours ?? cert.cpdHours ?? courseObj.cpd_points ?? courseObj.cpd_hours,
+          0
+        );
+
+        // Certificate URLs from API
+        const certViewUrl = toText(cert.certificate_url ?? cert.certificateUrl, "");
+        const certDownUrl = toText(cert.download_url ?? cert.downloadUrl, "");
+
         setCertificateData({
-          recipientName: userName,
+          recipientName: finalUserName,
           gdcRegistration: gdc,
-          courseTitle: toText(cert.title ?? courseDetails.title, "Course"),
+          courseTitle: finalCourseTitle,
           completionDateLabel: parseDateLabel(cert.completion_date ?? cert.completed_at ?? cert.date),
-          cpdHours: toNum(cert.cpd_hours ?? cert.hours ?? cert.cpdHours, 0),
+          cpdHours: finalCpdHours,
           score: rawScore >= 0 ? rawScore : 0,
           hasScore: rawScore >= 0,
           provider: toText(cert.provider ?? cert.issuer, "Enamel CPD"),
           certificateNumber: toText(cert.certificate_number ?? cert.number, certId ? `ENAMEL-CPD-${certId}` : "N/A"),
-          statusText: toText(cert.status_message, "Course completed successfully"),
+          statusText: toText(cert.status_message ?? cert.message, "Course completed successfully"),
+          certificateViewUrl: certViewUrl,
+          certificateDownloadUrl: certDownUrl,
         });
       } catch {
         if (!alive) return;
@@ -162,35 +193,40 @@ function CPDCertificateContent() {
   );
 
   const handleShare = async () => {
+    const shareUrl = certificateData.certificateViewUrl || window.location.href;
     try {
       if (navigator.share) {
         await navigator.share({
           title: shareTitle,
           text: shareText,
-          url: window.location.href
+          url: shareUrl,
         });
       } else {
-        // Fallback: Copy to clipboard
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareUrl);
         alert('Certificate link copied to clipboard!');
       }
     } catch (error) {
       console.log('Share cancelled or failed:', error);
-      // Don't show error for cancelled shares
       if (error instanceof Error && error.name !== 'AbortError') {
         alert('Unable to share. Link copied to clipboard instead.');
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareUrl);
       }
     }
   };
 
   const handleDownloadPDF = async () => {
+    // If API provides a download URL, use it directly
+    if (certificateData.certificateDownloadUrl) {
+      window.open(certificateData.certificateDownloadUrl, '_blank');
+      return;
+    }
+
+    // Fallback: generate PDF locally from the rendered certificate
     if (!certificateRef.current) return;
     
     try {
       setIsDownloading(true);
 
-      // Render certificate DOM to PNG using html-to-image (avoids html2canvas color parser)
       const dataUrl = await toPng(certificateRef.current, {
         cacheBust: true,
         pixelRatio: 2,
@@ -198,13 +234,11 @@ function CPDCertificateContent() {
         filter: (node: HTMLElement) => !node.classList?.contains('no-print')
       });
 
-      // Create PDF
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const img = new Image();
       img.src = dataUrl;
       await new Promise((res) => { img.onload = () => res(null); });
 
-      // Calculate dimensions to fit the certificate
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       const ratio = Math.min(pdfWidth / img.width, pdfHeight / img.height);
@@ -213,11 +247,9 @@ function CPDCertificateContent() {
       const imgX = (pdfWidth - imgW) / 2;
       const imgY = 0;
 
-      // Add image to PDF
       pdf.addImage(img, 'PNG', imgX, imgY, imgW, imgH);
 
-      // Download the PDF
-      const fileName = `CPD-Certificate-${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `CPD-Certificate-${certificateData.courseTitle}-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(fileName);
 
     } catch (error) {

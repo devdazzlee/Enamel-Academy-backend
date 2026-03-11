@@ -150,7 +150,7 @@ export default function ReflectionPage() {
         takeaways: formData.takeaways.trim(),
       });
       localStorage.removeItem(`course-reflection-draft-${courseId}`);
-      router.push(`/cpd-certificate?courseId=${courseId}`);
+      router.push(`/course/${courseId}`);
     } catch {
       setFormError("Unable to submit reflection right now. Please try again.");
     } finally {

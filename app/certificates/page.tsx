@@ -4,16 +4,17 @@ import { useEffect, useMemo, useState } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { CertificateModal } from "@/components/certificate-modal"
-import { Search, ChevronDown, Download, Calendar, Clock, Award, Filter, FileText, Eye, ChevronRight } from "lucide-react"
+import { Search, ChevronDown, Download, Calendar, Clock, Award, Filter, FileText, Eye, ChevronRight, X, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Spinner } from "@/components/ui/spinner"
 import { Skeleton } from "@/components/ui/skeleton"
 import jsPDF from 'jspdf';
-import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { certificatesService } from "@/lib/api/certificates";
 import { userService } from "@/lib/api/user";
+import { tokenStorage } from "@/lib/api/token";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -64,6 +65,10 @@ export default function CertificatesPage() {
   const [actionMessage, setActionMessage] = useState("")
   const [actionError, setActionError] = useState("")
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [certificateHtml, setCertificateHtml] = useState<string>("")
+  const [isHtmlModalOpen, setIsHtmlModalOpen] = useState(false)
+  const [htmlModalTitle, setHtmlModalTitle] = useState("")
+  const [isLoadingCertHtml, setIsLoadingCertHtml] = useState(false)
 
   // Fetch current user ID for verification
   useEffect(() => {
@@ -284,77 +289,51 @@ export default function CertificatesPage() {
     }
   }
 
-  const getRemotePreviewUrl = (payload: unknown): string => {
-    const root = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>
-    const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>
-    const possible = [
-      data.preview_url,
-      data.previewUrl,
-      data.certificate_url,
-      data.certificateUrl,
-      root.preview_url,
-      root.previewUrl,
-      root.certificate_url,
-      root.certificateUrl,
-      data.url,
-      root.url,
-    ]
-    const found = possible.find((v) => typeof v === "string" && v.trim().length > 0)
-    return typeof found === "string" ? found : ""
+  // Helper to fetch certificate HTML through the proxy
+  const fetchCertificateHtml = async (url: string): Promise<string> => {
+    const token = tokenStorage.get()
+    const proxyUrl = `/api/certificate-proxy?url=${encodeURIComponent(url)}`
+    const headers: HeadersInit = {}
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
+    }
+    const res = await fetch(proxyUrl, { headers })
+    if (!res.ok) throw new Error("Failed to fetch certificate HTML")
+    return res.text()
   }
 
   const handleViewCertificate = async (certId: string) => {
     setActionMessage("")
     setActionError("")
     setViewingCertId(certId)
+    setIsLoadingCertHtml(true)
     const certificate = certificatesData.find(cert => cert.id === certId)
-    if (certificate) {
-      try {
-        // Use the certificate_url directly from API data
-        if (certificate.certificateUrl && certificate.certificateUrl !== "#") {
-          // Open the actual certificate URL from API in a new tab
-          window.open(certificate.certificateUrl, "_blank", "noopener,noreferrer")
-          setActionMessage("Certificate opened from API.")
-        } else if (certificate.courseId) {
-          // Fallback: try to get certificate URL from API
-          const [availabilityRes, previewRes, detailRes] = await Promise.all([
-            certificatesService.checkAvailability(certificate.courseId),
-            certificatesService.preview(certificate.courseId),
-            certificatesService.getCourseCertificate(certificate.courseId),
-          ])
-          const availableRoot = (availabilityRes && typeof availabilityRes === "object" ? availabilityRes : {}) as Record<string, unknown>
-          const availableData = (availableRoot.data && typeof availableRoot.data === "object" ? availableRoot.data : availableRoot) as Record<string, unknown>
-          const isAvailable = Boolean(
-            availableData.available ??
-            availableData.is_available ??
-            availableRoot.available ??
-            availableRoot.is_available ??
-            true
-          )
-          if (!isAvailable) {
-            setActionError("Certificate is not available yet for this course.")
+    if (!certificate) {
             setViewingCertId(null)
+      setIsLoadingCertHtml(false)
             return
           }
-          const previewUrl = getRemotePreviewUrl(previewRes) || getRemotePreviewUrl(detailRes)
-          if (previewUrl) {
-            // Open the certificate URL from API in a new tab
-            window.open(previewUrl, "_blank", "noopener,noreferrer")
-            setActionMessage("Certificate opened from API.")
-        } else {
+
+    try {
+      const url = certificate.certificateUrl
+      if (!url || url === "#") {
             setActionError("Certificate URL not available.")
-          }
-        } else {
-          setActionError("Certificate URL not available.")
-        }
+        setViewingCertId(null)
+        setIsLoadingCertHtml(false)
+        return
+      }
+
+      // Fetch certificate HTML and display in modal
+      const html = await fetchCertificateHtml(url)
+      setCertificateHtml(html)
+      setHtmlModalTitle(certificate.title)
+      setIsHtmlModalOpen(true)
       } catch (error) {
         console.error("Error viewing certificate:", error)
-        setActionError("Could not open certificate. Please try again.")
+      setActionError("Could not load certificate. Please try again.")
       } finally {
         setViewingCertId(null)
-      }
-    } else {
-      setViewingCertId(null)
+      setIsLoadingCertHtml(false)
     }
   }
 
@@ -369,173 +348,76 @@ export default function CertificatesPage() {
     }
 
     try {
-      // First, try to use download_url from the API data if available
-      if (certificate.downloadUrl && certificate.downloadUrl !== "") {
-        // Use the download URL directly from API
-        window.open(certificate.downloadUrl, "_blank", "noopener,noreferrer")
-        setActionMessage("Certificate download opened from API.")
+      // Determine the URL to fetch HTML from
+      const url = certificate.downloadUrl && certificate.downloadUrl !== ""
+        ? certificate.downloadUrl
+        : certificate.certificateUrl
+
+      if (!url || url === "#") {
+        setActionError("Download URL not available.")
         setDownloadingCertId(null)
         return
       }
       
-      // Fallback: use certificate_url with download parameter
-      if (certificate.certificateUrl && certificate.certificateUrl !== "#") {
-        const downloadUrl = certificate.certificateUrl.includes("download=1") 
-          ? certificate.certificateUrl 
-          : `${certificate.certificateUrl}${certificate.certificateUrl.includes("?") ? "&" : "?"}download=1`
-        window.open(downloadUrl, "_blank", "noopener,noreferrer")
-        setActionMessage("Certificate download opened from API.")
-        setDownloadingCertId(null)
-        return
-      }
-      
-      // Fallback: try to get download URL from API
-      if (certificate.courseId) {
-        const [availabilityRes, detailRes] = await Promise.all([
-          certificatesService.checkAvailability(certificate.courseId),
-          certificatesService.getCourseCertificate(certificate.courseId),
-        ])
-        const availableRoot = (availabilityRes && typeof availabilityRes === "object" ? availabilityRes : {}) as Record<string, unknown>
-        const availableData = (availableRoot.data && typeof availableRoot.data === "object" ? availableRoot.data : availableRoot) as Record<string, unknown>
-        const isAvailable = Boolean(
-          availableData.available ??
-          availableData.is_available ??
-          availableRoot.available ??
-          availableRoot.is_available ??
-          true
-        )
-        if (!isAvailable) {
-          setActionError("Certificate is not available yet for this course.")
-          setDownloadingCertId(null)
-          return
-        }
+      // Fetch HTML from the download URL via proxy (images are inlined as base64)
+      const html = await fetchCertificateHtml(url)
 
-        const remoteUrl = getRemotePreviewUrl(detailRes)
-        if (remoteUrl) {
-          // Add download parameter if not present
-          const downloadUrl = remoteUrl.includes("download=1") ? remoteUrl : `${remoteUrl}${remoteUrl.includes("?") ? "&" : "?"}download=1`
-          window.open(downloadUrl, "_blank", "noopener,noreferrer")
-          setActionMessage("Certificate download opened from API.")
-          setDownloadingCertId(null)
-          return
-        }
-      }
-    } catch (error) {
-      console.error("Error downloading certificate:", error)
-      setActionError("Could not fetch certificate file from API. Falling back to generated PDF.")
-    }
-    
-    // Only fall back to PDF generation if API URLs are not available
-    // Continue with PDF generation fallback (existing code below)
+      // Create a hidden container to render the HTML for capture
+      const container = document.createElement("div")
+      container.style.position = "fixed"
+      container.style.left = "-10000px"
+      container.style.top = "-10000px"
+      container.style.width = "1200px"
+      container.style.backgroundColor = "white"
+      container.style.zIndex = "-9999"
+      container.innerHTML = html
+      document.body.appendChild(container)
 
-    // Create a temporary certificate element for download
-    const tempDiv = document.createElement('div')
-    tempDiv.style.position = 'absolute'
-    tempDiv.style.left = '-9999px'
-    tempDiv.style.top = '-9999px'
-    tempDiv.style.width = '800px'
-    tempDiv.style.padding = '48px'
-    tempDiv.style.backgroundColor = 'white'
-    tempDiv.style.border = '1px solid #e5e7eb'
-    tempDiv.style.borderRadius = '8px'
-    tempDiv.style.fontFamily = 'system-ui, -apple-system, sans-serif'
+      // Wait for content to render
+      await new Promise(resolve => setTimeout(resolve, 2000))
 
-    tempDiv.innerHTML = `
-      <div style="text-align: center; margin-bottom: 24px;">
-        <div style="color: #8b5cf6; margin-bottom: 16px;">
-          <svg width="48" height="48" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-          </svg>
-        </div>
-        <h2 style="font-size: 32px; font-weight: bold; color: #7c3aed; margin-bottom: 8px;">Certificate of Completion</h2>
-        <p style="color: #6b7280;">Continuing Professional Development</p>
-      </div>
-      
-      <div style="border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; padding: 32px 0; margin-bottom: 32px;">
-        <p style="text-align: center; color: #6b7280; margin-bottom: 16px;">This is to certify that</p>
-        <h3 style="font-size: 32px; font-weight: bold; color: #111827; text-align: center; margin-bottom: 8px;">Certificate Holder</h3>
-        <p style="text-align: center; color: #6b7280; margin-bottom: 24px;">GDC Registration: N/A</p>
-        
-        <p style="text-align: center; color: #6b7280; margin-bottom: 16px;">has successfully completed</p>
-        <h4 style="font-size: 24px; font-weight: bold; color: #7c3aed; text-align: center; margin-bottom: 16px;">${certificate.title}</h4>
-        
-        <div style="display: flex; justify-content: center; gap: 24px; color: #6b7280; margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            <span>${new Date(certificate.completionDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-            <span>${certificate.cpdHours} CPD Hours</span>
-          </div>
-        </div>
-        
-        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; color: #15803d;">
-          <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
-          <span style="font-weight: 600;">Assessment Passed with ${certificate.score}%</span>
-        </div>
-      </div>
-      
-      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 14px; color: #6b7280;">
-        <div>
-          <p style="color: #9ca3af;">Provided by</p>
-          <p style="font-weight: 600; color: #111827;">Enamel CPD</p>
-        </div>
-        <div style="text-align: right;">
-          <p style="color: #9ca3af;">Certificate Number</p>
-          <p style="font-weight: 600; color: #111827;">ENAMEL-CPD-${certificate.id}</p>
-        </div>
-      </div>
-      
-      <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
-        <p style="font-size: 12px; color: #6b7280; text-align: center;">
-          This certificate is awarded in recognition of successful completion of verified CPD activity and meets the requirements of the GDC Enhanced CPD Framework.
-        </p>
-      </div>
-    `
-
-    document.body.appendChild(tempDiv)
-
-    try {
-      const dataUrl = await toPng(tempDiv, {
-        cacheBust: true,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff'
+      // Capture with html2canvas
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        width: 1200,
+        windowWidth: 1200,
       })
 
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-      const img = new Image()
-      img.src = dataUrl
-      await new Promise((res) => { img.onload = () => res(null) })
+      // Determine orientation based on captured content
+      const isLandscape = canvas.width > canvas.height
+      const pdf = new jsPDF({
+        orientation: isLandscape ? "landscape" : "portrait",
+        unit: "mm",
+        format: "a4",
+      })
 
+      const imgData = canvas.toDataURL("image/png")
       const pdfWidth = pdf.internal.pageSize.getWidth()
       const pdfHeight = pdf.internal.pageSize.getHeight()
-      const ratio = Math.min(pdfWidth / img.width, pdfHeight / img.height)
-      const imgW = img.width * ratio
-      const imgH = img.height * ratio
+      const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height)
+      const imgW = canvas.width * ratio
+      const imgH = canvas.height * ratio
       const imgX = (pdfWidth - imgW) / 2
-      const imgY = 0
+      const imgY = (pdfHeight - imgH) / 2
 
-      pdf.addImage(img, 'PNG', imgX, imgY, imgW, imgH)
+      pdf.addImage(imgData, "PNG", imgX, imgY, imgW, imgH)
 
-      const fileName = `CPD-Certificate-${title.replace(/\s+/g, '-')}-${certificate.date}.pdf`
+      const fileName = `Certificate-${title.replace(/\s+/g, "-")}.pdf`
       pdf.save(fileName)
+
+      setActionMessage("Certificate PDF downloaded successfully.")
+
+      // Clean up
+      document.body.removeChild(container)
     } catch (error) {
-      console.error('Error generating PDF:', error)
-      alert('Error generating PDF. Please try again.')
+      console.error("Error downloading certificate as PDF:", error)
+      setActionError("Failed to download certificate as PDF. Please try again.")
     } finally {
-      document.body.removeChild(tempDiv)
+      setDownloadingCertId(null)
     }
   }
 
@@ -1053,6 +935,51 @@ export default function CertificatesPage() {
           onClose={() => setIsModalOpen(false)}
           certificate={selectedCertificate}
         />
+      )}
+
+      {/* Certificate HTML Viewer Modal */}
+      {isHtmlModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full h-full sm:h-[90vh] sm:max-w-5xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-[#8b5cf6] text-white p-3 sm:p-4 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <Award className="h-5 w-5 flex-shrink-0" />
+                <h2 className="text-base sm:text-lg font-semibold truncate">
+                  {htmlModalTitle || "Certificate Preview"}
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setIsHtmlModalOpen(false)
+                  setCertificateHtml("")
+                  setHtmlModalTitle("")
+                }}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            {/* Modal Body - iframe renders the certificate HTML */}
+            <div className="flex-1 overflow-hidden bg-gray-100">
+              {isLoadingCertHtml ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#8b5cf6]" />
+                    <p className="text-sm text-gray-600">Loading certificate...</p>
+                  </div>
+                </div>
+              ) : (
+                <iframe
+                  srcDoc={certificateHtml}
+                  className="w-full h-full border-0"
+                  title="Certificate Preview"
+                  sandbox="allow-same-origin allow-popups"
+                />
+              )}
+            </div>
+          </div>
+        </div>
       )}
       
       {/* Toast Notifications */}

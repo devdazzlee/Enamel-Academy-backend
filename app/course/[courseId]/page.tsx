@@ -802,6 +802,9 @@ export default function CoursePlayerPage() {
         
         await Promise.all(topicPromises)
       }
+      
+      // If completed flag is true and we've marked all lessons/topics, the backend should mark course as complete
+      // The backend calculates completion based on all lessons and topics being marked complete
     } catch (error) {
       console.error('Failed to track course progress:', error)
     } finally {
@@ -920,23 +923,34 @@ export default function CoursePlayerPage() {
     lastTrackedPageRef.current = learnPage
 
     // Calculate progress based on completed steps and current position
-    const actualLessonSteps = learnPages.length - 1 // Exclude overview page
-    const currentLessonIndex = learnPage - 1 // Convert to 0-based index
-    const progressPct = actualLessonSteps > 0 
-      ? Math.round((currentLessonIndex / actualLessonSteps) * 100)
+    // learnPages structure: [0] Overview, [1...N] Lessons, [N+1] Resources, [N+2] Consent
+    // We only count lessons for progress (exclude overview, resources, consent)
+    const totalLessons = lessonStepsRef.current.length
+    const currentLessonIndex = learnPage - 1 // learnPage is 1-based, convert to 0-based
+    
+    // Calculate progress: when viewing a lesson, you've completed up to that point
+    // If you're on lesson N out of N lessons, progress is 100%
+    // Progress = (currentLessonIndex / totalLessons) * 100, capped at 100%
+    const progressPct = totalLessons > 0 
+      ? Math.min(100, Math.round((currentLessonIndex / totalLessons) * 100))
       : 0
+    
+    // Mark as completed when we've viewed all lessons (reached the last lesson step)
+    // When learnPage - 1 >= totalLessons, we've completed all lessons
+    const isCompleted = totalLessons > 0 && currentLessonIndex >= totalLessons - 1
 
     console.log('[Track] useEffect triggered - tracking progress:', { 
       learnPage, 
       progressPct, 
       activeSection,
       currentLessonIndex,
-      actualLessonSteps,
-      completedLessons: completedLessonIdsRef.current.size
+      totalLessons,
+      completedLessons: completedLessonIdsRef.current.size,
+      isCompleted
     })
 
-    // Call tracking function directly - it's stable and uses refs internally
-    void trackCourseProgress(learnPage, progressPct, false, 0)
+    // Call tracking function - pass completed: true when reaching 100%
+    void trackCourseProgress(learnPage, progressPct, isCompleted, 0)
   }, [learnPage, activeSection]) // Only depend on actual state changes, not functions
 
   useEffect(() => {

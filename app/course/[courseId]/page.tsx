@@ -199,6 +199,13 @@ export default function CoursePlayerPage() {
   // Use refs instead of state to prevent infinite loops in useEffect
   const completedLessonIdsRef = useRef<Set<number>>(new Set())
   const completedTopicIdsRef = useRef<Set<number>>(new Set())
+  // Track the last page we tracked to prevent duplicate API calls
+  const lastTrackedPageRef = useRef<number | null>(null)
+  // Track which pages are currently being tracked to prevent concurrent calls
+  const trackingPagesRef = useRef<Set<number>>(new Set())
+  // Store latest lessonSteps in ref to avoid function recreation
+  // Initialize with empty array - will be updated when lessonSteps is defined
+  const lessonStepsRef = useRef<any[]>([])
 
   // Fetch course data from API
   useEffect(() => {
@@ -347,9 +354,7 @@ export default function CoursePlayerPage() {
           setCourseContent(data.data.course ?? {})
           setIsCourseCompletedByApi(Boolean((data.data.course as Record<string, unknown> | undefined)?.is_completed))
 
-          const topics = Array.isArray(data.data.curriculum)
-            ? data.data.curriculum.flatMap((section: any) => Array.isArray(section?.topics) ? section.topics : [])
-            : []
+          // Fetch assessment questions from API only - no hardcoded fallback
           const assessmentsRoot = (assessmentsResponse && typeof assessmentsResponse === "object" ? assessmentsResponse : {}) as Record<string, unknown>
           const assessmentsData = (assessmentsRoot.data && typeof assessmentsRoot.data === "object"
             ? assessmentsRoot.data
@@ -361,6 +366,7 @@ export default function CoursePlayerPage() {
               : Array.isArray(assessmentsData.questions)
                 ? assessmentsData.questions
                 : []
+          // Only use questions from API - no hardcoded fallback
           const apiQuestions: AssessmentQuestion[] = (assessmentItems as unknown[])
             .map((item, index) => {
               const q = (item && typeof item === "object" ? item : {}) as Record<string, unknown>
@@ -386,22 +392,9 @@ export default function CoursePlayerPage() {
               }
             })
             .filter(Boolean) as AssessmentQuestion[]
-          const generatedQuestions: AssessmentQuestion[] = topics.slice(0, 5).map((topic: any, index: number) => {
-            const topicTitle = sanitizeApiText(topic?.title, `Topic ${index + 1}`)
-            return {
-              id: index + 1,
-              question: `Which statement best reflects your understanding of ${topicTitle}?`,
-              options: [
-                `I can apply ${topicTitle} confidently in practice.`,
-                `I understand ${topicTitle} but need more practice.`,
-                `I reviewed ${topicTitle} and can identify key concepts.`,
-                `I need to revisit ${topicTitle} before applying it.`,
-              ],
-              correctAnswer: 0,
-              explanation: `Review ${topicTitle} in the learning section and align your answer with practical confidence.`,
-            }
-          })
-          setQuizQuestions(apiQuestions.length > 0 ? apiQuestions : generatedQuestions)
+          
+          // Only set quiz questions if API returns questions - no hardcoded fallback
+          setQuizQuestions(apiQuestions)
 
           const rootResources = toResourceArray(toRecord(data.data))
           const courseResources = toResourceArray(toRecord(data.data.course))
@@ -697,6 +690,11 @@ export default function CoursePlayerPage() {
     })
   ), [curriculumSections])
 
+  // Update lessonStepsRef whenever lessonSteps changes
+  useEffect(() => {
+    lessonStepsRef.current = lessonSteps
+  }, [lessonSteps])
+
   // Helper to extract numeric ID from string or number (used in multiple places)
   const extractNumericId = useCallback((id: string | number | undefined): number | undefined => {
     if (id === undefined || id === null) return undefined
@@ -716,6 +714,7 @@ export default function CoursePlayerPage() {
   }, [])
 
   // Fire-and-forget progress tracking helper - tracks on every step
+  // Made stable by using refs for all dependencies - only depends on courseId and extractNumericId
   const trackCourseProgress = useCallback(async (stepIndex: number, progressPercentage: number, completed = false, watchedSeconds?: number) => {
     // Validate inputs - require at least courseId and valid stepIndex
     if (!courseId || !stepIndex || stepIndex < 1) {
@@ -723,8 +722,17 @@ export default function CoursePlayerPage() {
       return
     }
 
+    // Prevent concurrent tracking calls for the same step
+    if (trackingPagesRef.current.has(stepIndex)) {
+      console.log('[Track] Already tracking this step, skipping duplicate call:', stepIndex)
+      return
+    }
+
+    trackingPagesRef.current.add(stepIndex)
+
     try {
-      const lessonStep = lessonSteps[stepIndex - 1]
+      // Use ref to get latest lessonSteps without making this function depend on it
+      const lessonStep = lessonStepsRef.current[stepIndex - 1]
       // Allow tracking even if lessonStep doesn't exist (for overview page, etc.)
 
       const lessonId = lessonStep ? extractNumericId(lessonStep.id) : undefined
@@ -796,8 +804,10 @@ export default function CoursePlayerPage() {
       }
     } catch (error) {
       console.error('Failed to track course progress:', error)
+    } finally {
+      trackingPagesRef.current.delete(stepIndex)
     }
-  }, [courseId, lessonSteps, extractNumericId])
+  }, [courseId, extractNumericId]) // Removed lessonSteps - now using ref
 
   const objectives = Array.isArray(courseContent?.learning_objectives) ? courseContent.learning_objectives : []
   const features = Array.isArray(courseContent?.features) ? courseContent.features : []
@@ -893,32 +903,41 @@ export default function CoursePlayerPage() {
   ]), [courseDescription, courseDetails.objectives, lessonSteps, resources])
 
   // Track progress on every step change (learnPage change)
+  // Only track when learnPage or activeSection actually changes, not when functions change
   useEffect(() => {
-    if (activeSection === "learn" && learnPage > 0 && learnPages.length > 0) {
-      // Calculate progress based on completed steps and current position
-      // learnPages includes: [0] Course Overview, [1+] Lessons
-      // So actual lesson steps are from index 1 onwards
-      const actualLessonSteps = learnPages.length - 1 // Exclude overview page
-      const currentLessonIndex = learnPage - 1 // Convert to 0-based index
-      
-      // Calculate progress: (current lesson index / total lesson steps) * 100
-      // This gives incremental progress as user moves through lessons
-      const progressPct = actualLessonSteps > 0 
-        ? Math.round((currentLessonIndex / actualLessonSteps) * 100)
-        : 0
-      
-      // Track on every step change - including overview page (learnPage = 1)
-      console.log('[Track] useEffect triggered - tracking progress:', { 
-        learnPage, 
-        progressPct, 
-        activeSection,
-        currentLessonIndex,
-        actualLessonSteps,
-        completedLessons: completedLessonIdsRef.current.size
-      })
-      trackCourseProgress(learnPage, progressPct, false, 0)
+    // Only track in learn section with valid page
+    if (activeSection !== "learn" || learnPage <= 0 || learnPages.length === 0) {
+      return
     }
-  }, [learnPage, activeSection, learnPages.length, trackCourseProgress])
+
+    // Prevent duplicate tracking for the same page
+    if (lastTrackedPageRef.current === learnPage) {
+      console.log('[Track] Skipping duplicate tracking for page:', learnPage)
+      return
+    }
+
+    // Mark this page as tracked immediately to prevent race conditions
+    lastTrackedPageRef.current = learnPage
+
+    // Calculate progress based on completed steps and current position
+    const actualLessonSteps = learnPages.length - 1 // Exclude overview page
+    const currentLessonIndex = learnPage - 1 // Convert to 0-based index
+    const progressPct = actualLessonSteps > 0 
+      ? Math.round((currentLessonIndex / actualLessonSteps) * 100)
+      : 0
+
+    console.log('[Track] useEffect triggered - tracking progress:', { 
+      learnPage, 
+      progressPct, 
+      activeSection,
+      currentLessonIndex,
+      actualLessonSteps,
+      completedLessons: completedLessonIdsRef.current.size
+    })
+
+    // Call tracking function directly - it's stable and uses refs internally
+    void trackCourseProgress(learnPage, progressPct, false, 0)
+  }, [learnPage, activeSection]) // Only depend on actual state changes, not functions
 
   useEffect(() => {
     if (!resumeLessonParam || resumeApplied || lessonSteps.length === 0) return

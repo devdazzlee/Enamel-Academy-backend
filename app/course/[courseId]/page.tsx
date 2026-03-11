@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState, useEffect, useCallback } from "react"
+import React, { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
@@ -196,8 +196,9 @@ export default function CoursePlayerPage() {
   const [isCertificateAvailable, setIsCertificateAvailable] = useState(false)
   
   // Track completed lessons and topics to avoid marking them complete multiple times
-  const [completedLessonIds, setCompletedLessonIds] = useState<Set<number>>(new Set())
-  const [completedTopicIds, setCompletedTopicIds] = useState<Set<number>>(new Set())
+  // Use refs instead of state to prevent infinite loops in useEffect
+  const completedLessonIdsRef = useRef<Set<number>>(new Set())
+  const completedTopicIdsRef = useRef<Set<number>>(new Set())
 
   // Fetch course data from API
   useEffect(() => {
@@ -758,16 +759,16 @@ export default function CoursePlayerPage() {
       console.log('[Track] Successfully tracked progress')
       
       // Mark lesson complete ONLY ONCE per lesson (if we have valid ID and haven't marked it before)
-      if (lessonId && lessonStep && !completedLessonIds.has(lessonId)) {
+      if (lessonId && lessonStep && !completedLessonIdsRef.current.has(lessonId)) {
         try {
           console.log('[Track] Marking lesson complete (first time):', { courseId, lessonId })
           await coursesService.markLessonComplete(courseId, lessonId)
-          setCompletedLessonIds(prev => new Set([...prev, lessonId]))
+          completedLessonIdsRef.current.add(lessonId)
           console.log('[Track] Successfully marked lesson complete')
         } catch (error) {
           console.error('[Track] Failed to mark lesson complete:', error)
         }
-      } else if (lessonId && completedLessonIds.has(lessonId)) {
+      } else if (lessonId && completedLessonIdsRef.current.has(lessonId)) {
         console.log('[Track] Skipping lesson complete - already marked:', { courseId, lessonId })
       }
       
@@ -777,16 +778,16 @@ export default function CoursePlayerPage() {
           .filter(topic => topic.id)
           .map(async (topic) => {
             const topicIdNum = extractNumericId(topic.id)
-            if (topicIdNum && !completedTopicIds.has(topicIdNum)) {
+            if (topicIdNum && !completedTopicIdsRef.current.has(topicIdNum)) {
               try {
                 console.log('[Track] Marking topic complete (first time):', { courseId, topicId: topicIdNum })
                 await coursesService.markTopicComplete(courseId, topicIdNum)
-                setCompletedTopicIds(prev => new Set([...prev, topicIdNum]))
+                completedTopicIdsRef.current.add(topicIdNum)
                 console.log('[Track] Successfully marked topic complete')
               } catch (error) {
                 console.error('[Track] Failed to mark topic complete:', error)
               }
-            } else if (topicIdNum && completedTopicIds.has(topicIdNum)) {
+            } else if (topicIdNum && completedTopicIdsRef.current.has(topicIdNum)) {
               console.log('[Track] Skipping topic complete - already marked:', { courseId, topicId: topicIdNum })
             }
           })
@@ -796,7 +797,7 @@ export default function CoursePlayerPage() {
     } catch (error) {
       console.error('Failed to track course progress:', error)
     }
-  }, [courseId, lessonSteps, completedLessonIds, completedTopicIds, extractNumericId])
+  }, [courseId, lessonSteps, extractNumericId])
 
   const objectives = Array.isArray(courseContent?.learning_objectives) ? courseContent.learning_objectives : []
   const features = Array.isArray(courseContent?.features) ? courseContent.features : []
@@ -913,11 +914,11 @@ export default function CoursePlayerPage() {
         activeSection,
         currentLessonIndex,
         actualLessonSteps,
-        completedLessons: completedLessonIds.size
+        completedLessons: completedLessonIdsRef.current.size
       })
       trackCourseProgress(learnPage, progressPct, false, 0)
     }
-  }, [learnPage, activeSection, learnPages.length, completedLessonIds, trackCourseProgress, extractNumericId, lessonSteps])
+  }, [learnPage, activeSection, learnPages.length, trackCourseProgress])
 
   useEffect(() => {
     if (!resumeLessonParam || resumeApplied || lessonSteps.length === 0) return

@@ -114,6 +114,17 @@ type CourseData = {
     curriculum_overview?: string;
     language?: string;
     updated_date?: string;
+    settings?: {
+      short_description?: string;
+      duration?: {
+        minutes?: number;
+        text?: string;
+      };
+      price_type?: string;
+      certificate?: string;
+      disable_lesson_progression?: boolean;
+      raw_settings?: Record<string, unknown>;
+    };
   };
   related_courses?: RelatedCourse[];
   instructor?: CourseInstructor | null;
@@ -531,10 +542,15 @@ export function CourseDetailClient() {
     ""
   );
   const excerptText = sanitizeApiText(apiCourse.excerpt ?? (course as any).excerpt ?? "", "");
-  const descriptionText = sanitizeApiText(
+  // Check multiple sources for description, prioritizing settings.short_description
+  // Access settings directly from courseData to ensure we get it even if type checking is strict
+  const settingsFromCourse = (courseData?.course as any)?.settings;
+  const settingsDescription = sanitizeApiText(settingsFromCourse?.short_description ?? apiCourse.settings?.short_description ?? "", "");
+  const mainDescription = sanitizeApiText(
     apiCourse.description ?? (course as any).description ?? "",
-    "No description returned by API."
+    ""
   );
+  const descriptionText = settingsDescription || mainDescription || "No description returned by API.";
   const difficultyLabel = sanitizeApiText(apiCourse.difficulty ?? (course as any).level ?? "", "");
   const formatLabel = sanitizeApiText(apiCourse.format ?? "", "");
   const planLabel = sanitizeApiText(apiCourse.plan ?? "", "");

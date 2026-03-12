@@ -24,7 +24,8 @@ import {
   Menu,
   X,
   FileText,
-  Download
+  Download,
+  AlertTriangle
 } from "lucide-react"
 import { authApi } from "@/lib/api/http"
 import { coursesService } from "@/lib/api/courses"
@@ -203,6 +204,7 @@ export default function CoursePlayerPage() {
   const [isCertificateAvailable, setIsCertificateAvailable] = useState(false)
   const [certificateUrl, setCertificateUrl] = useState<string>("")
   const [certificateDownloadUrl, setCertificateDownloadUrl] = useState<string>("")
+  const [quizBlockingCompletion, setQuizBlockingCompletion] = useState<{ quizId: string; quizTitle: string } | null>(null)
   
   // Track completed lessons and topics to avoid marking them complete multiple times
   // Use refs instead of state to prevent infinite loops in useEffect
@@ -937,9 +939,8 @@ export default function CoursePlayerPage() {
 
   /**
    * Attempts to mark all incomplete topics for a lesson, then the lesson itself.
-   * Backend requires: all topics complete → then lesson complete.
-   * Returns true only if the backend explicitly confirms success.
-   * Does NOT retry or use fallbacks — respects the backend's response.
+   * Backend requires: ALL topics must be successfully marked complete BEFORE the lesson can be marked.
+   * Returns true only if ALL topics AND the lesson were successfully marked complete.
    */
   const markLessonAndTopicsComplete = useCallback(async (
     lessonId: number,
@@ -947,31 +948,51 @@ export default function CoursePlayerPage() {
   ): Promise<boolean> => {
     try {
       // Step 1: Mark each incomplete topic complete (sequentially for ordering)
-      for (const topicId of topicIds) {
-        if (!completedTopicIdsRef.current.has(topicId)) {
-          try {
-            const topicRes = await coursesService.markTopicComplete(courseId, topicId)
-            if (isApiSuccess(topicRes)) {
-              completedTopicIdsRef.current.add(topicId)
-            }
-          } catch {
-            // Topic mark failed — continue to next
+      // Track which ones actually succeeded — lesson can only be marked if ALL topics succeed
+      const topicsToMark = topicIds.filter(tid => !completedTopicIdsRef.current.has(tid))
+      let allTopicsSucceeded = true
+
+      for (const topicId of topicsToMark) {
+        try {
+          const topicRes = await coursesService.markTopicComplete(courseId, topicId)
+          if (isApiSuccess(topicRes)) {
+            completedTopicIdsRef.current.add(topicId)
+          } else {
+            // Topic mark returned success:false — backend rejected it
+            console.warn('[Track] Topic mark failed (backend rejected):', { lessonId, topicId, response: topicRes })
+            allTopicsSucceeded = false
           }
+        } catch (err) {
+          // Topic mark threw an error (network, 500, etc.)
+          console.warn('[Track] Topic mark failed (error):', { lessonId, topicId, error: err })
+          allTopicsSucceeded = false
         }
       }
 
-      // Step 2: Mark the lesson complete
+      // If we marked any topics, give backend a moment to process them
+      if (topicsToMark.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
+
+      // Step 2: Only mark lesson complete if ALL topics succeeded (or there were no topics)
       if (!completedLessonIdsRef.current.has(lessonId)) {
-        try {
+        // If there were topics to mark and any failed, don't try to mark the lesson
+        if (topicsToMark.length > 0 && !allTopicsSucceeded) {
+          console.warn('[Track] Skipping lesson mark — not all topics succeeded:', { lessonId, topicsToMark: topicsToMark.length, allSucceeded: allTopicsSucceeded })
+          return false
+    }
+
+    try {
           const lessonRes = await coursesService.markLessonComplete(courseId, lessonId)
           if (isApiSuccess(lessonRes)) {
             completedLessonIdsRef.current.add(lessonId)
             return true
           }
-          // Backend explicitly said success:false — do NOT add to completed set
-          // Do NOT try a fallback (trackProgress gives false positives)
+          // Backend explicitly said success:false — log for debugging
+          console.warn('[Track] Lesson mark failed (backend rejected):', { lessonId, response: lessonRes })
           return false
-        } catch {
+        } catch (err) {
+          console.warn('[Track] Lesson mark failed (error):', { lessonId, error: err })
           return false
         }
       }
@@ -1016,9 +1037,11 @@ export default function CoursePlayerPage() {
 
         if (!moduleCompleted || incompleteTopicIds.length > 0) {
           incompleteCount++
+          // Only pass incomplete topic IDs — don't try to re-mark already-completed topics
+          // If lesson isn't complete but all topics are, just pass empty array (will only mark lesson)
           const topicIds = incompleteTopicIds.length > 0
             ? incompleteTopicIds
-            : topics.map((t: Record<string, unknown>) => (typeof t.id === "number" ? t.id : null)).filter((id: number | null): id is number => id !== null)
+            : []
 
           const ok = await markLessonAndTopicsComplete(moduleId, topicIds)
           if (ok) markedCount++
@@ -1027,7 +1050,7 @@ export default function CoursePlayerPage() {
 
       console.log('[Track] syncIncompleteModules:', { incomplete: incompleteCount, marked: markedCount })
       return incompleteCount === 0 || markedCount === incompleteCount
-    } catch (error) {
+        } catch (error) {
       console.error('[Track] syncIncompleteModules failed:', error)
       return false
     }
@@ -1051,57 +1074,243 @@ export default function CoursePlayerPage() {
     const courseObj = (data.course && typeof data.course === "object" ? data.course : {}) as Record<string, unknown>
     let isCompleted = Boolean(courseObj.is_completed)
 
-    // Check 2: If not officially complete, check dashboard modules as secondary source
-    if (!isCompleted) {
-      try {
-        const dashRes = await authApi.get(API_PATHS.dashboard.courseById(courseId))
-        const dashRoot = (dashRes.data && typeof dashRes.data === "object" ? dashRes.data : {}) as Record<string, unknown>
-        const dashData = (dashRoot.data && typeof dashRoot.data === "object" ? dashRoot.data : {}) as Record<string, unknown>
-        const progressObj = (dashData.progress && typeof dashData.progress === "object" ? dashData.progress : {}) as Record<string, unknown>
-        const progressData = (dashData.course_progress && typeof dashData.course_progress === "object" ? dashData.course_progress : dashData) as Record<string, unknown>
-        const modules = (progressData.modules && Array.isArray(progressData.modules) ? progressData.modules : (dashData.modules && Array.isArray(dashData.modules) ? dashData.modules : [])) as Array<Record<string, unknown>>
+    // Check 2: Fetch dashboard data once and use for both completion check and certificate check
+    let derivedAllModulesComplete = false
+    let completedSteps = 0
+    let totalSteps = 0
+    
+    try {
+      const dashRes = await authApi.get(API_PATHS.dashboard.courseById(courseId))
+      const dashRoot = (dashRes.data && typeof dashRes.data === "object" ? dashRes.data : {}) as Record<string, unknown>
+      const dashData = (dashRoot.data && typeof dashRoot.data === "object" ? dashRoot.data : {}) as Record<string, unknown>
+      const progressObj = (dashData.progress && typeof dashData.progress === "object" ? dashData.progress : {}) as Record<string, unknown>
+      const progressData = (dashData.course_progress && typeof dashData.course_progress === "object" ? dashData.course_progress : dashData) as Record<string, unknown>
+      const modules = (progressData.modules && Array.isArray(progressData.modules) ? progressData.modules : (dashData.modules && Array.isArray(dashData.modules) ? dashData.modules : [])) as Array<Record<string, unknown>>
 
-        // Check if all modules and topics are complete
-        if (modules.length > 0) {
-          const allModulesComplete = modules.every((mod: Record<string, unknown>) => {
-            if (!Boolean(mod.completed)) return false
-            const topics = (mod.topics && Array.isArray(mod.topics) ? mod.topics : []) as Array<Record<string, unknown>>
-            return topics.every((t: Record<string, unknown>) => Boolean(t.completed))
-          })
+      // Check if all modules and topics are complete
+      if (modules.length > 0) {
+        derivedAllModulesComplete = modules.every((mod: Record<string, unknown>) => {
+          if (!Boolean(mod.completed)) return false
+          const topics = (mod.topics && Array.isArray(mod.topics) ? mod.topics : []) as Array<Record<string, unknown>>
+          return topics.every((t: Record<string, unknown>) => Boolean(t.completed))
+        })
 
-          // Also check step-based progress (handles quiz completion)
-          const completedSteps = typeof progressObj.completed_steps === "number" ? progressObj.completed_steps : 0
-          const totalSteps = typeof progressObj.total_steps === "number" ? progressObj.total_steps : 0
-          const stepsComplete = totalSteps > 0 && completedSteps >= totalSteps
+        // Also check step-based progress (handles quiz completion)
+        completedSteps = typeof progressObj.completed_steps === "number" ? progressObj.completed_steps : 0
+        totalSteps = typeof progressObj.total_steps === "number" ? progressObj.total_steps : 0
+        const stepsComplete = totalSteps > 0 && completedSteps >= totalSteps
+        
+        // Log dashboard progress for comparison with certificate API
+        console.log('[Track] Dashboard API progress data:', {
+          courseId,
+          completedSteps,
+          totalSteps,
+          percentage: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
+          isCompleted: Boolean(progressObj.is_completed ?? dashData.is_completed),
+          derivedAllModulesComplete,
+          stepsComplete,
+          modulesCount: modules.length,
+          allModulesComplete: modules.every((mod: Record<string, unknown>) => Boolean(mod.completed))
+        })
 
-          if (allModulesComplete && stepsComplete) {
-            isCompleted = true
-            console.log('[Track] Course derived as complete from dashboard modules + steps:', { modules: modules.length, completedSteps, totalSteps })
-          } else if (allModulesComplete) {
-            console.log('[Track] All modules complete but steps incomplete:', { completedSteps, totalSteps, allModulesComplete })
+        if (!isCompleted && derivedAllModulesComplete && stepsComplete) {
+          isCompleted = true
+          console.log('[Track] Course derived as complete from dashboard modules + steps:', { modules: modules.length, completedSteps, totalSteps })
+          setQuizBlockingCompletion(null) // Not blocking if steps are complete
+        } else if (!isCompleted && derivedAllModulesComplete) {
+          console.log('[Track] All modules complete but steps incomplete:', { completedSteps, totalSteps, allModulesComplete: derivedAllModulesComplete })
+          
+          // Check if quiz is blocking completion by checking actual quiz attempts
+          try {
+            // First, get all quizzes for this course
+            const quizzesRes = await assignmentService.courseQuizzes(courseId)
+            const quizzesRoot = (quizzesRes && typeof quizzesRes === "object" ? quizzesRes : {}) as Record<string, unknown>
+            const quizzesData = (quizzesRoot.data && typeof quizzesRoot.data === "object" ? quizzesRoot.data : quizzesRoot) as Record<string, unknown>
+            const quizzes = Array.isArray(quizzesData.quizzes) ? quizzesData.quizzes : []
+            
+            if (quizzes.length > 0) {
+              // Check each quiz's attempts directly using the attempts endpoint
+              let foundBlockingQuiz = false
+              
+              for (const quiz of quizzes) {
+                const quizObj = quiz as Record<string, unknown>
+                const quizId = typeof quizObj.id === "number" ? String(quizObj.id) : String(quizObj.id ?? "")
+                const quizTitle = String(quizObj.title ?? "Quiz")
+                
+                try {
+                  // Check actual attempts for this quiz using the attempts endpoint
+                  console.log('[Track] Checking quiz attempts endpoint:', { 
+                    quizId, 
+                    quizTitle, 
+                    endpoint: `/wp-json/reactapi/v1/quizzes/${quizId}/attempts` 
+                  })
+                  
+                  const attemptsRes = await assignmentService.quizAttempts(quizId)
+                  
+                  // Log full response structure for debugging
+                  console.log('[Track] Quiz attempts API response:', { 
+                    quizId, 
+                    quizTitle,
+                    rawResponse: attemptsRes,
+                    responseType: typeof attemptsRes,
+                    isObject: typeof attemptsRes === "object",
+                    responseKeys: typeof attemptsRes === "object" && attemptsRes !== null ? Object.keys(attemptsRes) : []
+                  })
+                  
+                  const attemptsRoot = (attemptsRes && typeof attemptsRes === "object" ? attemptsRes : {}) as Record<string, unknown>
+                  const attemptsData = (attemptsRoot.data && typeof attemptsRoot.data === "object" ? attemptsRoot.data : attemptsRoot) as Record<string, unknown>
+                  
+                  // Log data structure
+                  console.log('[Track] Quiz attempts data structure:', {
+                    quizId,
+                    quizTitle,
+                    attemptsRootKeys: Object.keys(attemptsRoot),
+                    attemptsDataKeys: Object.keys(attemptsData),
+                    hasAttemptsArray: Array.isArray(attemptsData.attempts),
+                    hasItemsArray: Array.isArray(attemptsData.items),
+                    hasResultsArray: Array.isArray(attemptsData.results),
+                    attemptsDataAttempts: attemptsData.attempts,
+                    attemptsDataItems: attemptsData.items,
+                    attemptsDataResults: attemptsData.results
+                  })
+                  
+                  // Extract attempts array from various possible locations
+                  const attempts = Array.isArray(attemptsData.attempts)
+                    ? attemptsData.attempts
+                    : Array.isArray(attemptsData.items)
+                      ? attemptsData.items
+                      : Array.isArray(attemptsData.results)
+                        ? attemptsData.results
+                        : Array.isArray(attemptsRoot.attempts)
+                          ? attemptsRoot.attempts
+                          : []
+                  
+                  console.log('[Track] Extracted attempts array:', {
+                    quizId,
+                    quizTitle,
+                    attemptsLength: attempts.length,
+                    attempts: attempts
+                  })
+                  
+                  if (attempts.length === 0) {
+                    // This quiz has no attempts — it's blocking completion
+                    setQuizBlockingCompletion({ quizId, quizTitle })
+                    foundBlockingQuiz = true
+                    console.log('[Track] ✅ Quiz blocking completion — no attempts found:', { 
+                      quizId, 
+                      quizTitle, 
+                      attemptsEndpoint: `/wp-json/reactapi/v1/quizzes/${quizId}/attempts`,
+                      fullResponse: attemptsRes
+                    })
+                    break // Found a blocking quiz, no need to check others
+                  } else {
+                    console.log('[Track] ✅ Quiz has attempts — not blocking:', { 
+                      quizId, 
+                      quizTitle, 
+                      attemptsCount: attempts.length,
+                      firstAttempt: attempts[0]
+                    })
+                  }
+                } catch (attemptErr: any) {
+                  // Failed to check attempts for this quiz — log full error details
+                  console.error('[Track] ❌ Failed to check quiz attempts:', { 
+                    quizId, 
+                    quizTitle, 
+                    endpoint: `/wp-json/reactapi/v1/quizzes/${quizId}/attempts`,
+                    error: attemptErr,
+                    errorMessage: attemptErr?.message,
+                    errorResponse: attemptErr?.response?.data,
+                    errorStatus: attemptErr?.response?.status
+                  })
+                  setQuizBlockingCompletion({ quizId, quizTitle })
+                  foundBlockingQuiz = true
+                  break
+                }
+              }
+              
+              if (!foundBlockingQuiz) {
+                // All quizzes have attempts — not blocking
+                setQuizBlockingCompletion(null)
+                console.log('[Track] All quizzes have attempts — course completion not blocked by quiz')
+              }
+            } else {
+              // No quizzes found — not blocking
+              setQuizBlockingCompletion(null)
+            }
+          } catch {
+            // Quiz check failed — don't set blocking state
+            setQuizBlockingCompletion(null)
           }
         }
-      } catch {
-        // Dashboard check failed — rely on is_completed flag only
       }
+    } catch {
+      // Dashboard check failed — rely on is_completed flag only
     }
 
     setCourse((prev: any) => (prev ? ({ ...prev, course: { ...(prev.course ?? {}), is_completed: isCompleted } }) : prev))
     setIsCourseCompletedByApi(isCompleted)
 
     // Check certificate availability from API
+    // Also consider derived completion (all modules complete) for UI purposes
     try {
       const certResponse = await certificatesService.getCourseCertificate(courseId)
       const certRoot = (certResponse && typeof certResponse === "object" ? certResponse : {}) as Record<string, unknown>
       const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
-      const available = Boolean(certRoot.success) && Boolean(certData.certificate_url || certData.certificateUrl)
+      
+      // Log certificate API response for debugging
+      console.log('[Track] Certificate API response:', {
+        courseId,
+        certSuccess: certRoot.success,
+        certMessage: certRoot.message,
+        certData,
+        certDataKeys: Object.keys(certData),
+        certProgress: certData.progress,
+        certIsCompleted: certData.is_completed,
+        dashboardProgress: { completedSteps, totalSteps, percentage: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0 },
+        derivedAllModulesComplete,
+        mismatch: {
+          dashboardShows: `${completedSteps}/${totalSteps}`,
+          certificateShows: certData.progress ? `${(certData.progress as Record<string, unknown>).completed}/${(certData.progress as Record<string, unknown>).total}` : 'N/A',
+          certificateIsCompleted: certData.is_completed,
+          dashboardIsCompleted: isCompleted
+        }
+      })
+      
+      const apiAvailable = Boolean(certRoot.success) && Boolean(certData.certificate_url || certData.certificateUrl)
+      
+      // Show certificate button if API says available OR if all modules are complete (even if API hasn't processed it yet)
+      const available = apiAvailable || derivedAllModulesComplete
       setIsCertificateAvailable(available)
-      if (available) {
+      
+      if (apiAvailable) {
         setCertificateUrl(pickString(certData.certificate_url ?? certData.certificateUrl, ""))
         setCertificateDownloadUrl(pickString(certData.download_url ?? certData.downloadUrl, ""))
+      } else if (derivedAllModulesComplete) {
+        // All modules complete but API hasn't generated certificate yet — clear URLs so button fetches on click
+        setCertificateUrl("")
+        setCertificateDownloadUrl("")
+      } else {
+        setCertificateUrl("")
+        setCertificateDownloadUrl("")
       }
-    } catch {
-      setIsCertificateAvailable(false)
+    } catch (certErr: any) {
+      // Log certificate API error
+      console.error('[Track] Certificate API error:', {
+        courseId,
+        error: certErr,
+        errorMessage: certErr?.message,
+        errorResponse: certErr?.response?.data,
+        errorStatus: certErr?.response?.status,
+        dashboardProgress: { completedSteps, totalSteps, percentage: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0 },
+        derivedAllModulesComplete
+      })
+      
+      // If API call fails but all modules are complete, still show button (will fetch on click)
+      setIsCertificateAvailable(derivedAllModulesComplete)
+      if (!derivedAllModulesComplete) {
+        setCertificateUrl("")
+        setCertificateDownloadUrl("")
+      }
     }
 
     return isCompleted
@@ -1373,25 +1582,10 @@ export default function CoursePlayerPage() {
     setShowResults(true)
     setAssessmentCompleted(isPassed)
 
-    // Mark quiz completion via progress endpoint (backend doesn't have a dedicated quiz submission endpoint)
-    // This tells LearnDash the quiz step is complete, which is required for course completion
-    if (isPassed && selectedQuizId) {
-      try {
-        const quizIdNum = typeof selectedQuizId === "string" ? parseInt(selectedQuizId, 10) : selectedQuizId
-        if (!isNaN(quizIdNum) && quizIdNum > 0) {
-          // Use progress endpoint to mark quiz as complete
-          await coursesService.trackProgress(courseId, {
-            quiz_id: quizIdNum,
-            progress_percentage: 100,
-            completed: true,
-          })
-          console.log('[Quiz] Quiz marked complete via progress endpoint:', { quizId: selectedQuizId, score: Math.round(scorePercValue) })
-        }
-      } catch (err) {
-        // Progress tracking failed — log but don't block the UI
-        console.warn('[Quiz] Failed to mark quiz complete via progress:', err)
-      }
-    }
+    // Note: Quiz completion cannot be marked via API — the backend has no quiz submission endpoint
+    // and the progress endpoint doesn't accept quiz_id. The quiz step must be completed through
+    // LearnDash's native interface for the backend to recognize completion.
+    // The frontend will still show completion based on derived logic (all modules complete).
   }
 
   const handleRetry = () => {
@@ -1452,27 +1646,43 @@ export default function CoursePlayerPage() {
 
     setIsSubmittingFeedback(true)
     try {
-      // Check derived completion first (all modules complete)
-      const derivedCompleted = await checkCompletionAndCertificate()
-      
-      // If backend says not complete but all modules are done, try submitting anyway
-      // (backend may need a moment to process quiz completion)
+      // Check if all modules are complete (even if quiz step isn't tracked)
+      let allModulesComplete = false
       try {
-        await coursesService.saveFeedback(courseId, {
-          ratings: {
-            overall: ratings[0] ?? 0,
-            content_quality: ratings[1] ?? 0,
-            instructor_effectiveness: ratings[2] ?? 0,
-            difficulty_level: ratings[3] ?? 0,
-            time_commitment: ratings[4] ?? 0,
-            materials_quality: ratings[5] ?? 0,
-            support: ratings[6] ?? 0,
-            relevance: ratings[7] ?? 0,
-          },
-          comment: feedbackComment.trim() || "",
-        })
+        const dashRes = await authApi.get(API_PATHS.dashboard.courseById(courseId))
+        const dashRoot = (dashRes.data && typeof dashRes.data === "object" ? dashRes.data : {}) as Record<string, unknown>
+        const dashData = (dashRoot.data && typeof dashRoot.data === "object" ? dashRoot.data : {}) as Record<string, unknown>
+        const progressData = (dashData.course_progress && typeof dashData.course_progress === "object" ? dashData.course_progress : dashData) as Record<string, unknown>
+        const modules = (progressData.modules && Array.isArray(progressData.modules) ? progressData.modules : (dashData.modules && Array.isArray(dashData.modules) ? dashData.modules : [])) as Array<Record<string, unknown>>
 
-        setFeedbackSubmitted(true)
+        if (modules.length > 0) {
+          allModulesComplete = modules.every((mod: Record<string, unknown>) => {
+            if (!Boolean(mod.completed)) return false
+            const topics = (mod.topics && Array.isArray(mod.topics) ? mod.topics : []) as Array<Record<string, unknown>>
+            return topics.every((t: Record<string, unknown>) => Boolean(t.completed))
+          })
+        }
+      } catch {
+        // Dashboard check failed — will try submission anyway
+      }
+
+      // Try submitting feedback
+    try {
+      await coursesService.saveFeedback(courseId, {
+        ratings: {
+          overall: ratings[0] ?? 0,
+          content_quality: ratings[1] ?? 0,
+          instructor_effectiveness: ratings[2] ?? 0,
+          difficulty_level: ratings[3] ?? 0,
+          time_commitment: ratings[4] ?? 0,
+          materials_quality: ratings[5] ?? 0,
+          support: ratings[6] ?? 0,
+          relevance: ratings[7] ?? 0,
+        },
+        comment: feedbackComment.trim() || "",
+      })
+
+      setFeedbackSubmitted(true)
 
         // Sync any remaining incomplete modules
         await syncIncompleteModules()
@@ -1487,14 +1697,17 @@ export default function CoursePlayerPage() {
         // Backend rejected feedback submission
         const errorMsg = submitErr?.response?.data?.message || submitErr?.message || ""
         if (errorMsg.includes("Course must be completed") || errorMsg.includes("not completed")) {
-          // All modules are complete but backend hasn't processed it yet
-          if (derivedCompleted) {
-            setFeedbackSubmitError("All course content is complete, but the backend is still processing completion. Please wait a moment and try again, or complete the quiz if you haven't already.")
-          } else {
-            setFeedbackSubmitError("Please complete all course content (including the quiz) before submitting feedback.")
-          }
+          if (allModulesComplete) {
+            // All modules complete but quiz step isn't tracked (backend limitation)
+            const quizMsg = quizBlockingCompletion
+              ? `The quiz "${quizBlockingCompletion.quizTitle}" must be completed through LearnDash's native interface for the backend to recognize course completion. Please complete the quiz in LearnDash and try again.`
+              : "The quiz step needs to be completed through LearnDash's native interface for the backend to recognize completion. Please complete the quiz in LearnDash and try again, or contact support if you've already completed it."
+            setFeedbackSubmitError(quizMsg)
+      } else {
+            setFeedbackSubmitError("Please complete all course content (including all lessons, topics, and the quiz) before submitting feedback.")
+      }
         } else {
-          setFeedbackSubmitError("Unable to submit feedback right now. Please try again.")
+      setFeedbackSubmitError("Unable to submit feedback right now. Please try again.")
         }
       }
     } catch {
@@ -2248,6 +2461,26 @@ export default function CoursePlayerPage() {
         </div>
       </div>
 
+      {/* Quiz Blocking Completion Warning */}
+      {quizBlockingCompletion && (
+        <div className="bg-amber-50 border-amber-200 border rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-base sm:text-lg font-bold text-amber-800 mb-2">
+                Quiz Required for Certificate
+              </h3>
+              <p className="text-amber-700 text-xs sm:text-sm mb-3">
+                All course content is complete, but the quiz <strong>"{quizBlockingCompletion.quizTitle}"</strong> must be completed through LearnDash's native interface for the backend to recognize course completion and generate your certificate.
+              </p>
+              <p className="text-amber-700 text-xs sm:text-sm">
+                <strong>Next step:</strong> Complete the quiz in LearnDash, then return here to view your certificate. The quiz completion cannot be recorded through this custom interface.
+              </p>
+          </div>
+        </div>
+      </div>
+      )}
+
       {/* Certificate & Actions */}
       <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
         <h3 className="text-purple-600 font-semibold text-sm sm:text-base mb-3">Next Steps</h3>
@@ -2276,10 +2509,20 @@ export default function CoursePlayerPage() {
                   if (dlUrl) setCertificateDownloadUrl(dlUrl)
                   window.open(url, '_blank')
                 } else {
-                  alert("Certificate is not available from the API yet. The backend may still be processing your completion.")
+                  const errorMsg = typeof certRoot.message === "string" ? certRoot.message : ""
+                  if (errorMsg.includes("not completed")) {
+                    alert("Certificate is not available yet. The quiz step needs to be completed through LearnDash's native interface for the backend to recognize course completion. Please complete the quiz in LearnDash and try again.")
+                  } else {
+                    alert("Certificate is not available from the API yet. The backend may still be processing your completion.")
+                  }
                 }
-              } catch {
-                alert("Unable to fetch certificate. Please try again later.")
+              } catch (err: any) {
+                const errorMsg = err?.response?.data?.message || err?.message || ""
+                if (errorMsg.includes("not completed")) {
+                  alert("Certificate is not available yet. The quiz step needs to be completed through LearnDash's native interface for the backend to recognize course completion. Please complete the quiz in LearnDash and try again.")
+                } else {
+                  alert("Unable to fetch certificate. Please try again later.")
+                }
               }
             }}
             className="px-3 sm:px-4 py-2.5 sm:py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-xs sm:text-sm"

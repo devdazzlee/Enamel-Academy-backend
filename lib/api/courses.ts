@@ -456,7 +456,7 @@ const normalizeCourses = (raw: unknown): ApiCourse[] => {
   // Check if it's a single course or array of courses
   const courses = data.courses as unknown[];
   if (!Array.isArray(courses)) {
-    // Handle single course case (for details endpoint)
+    // Handle single course case (for details endpoint - standard API structure)
     const course = data.course as Record<string, unknown>;
     if (!course || typeof course !== "object") return [];
 
@@ -478,12 +478,19 @@ const normalizeCourses = (raw: unknown): ApiCourse[] => {
     if (typeof duration === "string" && duration.length > 0) result.duration = duration;
     const category = (course.difficulty as string | undefined);
     if (typeof category === "string" && category.length > 0) result.category = category;
+    
     const progress = ((course.user_progress as Record<string, unknown>)?.percentage as number | undefined);
     if (typeof progress === "number") result.progress = progress;
+    
     const enrolled = (course.is_enrolled as boolean | undefined);
     if (typeof enrolled === "boolean") result.enrolled = enrolled;
+    
+    const completed = (course.is_completed as boolean | undefined);
+    if (typeof completed === "boolean") result.completed = completed;
+    
     const lessons = (course.total_topics as number | undefined);
     if (typeof lessons === "number") result.lessons = lessons;
+    
     const rating = (course.rating as number | undefined);
     if (typeof rating === "number") result.rating = rating;
     const instructor = ((course.instructor as Record<string, unknown>)?.name as string | undefined);
@@ -604,36 +611,13 @@ export const coursesService = {
   },
 
   async details(idOrSlug: string): Promise<ApiCourse | null> {
-    // Use enhanced dashboard endpoint for more data
-    // Check if it's numeric ID or slug
+    // Use standard endpoint
     const isNumericId = /^\d+$/.test(idOrSlug);
-    if (isNumericId) {
-      // Use enhanced endpoint for numeric IDs
-      const response = await authApi.get(API_PATHS.dashboard.courseById(idOrSlug));
-      const normalized = normalizeCourses(response.data);
-      return normalized[0] ?? null;
-    } else {
-      // For slugs, first get the course ID, then use enhanced endpoint
-      const slugResponse = await authApi.get(API_PATHS.courses.details, {
-        params: { slug: idOrSlug },
-      });
-      const slugNormalized = normalizeCourses(slugResponse.data);
-      const course = slugNormalized[0] ?? null;
-      
-      // If we got a course with an ID, fetch enhanced data
-      if (course?.id) {
-        try {
-          const enhancedResponse = await authApi.get(API_PATHS.dashboard.courseById(course.id));
-          const enhancedNormalized = normalizeCourses(enhancedResponse.data);
-          return enhancedNormalized[0] ?? course;
-        } catch {
-          // If enhanced fails, return the standard course data
-          return course;
-        }
-      }
-      
-      return course;
-    }
+    const response = await authApi.get(API_PATHS.courses.details, {
+      params: isNumericId ? { id: idOrSlug } : { slug: idOrSlug },
+    });
+    const normalized = normalizeCourses(response.data);
+    return normalized[0] ?? null;
   },
 
   async detailsBySlug(slug: string): Promise<ApiCourse | null> {

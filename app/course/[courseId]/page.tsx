@@ -337,7 +337,7 @@ export default function CoursePlayerPage() {
         setAssessmentMetaError("")
         const optionalApiErrors: string[] = []
         const [courseResponse, assessmentsResponse, assignmentsResponse, quizzesResponse, quizStatsResponse, assignmentStatsResponse] = await Promise.all([
-          authApi.get(API_PATHS.dashboard.courseById(courseId)),
+          authApi.get(API_PATHS.courses.details, { params: { id: courseId } }),
           assignmentService.courseAssessments(courseId).catch((error) => {
             optionalApiErrors.push(getApiErrorMessage(error))
             return null

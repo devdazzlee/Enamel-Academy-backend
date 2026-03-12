@@ -260,10 +260,18 @@ export function CourseDetailClient() {
       setLoading(true)
       try {
         const isNumericId = /^\d+$/.test(courseIdOrSlug)
+        // Fetch full API response to get curriculum, related_courses, instructor, etc.
+        const fullResponse = await authApi.get(API_PATHS.courses.details, {
+          params: isNumericId ? { id: courseIdOrSlug } : { slug: courseIdOrSlug },
+        })
+        if (!alive) return
+        
+        // Get normalized course for compatibility
         const data = isNumericId
           ? await coursesService.details(courseIdOrSlug)
           : await coursesService.detailsBySlug(courseIdOrSlug)
         if (!alive) return
+        
         setEnrollConfirmedByAction(false)
         setCourse(data)
         setIsEnrolled(Boolean((data as any)?.enrolled ?? (data as any)?.is_enrolled))
@@ -282,24 +290,10 @@ export function CourseDetailClient() {
             }
           }
         }
-        // Store the full API response to access curriculum and related courses
-        // Use enhanced endpoint for more data
-        if (data?.id !== undefined && data?.id !== null) {
-          try {
-            const enhancedResponse = await authApi.get(API_PATHS.dashboard.courseById(data.id))
-            if (enhancedResponse.data && alive) {
-              // Use enhanced response data
-              const enhancedData = enhancedResponse.data?.data ?? enhancedResponse.data
-              setCourseData(enhancedData)
-            }
-          } catch {
-            // If enhanced fails, use the course data we already have
-            if (data && alive) {
-              setCourseData(data as any)
-            }
-          }
-        } else if (data && alive) {
-          setCourseData(data as any)
+        // Store the full API response to access curriculum, related_courses, instructor, etc.
+        if (fullResponse.data && alive) {
+          const apiData = fullResponse.data?.data ?? fullResponse.data
+          setCourseData(apiData as any)
         }
       } catch (e) {
         if (!alive) return
@@ -494,14 +488,25 @@ export function CourseDetailClient() {
     )
   }
 
+  const apiCourse = courseData?.course ?? {};
+  const learningObjectives = apiCourse.learning_objectives ?? [];
+  const requirements = apiCourse.requirements ?? [];
+  const prerequisites = apiCourse.prerequisites ?? [];
+  const targetAudience = apiCourse.target_audience ?? [];
+  
+  // Standard API uses 'curriculum' - define before calculateTotalDuration
+  const curriculum = courseData?.curriculum ?? [];
+
   // Calculate total duration from curriculum topics
   const calculateTotalDuration = (): string | null => {
-    if (!courseData?.curriculum) return null;
+    if (curriculum.length === 0) {
+      return (courseData?.course as any)?.duration ?? null;
+    }
     
     let totalMinutes = 0;
-    courseData.curriculum.forEach((lesson: CurriculumSection) => {
+    curriculum.forEach((lesson: any) => {
       if (lesson.topics && lesson.topics.length > 0) {
-        lesson.topics.forEach((topic: CurriculumTopic) => {
+        lesson.topics.forEach((topic: any) => {
           if (topic.duration && topic.duration.includes('min')) {
             const minutes = parseInt(topic.duration.replace('min', '').trim());
             if (!isNaN(minutes)) {
@@ -512,7 +517,7 @@ export function CourseDetailClient() {
       }
     });
     
-    if (totalMinutes === 0) return courseData.course?.duration ?? null;
+    if (totalMinutes === 0) return (courseData?.course as any)?.duration ?? null;
     
     if (totalMinutes < 60) {
       return `${totalMinutes} minutes`;
@@ -526,17 +531,10 @@ export function CourseDetailClient() {
   const durationLabel = calculateTotalDuration()
   const courseStats = [
     durationLabel ? { icon: <Clock />, value: durationLabel, label: "Duration" } : null,
-    courseData?.curriculum?.length ? { icon: <BookOpen />, value: `${courseData.curriculum.length} Lessons`, label: "Content" } : null,
+    curriculum.length > 0 ? { icon: <BookOpen />, value: `${curriculum.length} Lessons`, label: "Content" } : null,
     course.students_count ? { icon: <Users />, value: String(course.students_count), label: "Students" } : null,
     courseData?.course?.cpd_points ? { icon: <Award />, value: `${courseData.course.cpd_points} CPD`, label: "Points" } : null,
   ].filter(Boolean) as Array<{ icon: React.ReactNode; value: string; label: string }>
-
-  const apiCourse = courseData?.course ?? {};
-  const learningObjectives = apiCourse.learning_objectives ?? [];
-  const requirements = apiCourse.requirements ?? [];
-  const prerequisites = apiCourse.prerequisites ?? [];
-  const targetAudience = apiCourse.target_audience ?? [];
-  const curriculum = courseData?.curriculum ?? [];
   const relatedCourses = courseData?.related_courses ?? [];
   const instructor = courseData?.instructor ?? null;
   const featureIncludes = (apiCourse.features ?? [])
@@ -557,11 +555,15 @@ export function CourseDetailClient() {
   // Access settings directly from courseData to ensure we get it even if type checking is strict
   const settingsFromCourse = (courseData?.course as any)?.settings;
   const settingsDescription = sanitizeApiText(settingsFromCourse?.short_description ?? apiCourse.settings?.short_description ?? "", "");
-  const mainDescription = sanitizeApiText(
-    apiCourse.description ?? (course as any).description ?? "",
-    ""
-  );
-  const descriptionText = settingsDescription || mainDescription || "No description returned by API.";
+  // Standard API: description is in courseData.course.description (may contain HTML)
+  const mainDescriptionRaw = apiCourse.description ?? (courseData?.course as any)?.description ?? (course as any).description ?? "";
+  const mainDescription = typeof mainDescriptionRaw === 'string' && mainDescriptionRaw.trim() 
+    ? mainDescriptionRaw 
+    : "";
+  // Use raw HTML if available, otherwise use sanitized text
+  const descriptionHtml = mainDescription || settingsDescription || "";
+  const descriptionText = descriptionHtml || "No description returned by API.";
+  const hasDescriptionHtml = descriptionHtml && descriptionHtml !== "No description returned by API." && descriptionHtml.includes('<');
   const difficultyLabel = sanitizeApiText(apiCourse.difficulty ?? (course as any).level ?? "", "");
   const formatLabel = sanitizeApiText(apiCourse.format ?? "", "");
   const planLabel = sanitizeApiText(apiCourse.plan ?? "", "");
@@ -572,6 +574,7 @@ export function CourseDetailClient() {
   const tagNames = (apiCourse.tags ?? [])
     .map((item) => sanitizeApiText(item?.name, ""))
     .filter(Boolean);
+  // Get progress from enhanced API: data.progress.overall_percentage
   const hasInProgressSignal =
     toNumber(apiCourse.user_progress?.percentage) > 0
     || toNumber(dashboardDetail?.progress.overallPercentage) > 0
@@ -631,9 +634,16 @@ export function CourseDetailClient() {
             {/* About This Course */}
             <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 border border-gray-200">
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">About This Course</h2>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                {descriptionText}
-              </p>
+              {hasDescriptionHtml ? (
+                <div 
+                  className="text-gray-600 text-sm leading-relaxed prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+                />
+              ) : (
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {descriptionText}
+                </p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
                 {difficultyLabel && (
                 <div className="flex items-center gap-2 text-gray-600">
@@ -710,8 +720,8 @@ export function CourseDetailClient() {
                 <div className="text-gray-700">Completion Status: <span className="font-medium">{apiCourse.is_completed ? "Completed" : "In progress"}</span></div>
                 <div className="text-gray-700">Enrolled On: <span className="font-medium">{formatDate(apiCourse.enrollment_date)}</span></div>
                 <div className="text-gray-700">Progress Status: <span className="font-medium">{sanitizeApiText(apiCourse.user_progress?.status, "not-started")}</span></div>
-                <div className="text-gray-700">User Progress: <span className="font-medium">{toNumber(apiCourse.user_progress?.percentage)}%</span></div>
-                <div className="text-gray-700">Completed Steps: <span className="font-medium">{toNumber(apiCourse.user_progress?.completed)} / {toNumber(apiCourse.user_progress?.total)}</span></div>
+                <div className="text-gray-700">User Progress: <span className="font-medium">{toNumber(apiCourse.user_progress?.percentage) ?? 0}%</span></div>
+                <div className="text-gray-700">Completed Steps: <span className="font-medium">{toNumber(apiCourse.user_progress?.completed) ?? 0} / {toNumber(apiCourse.user_progress?.total) ?? 0}</span></div>
                 {dashboardDetail && (
                   <>
                     <div className="text-gray-700">Dashboard Progress: <span className="font-medium">{dashboardDetail.progress.overallPercentage}%</span></div>

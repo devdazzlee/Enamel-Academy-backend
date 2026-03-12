@@ -187,16 +187,57 @@ export default function CPDActivitiesLog() {
     }, {});
     return Object.entries(grouped).map(([name, hours]) => ({ name, hours }));
   }, [activities]);
+  // Default GDC Categories
+  const defaultGdcCategories = [
+    'Clinical',
+    'Management & Leadership',
+    'Communication',
+    'Professionalism',
+    'Research & Audit',
+    'Education & Training'
+  ];
+
+  // Default Activity Types
+  const defaultActivityTypes = [
+    'Course',
+    'Workshop',
+    'Conference',
+    'Webinar',
+    'Reading',
+    'Peer Review'
+  ];
+
   const categoryOptions = useMemo(
-    () => apiCategoryOptions,
+    () => {
+      const combined = Array.from(new Set([...defaultGdcCategories, ...apiCategoryOptions]));
+      return combined.length > 0 ? combined : defaultGdcCategories;
+    },
     [apiCategoryOptions]
   );
   const typeOptions = useMemo(
-    () => apiTypeOptions,
+    () => {
+      const combined = Array.from(new Set([...defaultActivityTypes, ...apiTypeOptions]));
+      return combined.length > 0 ? combined : defaultActivityTypes;
+    },
     [apiTypeOptions]
   );
+  // Default Years (current year and previous 5 years)
+  const getDefaultYears = () => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = 0; i <= 5; i++) {
+      years.push(String(currentYear - i));
+    }
+    return years;
+  };
+
   const yearOptions = useMemo(
-    () => Array.from(new Set(activities.map((a) => getActivityYear(a.date)).filter(Boolean))).sort((a, b) => Number(b) - Number(a)),
+    () => {
+      const activityYears = Array.from(new Set(activities.map((a) => getActivityYear(a.date)).filter(Boolean)));
+      const defaultYears = getDefaultYears();
+      const combined = Array.from(new Set([...defaultYears, ...activityYears])).sort((a, b) => Number(b) - Number(a));
+      return combined.length > 0 ? combined : defaultYears;
+    },
     [activities]
   );
 

@@ -102,7 +102,7 @@ export default function CoursePlay() {
       setLoading(true);
       setLoadError('');
       try {
-        const response = await authApi.get(API_PATHS.courses.details, { params: { id: courseId } });
+        const response = await authApi.get(API_PATHS.dashboard.courseById(courseId));
         if (!alive) return;
         const data = response.data as Record<string, unknown>;
         const courseData = (data?.data && typeof data.data === 'object' ? data.data : data) as Record<string, unknown>;

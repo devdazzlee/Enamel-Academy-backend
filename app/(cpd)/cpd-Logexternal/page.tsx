@@ -197,8 +197,35 @@ export default function LogExternalCPD() {
     return () => { alive = false; };
   }, []);
 
-  const categories = useMemo(() => gdcCategories, [gdcCategories]);
-  const typeOptions = useMemo(() => activityTypes, [activityTypes]);
+  // Default GDC Categories
+  const defaultGdcCategories = [
+    'Clinical',
+    'Management & Leadership',
+    'Communication',
+    'Professionalism',
+    'Research & Audit',
+    'Education & Training'
+  ];
+
+  // Default Activity Types
+  const defaultActivityTypes = [
+    'Course',
+    'Workshop',
+    'Conference',
+    'Webinar',
+    'Reading',
+    'Peer Review'
+  ];
+
+  const categories = useMemo(() => {
+    const combined = Array.from(new Set([...defaultGdcCategories, ...gdcCategories]));
+    return combined.length > 0 ? combined : defaultGdcCategories;
+  }, [gdcCategories]);
+
+  const typeOptions = useMemo(() => {
+    const combined = Array.from(new Set([...defaultActivityTypes, ...activityTypes]));
+    return combined.length > 0 ? combined : defaultActivityTypes;
+  }, [activityTypes]);
   const parseDateValue = (value: string) => {
     if (!value) return undefined;
     const parsed = new Date(value);
@@ -218,7 +245,7 @@ export default function LogExternalCPD() {
 
     setIsSubmitting(true);
     try {
-      await cpdService.logExternal({
+      const payload = {
         title: formData.activityTitle,
         provider: formData.provider,
         date_completed: formData.dateCompleted,
@@ -229,7 +256,15 @@ export default function LogExternalCPD() {
         reflection: formData.reflection,
         apply_learning: formData.application,
         evidence: evidenceFile,
+      };
+      
+      // Log the payload for debugging (excluding file)
+      console.log('CPD Log External - Sending data:', {
+        ...payload,
+        evidence: evidenceFile ? `File: ${evidenceFile.name} (${evidenceFile.size} bytes)` : 'No file'
       });
+      
+      await cpdService.logExternal(payload);
       setSubmitSuccess("External CPD logged successfully.");
       setFormData({
         activityTitle: '',

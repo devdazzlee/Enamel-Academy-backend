@@ -69,6 +69,22 @@ export default function CertificatesPage() {
   const [isHtmlModalOpen, setIsHtmlModalOpen] = useState(false)
   const [htmlModalTitle, setHtmlModalTitle] = useState("")
   const [isLoadingCertHtml, setIsLoadingCertHtml] = useState(false)
+  const [certificateDetails, setCertificateDetails] = useState<{
+    certificate_id: string;
+    certificate_title: string;
+    certificate_content: string;
+    certificate_excerpt: string;
+    certificate_options: {
+      pdf_page_format: string;
+      pdf_page_orientation: string;
+    };
+    certificate_url: string;
+    download_url: string;
+    is_completed: boolean;
+    completion_date: string | null;
+    course_title: string;
+    user_name: string;
+  } | null>(null)
 
   // Fetch current user ID for verification
   useEffect(() => {
@@ -211,6 +227,18 @@ export default function CertificatesPage() {
         case "score":
           compareValue = a.score - b.score
           break
+        case "type":
+          compareValue = a.type.localeCompare(b.type)
+          break
+        case "format":
+          compareValue = a.format.localeCompare(b.format)
+          break
+        case "status":
+          compareValue = a.status.localeCompare(b.status)
+          break
+        case "instructor":
+          compareValue = a.instructor.localeCompare(b.instructor)
+          break
         default:
           compareValue = 0
       }
@@ -314,19 +342,70 @@ export default function CertificatesPage() {
             return
           }
 
+    if (!certificate.courseId) {
+      setActionError("Course ID not available.")
+            setViewingCertId(null)
+      setIsLoadingCertHtml(false)
+            return
+          }
+
     try {
-      const url = certificate.certificateUrl
-      if (!url || url === "#") {
-            setActionError("Certificate URL not available.")
+      // Fetch certificate details from API endpoint
+      const certResponse = await certificatesService.getCourseCertificate(certificate.courseId)
+      const certRoot = (certResponse && typeof certResponse === "object" ? certResponse : {}) as Record<string, unknown>
+      const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
+      
+      // Get certificate URL from API response
+      const certificateUrl = typeof certData.certificate_url === "string" 
+        ? certData.certificate_url 
+        : typeof certData.certificateUrl === "string"
+        ? certData.certificateUrl
+        : null
+
+      if (!certificateUrl) {
+        setActionError("Certificate URL not available from API.")
         setViewingCertId(null)
         setIsLoadingCertHtml(false)
         return
       }
 
-      // Fetch certificate HTML and display in modal
-      const html = await fetchCertificateHtml(url)
-      setCertificateHtml(html)
-      setHtmlModalTitle(certificate.title)
+      // Get certificate title from API response
+      const certTitle = typeof certData.certificate_title === "string"
+        ? certData.certificate_title
+        : typeof certData.certificateTitle === "string"
+        ? certData.certificateTitle
+        : typeof certData.course_title === "string"
+        ? certData.course_title
+        : certificate.title
+
+      // Store certificate details from API
+      const certDetails = {
+        certificate_id: typeof certData.certificate_id === "string" || typeof certData.certificate_id === "number"
+          ? String(certData.certificate_id)
+          : "",
+        certificate_title: typeof certData.certificate_title === "string" ? certData.certificate_title : "",
+        certificate_content: typeof certData.certificate_content === "string" ? certData.certificate_content : "",
+        certificate_excerpt: typeof certData.certificate_excerpt === "string" ? certData.certificate_excerpt : "",
+        certificate_options: (certData.certificate_options && typeof certData.certificate_options === "object")
+          ? {
+              pdf_page_format: typeof (certData.certificate_options as Record<string, unknown>).pdf_page_format === "string"
+                ? (certData.certificate_options as Record<string, unknown>).pdf_page_format as string
+                : "LETTER",
+              pdf_page_orientation: typeof (certData.certificate_options as Record<string, unknown>).pdf_page_orientation === "string"
+                ? (certData.certificate_options as Record<string, unknown>).pdf_page_orientation as string
+                : "L",
+            }
+          : { pdf_page_format: "LETTER", pdf_page_orientation: "L" },
+        certificate_url: certificateUrl,
+        download_url: typeof certData.download_url === "string" ? certData.download_url : certificateUrl,
+        is_completed: typeof certData.is_completed === "boolean" ? certData.is_completed : true,
+        completion_date: typeof certData.completion_date === "string" ? certData.completion_date : null,
+        course_title: typeof certData.course_title === "string" ? certData.course_title : "",
+        user_name: typeof certData.user_name === "string" ? certData.user_name : "",
+      }
+      
+      setCertificateDetails(certDetails)
+      setHtmlModalTitle(certTitle)
       setIsHtmlModalOpen(true)
       } catch (error) {
         console.error("Error viewing certificate:", error)
@@ -347,66 +426,238 @@ export default function CertificatesPage() {
       return
     }
 
-    try {
-      // Determine the URL to fetch HTML from
-      const url = certificate.downloadUrl && certificate.downloadUrl !== ""
-        ? certificate.downloadUrl
-        : certificate.certificateUrl
-
-      if (!url || url === "#") {
-        setActionError("Download URL not available.")
+    if (!certificate.courseId) {
+      setActionError("Course ID not available.")
         setDownloadingCertId(null)
         return
       }
       
-      // Fetch HTML from the download URL via proxy (images are inlined as base64)
-      const html = await fetchCertificateHtml(url)
+    try {
+      // Fetch certificate details from API endpoint
+      const certResponse = await certificatesService.getCourseCertificate(certificate.courseId)
+      const certRoot = (certResponse && typeof certResponse === "object" ? certResponse : {}) as Record<string, unknown>
+      const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
+      
+      // Get certificate title from API response for filename
+      const certTitle = typeof certData.certificate_title === "string"
+        ? certData.certificate_title
+        : typeof certData.certificateTitle === "string"
+        ? certData.certificateTitle
+        : typeof certData.course_title === "string"
+        ? certData.course_title
+        : title
 
-      // Create a hidden container to render the HTML for capture
+      // Store certificate details (same as view)
+      const certDetails = {
+        certificate_id: typeof certData.certificate_id === "string" || typeof certData.certificate_id === "number"
+          ? String(certData.certificate_id)
+          : "",
+        certificate_title: typeof certData.certificate_title === "string" ? certData.certificate_title : "",
+        certificate_content: typeof certData.certificate_content === "string" ? certData.certificate_content : "",
+        certificate_excerpt: typeof certData.certificate_excerpt === "string" ? certData.certificate_excerpt : "",
+        certificate_options: (certData.certificate_options && typeof certData.certificate_options === "object")
+          ? {
+              pdf_page_format: typeof (certData.certificate_options as Record<string, unknown>).pdf_page_format === "string"
+                ? (certData.certificate_options as Record<string, unknown>).pdf_page_format as string
+                : "LETTER",
+              pdf_page_orientation: typeof (certData.certificate_options as Record<string, unknown>).pdf_page_orientation === "string"
+                ? (certData.certificate_options as Record<string, unknown>).pdf_page_orientation as string
+                : "L",
+            }
+          : { pdf_page_format: "LETTER", pdf_page_orientation: "L" },
+        certificate_url: typeof certData.certificate_url === "string" ? certData.certificate_url : "",
+        download_url: typeof certData.download_url === "string" ? certData.download_url : "",
+        is_completed: typeof certData.is_completed === "boolean" ? certData.is_completed : true,
+        completion_date: typeof certData.completion_date === "string" ? certData.completion_date : null,
+        course_title: typeof certData.course_title === "string" ? certData.course_title : "",
+        user_name: typeof certData.user_name === "string" ? certData.user_name : "",
+      }
+
+      // Determine PDF page dimensions
+      const isLandscape = certDetails.certificate_options.pdf_page_orientation === "L"
+      const isA4 = certDetails.certificate_options.pdf_page_format === "A4"
+      
+      // PDF page dimensions in mm
+      // Letter: 8.5" x 11" = 215.9mm x 279.4mm
+      // A4: 210mm x 297mm
+      const pdfWidthMM = isA4 ? (isLandscape ? 297 : 210) : (isLandscape ? 279.4 : 215.9)
+      const pdfHeightMM = isA4 ? (isLandscape ? 210 : 297) : (isLandscape ? 215.9 : 279.4)
+      
+      // Convert mm to pixels at 96 DPI (standard web DPI)
+      // 1 inch = 25.4mm, 96 DPI = 96px per inch
+      // So: 1mm = 96/25.4 ≈ 3.7795px
+      const mmToPx = 96 / 25.4
+      const htmlWidthPx = Math.round(pdfWidthMM * mmToPx)
+      const htmlHeightPx = Math.round(pdfHeightMM * mmToPx)
+      
+      // Create a temporary container with proper dimensions matching PDF
       const container = document.createElement("div")
       container.style.position = "fixed"
       container.style.left = "-10000px"
       container.style.top = "-10000px"
-      container.style.width = "1200px"
-      container.style.backgroundColor = "white"
+      container.style.width = `${htmlWidthPx}px`
+      container.style.height = `${htmlHeightPx}px`
+      container.style.backgroundColor = "#f3f4f6"
+      container.style.padding = "0"
       container.style.zIndex = "-9999"
-      container.innerHTML = html
+      container.style.overflow = "hidden"
+      
+      // Calculate proportional sizes based on page dimensions
+      const baseFontSize = htmlWidthPx * 0.022 // ~2.2% of page width
+      const iconSize = Math.round(htmlWidthPx * 0.053) // ~5.3% of page width
+      const titleFontSize = Math.round(baseFontSize * 1.27)
+      const nameFontSize = Math.round(baseFontSize * 1.82)
+      const courseFontSize = Math.round(baseFontSize * 1.27)
+      const bodyFontSize = Math.round(baseFontSize * 0.73)
+      const smallFontSize = Math.round(baseFontSize * 0.45)
+      const padding = Math.round(htmlWidthPx * 0.027)
+      const borderWidth = Math.round(htmlWidthPx * 0.0033)
+      
+      // Generate the certificate HTML with proportional dimensions
+      container.innerHTML = `
+        <div style="width: ${htmlWidthPx}px; height: ${htmlHeightPx}px; margin: 0; background: white; border: ${borderWidth}px solid #8b5cf6; position: relative; display: flex; flex-direction: column; padding: ${padding}px;">
+          <!-- Header Section -->
+          <div style="text-align: center; margin-bottom: ${Math.round(htmlHeightPx * 0.015)}px;">
+            <div style="margin-bottom: ${Math.round(htmlHeightPx * 0.008)}px;">
+              <svg style="width: ${iconSize}px; height: ${iconSize}px; color: #8b5cf6; margin: 0 auto; display: block;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+              </svg>
+            </div>
+            <h1 style="font-size: ${titleFontSize}px; font-weight: bold; color: #8b5cf6; margin: 0 0 ${Math.round(htmlHeightPx * 0.006)}px 0; letter-spacing: ${Math.round(htmlWidthPx * 0.0017)}px; line-height: 1.3; padding-bottom: ${Math.round(htmlHeightPx * 0.006)}px; border-bottom: ${Math.round(htmlHeightPx * 0.0014)}px solid #8b5cf6; display: inline-block; white-space: nowrap;">
+              CERTIFICATE OF COMPLETION
+            </h1>
+          </div>
+
+          <!-- Main Content -->
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; text-align: center; padding: ${Math.round(htmlHeightPx * 0.02)}px 0;">
+            <p style="font-size: ${bodyFontSize}px; color: #374151; font-style: italic; margin: 0 0 ${Math.round(htmlHeightPx * 0.015)}px 0;">
+              This is to certify that
+            </p>
+            
+            <div style="margin: ${Math.round(htmlHeightPx * 0.015)}px 0; text-align: center;">
+              <h2 style="font-size: ${nameFontSize}px; font-weight: bold; color: #111827; margin: 0 auto; line-height: 1.3; padding-bottom: ${Math.round(htmlHeightPx * 0.005)}px; border-bottom: ${Math.round(htmlHeightPx * 0.0014)}px solid #8b5cf6; display: inline-block; max-width: ${Math.round(htmlWidthPx * 0.85)}px; word-break: keep-all;">
+                ${certDetails.user_name || "Student Name"}
+              </h2>
+            </div>
+            
+            <p style="font-size: ${bodyFontSize}px; color: #374151; margin: ${Math.round(htmlHeightPx * 0.015)}px 0; padding: 0 ${Math.round(htmlWidthPx * 0.013)}px;">
+              has successfully completed the course
+            </p>
+            
+            <div style="margin: ${Math.round(htmlHeightPx * 0.015)}px 0; padding: 0 ${Math.round(htmlWidthPx * 0.013)}px;">
+              <h3 style="font-size: ${courseFontSize}px; font-weight: bold; color: #8b5cf6; margin: 0; line-height: 1.2; word-wrap: break-word;">
+                ${certDetails.course_title || certDetails.certificate_title}
+              </h3>
+            </div>
+            
+            ${certDetails.certificate_content ? `
+              <div style="margin: ${Math.round(htmlHeightPx * 0.02)}px ${Math.round(htmlWidthPx * 0.013)}px; padding: ${Math.round(htmlHeightPx * 0.01)}px ${Math.round(htmlWidthPx * 0.017)}px; background: #fef3c7; border-left: ${Math.round(htmlWidthPx * 0.0033)}px solid #f59e0b;">
+                <p style="font-size: ${Math.round(bodyFontSize * 0.875)}px; color: #374151; font-style: italic; white-space: pre-wrap; margin: 0; line-height: 1.6; word-wrap: break-word;">
+                  "${certDetails.certificate_content}"
+                </p>
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Footer Section -->
+          <div style="margin-top: auto; padding-top: ${Math.round(htmlHeightPx * 0.015)}px; border-top: ${Math.round(htmlHeightPx * 0.0014)}px solid #d1d5db;">
+            <!-- Certificate Details -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: ${Math.round(htmlWidthPx * 0.013)}px; margin-bottom: ${Math.round(htmlHeightPx * 0.015)}px; font-size: ${smallFontSize}px;">
+              <div style="text-align: center;">
+                <p style="color: #6b7280; text-transform: uppercase; letter-spacing: ${Math.round(htmlWidthPx * 0.0008)}px; margin: 0 0 ${Math.round(htmlHeightPx * 0.003)}px 0; font-size: ${Math.round(smallFontSize * 0.83)}px;">Certificate ID</p>
+                <p style="font-weight: bold; color: #111827; margin: 0;">#${certDetails.certificate_id || "N/A"}</p>
+              </div>
+              ${certDetails.completion_date ? `
+                <div style="text-align: center;">
+                  <p style="color: #6b7280; text-transform: uppercase; letter-spacing: ${Math.round(htmlWidthPx * 0.0008)}px; margin: 0 0 ${Math.round(htmlHeightPx * 0.003)}px 0; font-size: ${Math.round(smallFontSize * 0.83)}px;">Date</p>
+                  <p style="font-weight: bold; color: #111827; margin: 0;">
+                    ${new Date(certDetails.completion_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Signature Section -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: ${Math.round(htmlWidthPx * 0.027)}px; margin-top: ${Math.round(htmlHeightPx * 0.02)}px;">
+              <!-- Signature -->
+              <div style="text-align: center;">
+                <div style="margin-bottom: ${Math.round(htmlHeightPx * 0.005)}px;">
+                  <div style="margin: 0 auto; width: ${Math.round(htmlWidthPx * 0.147)}px; height: ${Math.round(htmlHeightPx * 0.057)}px; background: white; border: ${Math.round(htmlWidthPx * 0.0008)}px solid #e5e7eb; border-radius: ${Math.round(htmlWidthPx * 0.0033)}px; box-shadow: 0 ${Math.round(htmlHeightPx * 0.0007)}px ${Math.round(htmlHeightPx * 0.002)}px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center;">
+                    <svg style="width: ${Math.round(htmlWidthPx * 0.133)}px; height: ${Math.round(htmlHeightPx * 0.046)}px; color: #1f2937;" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M15 25 Q10 15, 20 20 Q30 25, 25 30 Q20 35, 30 40 Q40 45, 50 42 Q60 39, 70 38 Q80 37, 90 38 Q100 39, 110 40 Q120 41, 130 40 Q140 39, 150 38 Q160 37, 170 36 Q180 35, 185 38" 
+                            stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+                <div style="width: ${Math.round(htmlWidthPx * 0.107)}px; height: ${Math.round(htmlHeightPx * 0.0007)}px; background: #9ca3af; margin: 0 auto ${Math.round(htmlHeightPx * 0.006)}px;"></div>
+                <p style="font-size: ${Math.round(bodyFontSize * 0.875)}px; font-weight: bold; color: #1f2937; margin: 0 0 ${Math.round(htmlHeightPx * 0.003)}px 0;">Dr. Sarah Johnson</p>
+                <p style="font-size: ${smallFontSize}px; color: #4b5563; margin: 0 0 ${Math.round(htmlHeightPx * 0.0014)}px 0;">Director of Education</p>
+                <p style="font-size: ${smallFontSize}px; color: #4b5563; margin: 0;">Enamel Academy</p>
+              </div>
+              
+              <!-- Official Seal -->
+              <div style="text-align: center;">
+                <div style="margin-bottom: ${Math.round(htmlHeightPx * 0.005)}px;">
+                  <div style="margin: 0 auto; width: ${Math.round(htmlWidthPx * 0.08)}px; height: ${Math.round(htmlWidthPx * 0.08)}px; background: linear-gradient(to bottom right, #8b5cf6, #a855f7); border-radius: 50%; border: ${Math.round(htmlWidthPx * 0.0033)}px solid #c084fc; box-shadow: 0 ${Math.round(htmlHeightPx * 0.006)}px ${Math.round(htmlHeightPx * 0.011)}px rgba(139, 92, 246, 0.3); display: flex; align-items: center; justify-content: center;">
+                    <svg style="width: ${Math.round(htmlWidthPx * 0.04)}px; height: ${Math.round(htmlWidthPx * 0.04)}px; color: white;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div style="width: ${Math.round(htmlWidthPx * 0.08)}px; height: ${Math.round(htmlHeightPx * 0.0007)}px; background: #9ca3af; margin: 0 auto ${Math.round(htmlHeightPx * 0.006)}px;"></div>
+                <p style="font-size: ${Math.round(bodyFontSize * 0.875)}px; font-weight: bold; color: #8b5cf6; margin: 0 0 ${Math.round(htmlHeightPx * 0.003)}px 0;">ENAMEL ACADEMY</p>
+                <p style="font-size: ${Math.round(smallFontSize * 0.83)}px; color: #6b7280; margin: 0 0 ${Math.round(htmlHeightPx * 0.0014)}px 0;">Official Seal</p>
+                <p style="font-size: ${Math.round(smallFontSize * 0.83)}px; color: #6b7280; margin: 0;">
+                  ${certDetails.completion_date ? new Date(certDetails.completion_date).getFullYear() : new Date().getFullYear()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+      
       document.body.appendChild(container)
 
-      // Wait for content to render
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Wait for content to render and images to load
+      await new Promise(resolve => setTimeout(resolve, 1500))
 
-      // Capture with html2canvas
+      // Capture with html2canvas at high quality (scale 2 for 192 DPI equivalent)
       const canvas = await html2canvas(container, {
-        scale: 2,
+        scale: 2, // 2x scale = 192 DPI (good quality for PDF)
         useCORS: true,
         allowTaint: true,
         logging: false,
-        backgroundColor: "#ffffff",
-        width: 1200,
-        windowWidth: 1200,
+        backgroundColor: "#f3f4f6",
+        width: htmlWidthPx,
+        height: htmlHeightPx,
+        windowWidth: htmlWidthPx,
+        windowHeight: htmlHeightPx,
       })
 
-      // Determine orientation based on captured content
-      const isLandscape = canvas.width > canvas.height
+      // Create PDF with exact dimensions
       const pdf = new jsPDF({
         orientation: isLandscape ? "landscape" : "portrait",
         unit: "mm",
-        format: "a4",
+        format: isA4 ? "a4" : "letter",
       })
 
-      const imgData = canvas.toDataURL("image/png")
+      // Convert canvas pixels to mm for PDF
+      // Canvas is at 2x scale, so actual pixel dimensions are canvas.width/2 x canvas.height/2
+      // But we want to use the full resolution, so we calculate based on the scale
+      const canvasWidthMM = canvas.width / (2 * mmToPx) // Divide by scale and convert
+      const canvasHeightMM = canvas.height / (2 * mmToPx)
+      
+      // PDF page dimensions
       const pdfWidth = pdf.internal.pageSize.getWidth()
       const pdfHeight = pdf.internal.pageSize.getHeight()
-      const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height)
-      const imgW = canvas.width * ratio
-      const imgH = canvas.height * ratio
-      const imgX = (pdfWidth - imgW) / 2
-      const imgY = (pdfHeight - imgH) / 2
 
-      pdf.addImage(imgData, "PNG", imgX, imgY, imgW, imgH)
+      // The canvas should match PDF dimensions exactly, but account for any rounding
+      const imgData = canvas.toDataURL("image/png", 1.0)
 
-      const fileName = `Certificate-${title.replace(/\s+/g, "-")}.pdf`
+      // Add image to fill the entire PDF page
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight, undefined, "FAST")
+
+      const fileName = `Certificate-${certTitle.replace(/\s+/g, "-")}.pdf`
       pdf.save(fileName)
 
       setActionMessage("Certificate PDF downloaded successfully.")
@@ -564,9 +815,11 @@ export default function CertificatesPage() {
               <div>
                 <label className="text-xs sm:text-sm text-[#6b7280] mb-1 sm:mb-2 block">Categories</label>
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="w-full px-3 py-2 bg-[#f5f5f5] border-0 rounded-lg text-xs sm:text-sm text-[#9ca3af] appearance-none focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/20 flex items-center justify-between hover:bg-[#e8e8e8] transition-colors">
-                    <span>{selectedCategory ? selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1) : "All Categories"}</span>
-                    <ChevronDown className="h-4 w-4" />
+                  <DropdownMenuTrigger className="w-full px-3 py-2 bg-white border border-[#e5e7eb] rounded-lg text-xs sm:text-sm text-[#1a1a1a] appearance-none focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/20 focus:border-[#8b5cf6] flex items-center justify-between hover:border-[#8b5cf6]/50 transition-colors cursor-pointer">
+                    <span className={selectedCategory ? "text-[#1a1a1a]" : "text-[#6b7280]"}>
+                      {selectedCategory ? selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1).replace(/-/g, ' ') : "All Categories"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-[#6b7280]" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-full min-w-[var(--radix-dropdown-menu-trigger-width)] bg-white border border-[#e5e7eb] rounded-lg shadow-md">
                     <DropdownMenuLabel className="text-xs sm:text-sm text-[#6b7280] px-3 py-2">Select Category</DropdownMenuLabel>
@@ -586,6 +839,71 @@ export default function CertificatesPage() {
                         {category}
                     </DropdownMenuItem>
                     ))}
+                    {/* Additional common categories */}
+                    {!categoryOptions.includes("Clinical") && (
+                      <DropdownMenuItem 
+                        onClick={() => setSelectedCategory("clinical")}
+                        className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                      >
+                        Clinical
+                      </DropdownMenuItem>
+                    )}
+                    {!categoryOptions.includes("Compliance") && (
+                      <DropdownMenuItem 
+                        onClick={() => setSelectedCategory("compliance")}
+                        className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                      >
+                        Compliance
+                      </DropdownMenuItem>
+                    )}
+                    {!categoryOptions.includes("Endodontics") && (
+                      <DropdownMenuItem 
+                        onClick={() => setSelectedCategory("endodontics")}
+                        className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                      >
+                        Endodontics
+                      </DropdownMenuItem>
+                    )}
+                    {!categoryOptions.includes("Orthodontics") && (
+                      <DropdownMenuItem 
+                        onClick={() => setSelectedCategory("orthodontics")}
+                        className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                      >
+                        Orthodontics
+                      </DropdownMenuItem>
+                    )}
+                    {!categoryOptions.includes("Periodontics") && (
+                      <DropdownMenuItem 
+                        onClick={() => setSelectedCategory("periodontics")}
+                        className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                      >
+                        Periodontics
+                      </DropdownMenuItem>
+                    )}
+                    {!categoryOptions.includes("Prosthodontics") && (
+                      <DropdownMenuItem 
+                        onClick={() => setSelectedCategory("prosthodontics")}
+                        className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                      >
+                        Prosthodontics
+                      </DropdownMenuItem>
+                    )}
+                    {!categoryOptions.includes("Oral Surgery") && (
+                      <DropdownMenuItem 
+                        onClick={() => setSelectedCategory("oral-surgery")}
+                        className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                      >
+                        Oral Surgery
+                      </DropdownMenuItem>
+                    )}
+                    {!categoryOptions.includes("General Dentistry") && (
+                      <DropdownMenuItem 
+                        onClick={() => setSelectedCategory("general-dentistry")}
+                        className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                      >
+                        General Dentistry
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -593,9 +911,9 @@ export default function CertificatesPage() {
               <div className="mt-3 sm:mt-4">
                 <label className="text-xs sm:text-sm text-[#6b7280] mb-1 sm:mb-2 block">Sort By</label>
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="w-full px-3 py-2 bg-[#f5f5f5] border-0 rounded-lg text-xs sm:text-sm text-[#9ca3af] appearance-none focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/20 flex items-center justify-between hover:bg-[#e8e8e8] transition-colors">
-                    <span>{sortBy.charAt(0).toUpperCase() + sortBy.slice(1)}</span>
-                    <ChevronDown className="h-4 w-4" />
+                  <DropdownMenuTrigger className="w-full px-3 py-2 bg-white border border-[#e5e7eb] rounded-lg text-xs sm:text-sm text-[#1a1a1a] appearance-none focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/20 focus:border-[#8b5cf6] flex items-center justify-between hover:border-[#8b5cf6]/50 transition-colors cursor-pointer">
+                    <span>{sortBy === "date" ? "Date" : sortBy === "title" ? "Title" : sortBy === "cpdHours" ? "CPD Hours" : sortBy === "score" ? "Score" : sortBy === "type" ? "Type" : sortBy === "format" ? "Format" : sortBy === "status" ? "Status" : sortBy === "instructor" ? "Instructor" : sortBy.charAt(0).toUpperCase() + sortBy.slice(1)}</span>
+                    <ChevronDown className="h-4 w-4 text-[#6b7280]" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-full min-w-[var(--radix-dropdown-menu-trigger-width)] bg-white border border-[#e5e7eb] rounded-lg shadow-md" align="start">
                     <DropdownMenuLabel className="text-xs sm:text-sm text-[#6b7280] px-3 py-2">Sort By</DropdownMenuLabel>
@@ -624,6 +942,30 @@ export default function CertificatesPage() {
                     >
                       Score
                     </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setSortBy("type")}
+                      className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                    >
+                      Type
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setSortBy("format")}
+                      className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                    >
+                      Format
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setSortBy("status")}
+                      className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                    >
+                      Status
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setSortBy("instructor")}
+                      className="text-xs sm:text-sm text-[#1a1a1a] hover:bg-[#f9f5ff] hover:text-[#8b5cf6] cursor-pointer"
+                    >
+                      Instructor
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -633,7 +975,7 @@ export default function CertificatesPage() {
           {/* Main Content */}
           <div className="flex-1 min-w-0">
             {/* Search and Export */}
-            <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
+            <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
               <div className="flex-1 relative">
                 <input
                   type="text"
@@ -648,7 +990,7 @@ export default function CertificatesPage() {
               </div>
               <button 
                 onClick={handleExport}
-                className="w-full sm:w-auto px-3 sm:px-6 py-2 sm:py-2.5 bg-[#8b5cf6] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#7c3aed] transition-colors flex items-center justify-center gap-1 sm:gap-2"
+                className="flex-shrink-0 px-3 sm:px-6 py-2 sm:py-2.5 bg-[#8b5cf6] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#7c3aed] transition-colors flex items-center justify-center gap-1 sm:gap-2"
               >
                 <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Export to Excel</span>
@@ -717,27 +1059,27 @@ export default function CertificatesPage() {
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={() => handleViewCertificate(certificate.id)}
-                    disabled={viewingCertId === certificate.id}
-                    className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors"
+                    disabled={viewingCertId === certificate.id || isLoadingCertHtml}
+                    className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors disabled:opacity-50"
                     title="View Certificate"
                   >
+                    {viewingCertId === certificate.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
                     <Eye className="h-4 w-4" />
+                    )}
                   </button>
                   <button
                     onClick={() => handleDownloadCertificate(certificate.id, certificate.title)}
                     disabled={downloadingCertId === certificate.id}
-                    className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors"
+                    className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors disabled:opacity-50"
                     title="Download Certificate"
                   >
+                    {downloadingCertId === certificate.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
                     <Download className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleVerifyCertificate(certificate.id)}
-                    disabled={verifyingCertId === certificate.id}
-                    className="px-2 py-1 text-[10px] font-medium text-[#8b5cf6] border border-[#8b5cf6]/30 hover:bg-[#8b5cf6]/10 rounded-md transition-colors"
-                    title="Verify Certificate"
-                  >
-                    {verifyingCertId === certificate.id ? "..." : "Verify"}
+                    )}
                   </button>
                 </div>
               </div>
@@ -771,6 +1113,13 @@ export default function CertificatesPage() {
 
         {/* Desktop Table View */}
         <div className="hidden md:block bg-white rounded-xl border border-[#e5e7eb] overflow-hidden">
+          {activeFilters.filter(f => f.active).length === 0 ? (
+            <div className="text-center py-8 sm:py-12 px-4">
+              <Filter className="h-10 w-10 sm:h-12 sm:w-12 text-[#9ca3af] mx-auto mb-3 sm:mb-4" />
+              <p className="text-[#1a1a1a] text-base sm:text-lg font-medium mb-2">No columns selected</p>
+              <p className="text-[#6b7280] text-xs sm:text-sm">Please select at least one column filter above to view certificates</p>
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-[#f9f5ff] border-b border-[#e5e7eb]">
@@ -783,11 +1132,14 @@ export default function CertificatesPage() {
                         if (filter.label === "Date") handleSort("date")
                         if (filter.label === "Title") handleSort("title")
                         if (filter.label === "Time Taken") handleSort("cpdHours")
+                        if (filter.label === "Type") handleSort("type")
+                        if (filter.label === "Format") handleSort("format")
+                        if (filter.label === "Status") handleSort("status")
                       }}
                     >
                       <div className="flex items-center gap-2">
                         <span className="truncate">{filter.label}</span>
-                        {(filter.label === "Date" || filter.label === "Title" || filter.label === "Time Taken") && (
+                        {(filter.label === "Date" || filter.label === "Title" || filter.label === "Time Taken" || filter.label === "Type" || filter.label === "Format" || filter.label === "Status") && (
                           <span className="text-[#8b5cf6] flex-shrink-0">
                             {sortBy === (filter.label === "Time Taken" ? "cpdHours" : filter.label.toLowerCase()) && 
                              (sortOrder === "asc" ? "↑" : "↓")
@@ -885,27 +1237,27 @@ export default function CertificatesPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleViewCertificate(certificate.id)}
-                          disabled={viewingCertId === certificate.id}
-                          className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors"
+                          disabled={viewingCertId === certificate.id || isLoadingCertHtml}
+                          className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors disabled:opacity-50"
                           title="View Certificate"
                         >
+                          {viewingCertId === certificate.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
                           <Eye className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           onClick={() => handleDownloadCertificate(certificate.id, certificate.title)}
                           disabled={downloadingCertId === certificate.id}
-                          className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors"
+                          className="p-2 text-[#8b5cf6] hover:bg-[#8b5cf6]/10 rounded-lg transition-colors disabled:opacity-50"
                           title="Download Certificate"
                         >
+                          {downloadingCertId === certificate.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
                           <Download className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleVerifyCertificate(certificate.id)}
-                          disabled={verifyingCertId === certificate.id}
-                          className="px-2 py-1 text-[10px] font-medium text-[#8b5cf6] border border-[#8b5cf6]/30 hover:bg-[#8b5cf6]/10 rounded-md transition-colors"
-                          title="Verify Certificate"
-                        >
-                          {verifyingCertId === certificate.id ? "..." : "Verify"}
+                          )}
                         </button>
                       </div>
                     </td>
@@ -915,6 +1267,7 @@ export default function CertificatesPage() {
               </tbody>
             </table>
           </div>
+          )}
           </div>
           
         {!isLoading && filteredAndSortedData.length === 0 && (
@@ -939,8 +1292,8 @@ export default function CertificatesPage() {
 
       {/* Certificate HTML Viewer Modal */}
       {isHtmlModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white w-full h-full sm:h-[90vh] sm:max-w-5xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-0">
+          <div className="bg-white w-full h-full sm:h-[90vh] sm:max-w-5xl sm:rounded-xl sm:m-4 shadow-2xl flex flex-col overflow-hidden">
             {/* Modal Header */}
             <div className="bg-[#8b5cf6] text-white p-3 sm:p-4 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -954,14 +1307,15 @@ export default function CertificatesPage() {
                   setIsHtmlModalOpen(false)
                   setCertificateHtml("")
                   setHtmlModalTitle("")
+                  setCertificateDetails(null)
                 }}
                 className="p-2 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
               >
                 <X size={20} />
               </button>
             </div>
-            {/* Modal Body - iframe renders the certificate HTML */}
-            <div className="flex-1 overflow-hidden bg-gray-100">
+            {/* Modal Body - Custom Certificate Display */}
+            <div className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 p-2 sm:p-4 md:p-8">
               {isLoadingCertHtml ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex flex-col items-center gap-3">
@@ -969,13 +1323,121 @@ export default function CertificatesPage() {
                     <p className="text-sm text-gray-600">Loading certificate...</p>
                   </div>
                 </div>
+              ) : certificateDetails ? (
+                <div className="w-full max-w-4xl mx-auto px-1 sm:px-2 md:px-4 pb-4 sm:pb-8">
+                  {/* Professional Certificate Container */}
+                  <div className="relative bg-white shadow-2xl border-2 sm:border-4 border-[#8b5cf6] min-h-[500px] sm:min-h-[700px] md:min-h-[800px] w-full">
+                    {/* Certificate Content */}
+                    <div className="relative min-h-full flex flex-col p-2 sm:p-3 md:p-4 lg:p-6 xl:p-8">
+                      {/* Header Section */}
+                      <div className="text-center mb-4 sm:mb-6 md:mb-8">
+                        <div className="mb-3 sm:mb-4">
+                          <Award className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 mx-auto text-[#8b5cf6]" />
+                        </div>
+                        <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#8b5cf6] mb-2 tracking-wide">
+                          CERTIFICATE OF COMPLETION
+                        </h1>
+                        <div className="w-20 sm:w-32 md:w-40 h-0.5 bg-[#8b5cf6] mx-auto"></div>
+                      </div>
+
+                      {/* Main Content */}
+                      <div className="flex-1 flex flex-col justify-center text-center space-y-3 sm:space-y-4 md:space-y-6">
+                        <p className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-700 italic">
+                          This is to certify that
+                        </p>
+                        
+                        <div className="py-2 sm:py-4">
+                          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 break-words">
+                            {certificateDetails.user_name || "Student Name"}
+                          </h2>
+                          <div className="w-24 sm:w-32 md:w-48 h-0.5 bg-[#8b5cf6] mx-auto mt-2"></div>
+                        </div>
+                        
+                        <p className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-700 px-2">
+                          has successfully completed the course
+                        </p>
+                        
+                        <div className="py-2 sm:py-3 md:py-4 px-2">
+                          <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-[#8b5cf6] break-words">
+                            {certificateDetails.course_title || certificateDetails.certificate_title}
+                          </h3>
+                        </div>
+                        
+                        {certificateDetails.certificate_content && (
+                          <div className="mt-2 sm:mt-4 p-3 sm:p-4 md:p-6 bg-amber-50 border-l-4 border-amber-400 mx-2 sm:mx-4">
+                            <p className="text-xs sm:text-sm md:text-base text-gray-700 italic whitespace-pre-wrap break-words">
+                              "{certificateDetails.certificate_content}"
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer Section */}
+                      <div className="mt-4 sm:mt-6 md:mt-8 pt-4 sm:pt-6 border-t-2 border-gray-300">
+                        {/* Certificate Details */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6 text-xs sm:text-sm">
+                          <div className="text-center sm:text-left">
+                            <p className="text-gray-500 uppercase tracking-wide mb-1">Certificate ID</p>
+                            <p className="font-bold text-gray-900">#{certificateDetails.certificate_id || "N/A"}</p>
+                          </div>
+                          {certificateDetails.completion_date && (
+                            <div className="text-center sm:text-right">
+                              <p className="text-gray-500 uppercase tracking-wide mb-1">Date</p>
+                              <p className="font-bold text-gray-900">
+                                {new Date(certificateDetails.completion_date).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Signature Section */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
+                          {/* Signature */}
+                          <div className="text-center">
+                            <div className="mb-2 sm:mb-3">
+                              <div className="mx-auto w-44 sm:w-52 md:w-60 h-20 sm:h-24 md:h-28 bg-white border border-gray-200 rounded flex items-center justify-center shadow-sm">
+                                <svg className="w-40 sm:w-48 md:w-56 h-16 sm:h-20 md:h-24 text-gray-800" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  {/* Simple elegant signature - cursive J with flowing letters */}
+                                  <path d="M15 25 Q10 15, 20 20 Q30 25, 25 30 Q20 35, 30 40 Q40 45, 50 42 Q60 39, 70 38 Q80 37, 90 38 Q100 39, 110 40 Q120 41, 130 40 Q140 39, 150 38 Q160 37, 170 36 Q180 35, 185 38" 
+                                        stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="w-32 sm:w-40 h-0.5 bg-gray-400 mx-auto mb-2"></div>
+                            <p className="text-xs sm:text-sm md:text-base font-bold text-gray-800">Dr. Sarah Johnson</p>
+                            <p className="text-xs sm:text-sm text-gray-600 mt-1">Director of Education</p>
+                            <p className="text-xs sm:text-sm text-gray-600">Enamel Academy</p>
+                          </div>
+                          
+                          {/* Official Seal */}
+                          <div className="text-center">
+                            <div className="mb-2 sm:mb-3">
+                              <div className="mx-auto w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-gradient-to-br from-[#8b5cf6] to-[#a855f7] rounded-full flex items-center justify-center border-4 border-purple-300 shadow-lg">
+                                <Award className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 text-white" />
+                              </div>
+                            </div>
+                            <div className="w-24 sm:w-32 h-0.5 bg-gray-400 mx-auto mb-2"></div>
+                            <p className="text-xs sm:text-sm md:text-base font-bold text-[#8b5cf6]">ENAMEL ACADEMY</p>
+                            <p className="text-xs text-gray-500 mt-1">Official Seal</p>
+                            <p className="text-xs text-gray-500">
+                              {certificateDetails.completion_date 
+                                ? new Date(certificateDetails.completion_date).getFullYear()
+                                : new Date().getFullYear()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <iframe
-                  srcDoc={certificateHtml}
-                  className="w-full h-full border-0"
-                  title="Certificate Preview"
-                  sandbox="allow-same-origin allow-popups"
-                />
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-sm text-gray-600">No certificate data available</p>
+                </div>
               )}
             </div>
           </div>

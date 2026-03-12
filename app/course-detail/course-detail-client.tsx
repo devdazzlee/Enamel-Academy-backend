@@ -283,12 +283,23 @@ export function CourseDetailClient() {
           }
         }
         // Store the full API response to access curriculum and related courses
-        // Use the same endpoint to get the full response structure
-        const response = await authApi.get(API_PATHS.courses.details, {
-          params: isNumericId ? { id: courseIdOrSlug } : { slug: courseIdOrSlug },
-        })
-        if (response.data?.success && alive) {
-          setCourseData(response.data.data)
+        // Use enhanced endpoint for more data
+        if (data?.id !== undefined && data?.id !== null) {
+          try {
+            const enhancedResponse = await authApi.get(API_PATHS.dashboard.courseById(data.id))
+            if (enhancedResponse.data && alive) {
+              // Use enhanced response data
+              const enhancedData = enhancedResponse.data?.data ?? enhancedResponse.data
+              setCourseData(enhancedData)
+            }
+          } catch {
+            // If enhanced fails, use the course data we already have
+            if (data && alive) {
+              setCourseData(data as any)
+            }
+          }
+        } else if (data && alive) {
+          setCourseData(data as any)
         }
       } catch (e) {
         if (!alive) return

@@ -604,19 +604,59 @@ export const coursesService = {
   },
 
   async details(idOrSlug: string): Promise<ApiCourse | null> {
-    const response = await authApi.get(API_PATHS.courses.details, {
-      params: { id: idOrSlug },
-    });
-    const normalized = normalizeCourses(response.data);
-    return normalized[0] ?? null;
+    // Use enhanced dashboard endpoint for more data
+    // Check if it's numeric ID or slug
+    const isNumericId = /^\d+$/.test(idOrSlug);
+    if (isNumericId) {
+      // Use enhanced endpoint for numeric IDs
+      const response = await authApi.get(API_PATHS.dashboard.courseById(idOrSlug));
+      const normalized = normalizeCourses(response.data);
+      return normalized[0] ?? null;
+    } else {
+      // For slugs, first get the course ID, then use enhanced endpoint
+      const slugResponse = await authApi.get(API_PATHS.courses.details, {
+        params: { slug: idOrSlug },
+      });
+      const slugNormalized = normalizeCourses(slugResponse.data);
+      const course = slugNormalized[0] ?? null;
+      
+      // If we got a course with an ID, fetch enhanced data
+      if (course?.id) {
+        try {
+          const enhancedResponse = await authApi.get(API_PATHS.dashboard.courseById(course.id));
+          const enhancedNormalized = normalizeCourses(enhancedResponse.data);
+          return enhancedNormalized[0] ?? course;
+        } catch {
+          // If enhanced fails, return the standard course data
+          return course;
+        }
+      }
+      
+      return course;
+    }
   },
 
   async detailsBySlug(slug: string): Promise<ApiCourse | null> {
+    // First get by slug to get the course ID
     const response = await authApi.get(API_PATHS.courses.details, {
       params: { slug },
     });
     const normalized = normalizeCourses(response.data);
-    return normalized[0] ?? null;
+    const course = normalized[0] ?? null;
+    
+    // If we got a course with an ID, fetch enhanced data
+    if (course?.id) {
+      try {
+        const enhancedResponse = await authApi.get(API_PATHS.dashboard.courseById(course.id));
+        const enhancedNormalized = normalizeCourses(enhancedResponse.data);
+        return enhancedNormalized[0] ?? course;
+      } catch {
+        // If enhanced fails, return the standard course data
+        return course;
+      }
+    }
+    
+    return course;
   },
 
   async ongoing(): Promise<ApiCourse[]> {

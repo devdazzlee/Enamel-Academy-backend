@@ -337,7 +337,7 @@ export default function CoursePlayerPage() {
         setAssessmentMetaError("")
         const optionalApiErrors: string[] = []
         const [courseResponse, assessmentsResponse, assignmentsResponse, quizzesResponse, quizStatsResponse, assignmentStatsResponse] = await Promise.all([
-          authApi.get(API_PATHS.courses.details, { params: { id: courseId } }),
+          authApi.get(API_PATHS.dashboard.courseById(courseId)),
           assignmentService.courseAssessments(courseId).catch((error) => {
             optionalApiErrors.push(getApiErrorMessage(error))
             return null
@@ -1068,7 +1068,7 @@ export default function CoursePlayerPage() {
    */
   const checkCompletionAndCertificate = useCallback(async (): Promise<boolean> => {
     // Check 1: Official is_completed flag
-    const courseRes = await authApi.get(API_PATHS.courses.details, { params: { id: courseId } })
+    const courseRes = await authApi.get(API_PATHS.dashboard.courseById(courseId))
     const root = (courseRes.data && typeof courseRes.data === "object" ? courseRes.data : {}) as Record<string, unknown>
     const data = (root.data && typeof root.data === "object" ? root.data : {}) as Record<string, unknown>
     const courseObj = (data.course && typeof data.course === "object" ? data.course : {}) as Record<string, unknown>

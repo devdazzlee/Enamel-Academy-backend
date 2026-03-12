@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
-import { Key, HelpCircle, Users, Info, Contact, FlaskConical } from "lucide-react";
+import { Key, HelpCircle, Users, Info, Contact } from "lucide-react";
 import Link from "next/link";
 
 import { userService, type ApiUser } from "@/lib/api/user";
@@ -186,24 +186,6 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <h3 className="font-medium text-[#1a1a1a] group-hover:text-[#8b5cf6] transition-colors">Contact Us</h3>
                 <p className="text-sm text-[#6b7280]">Get in touch with our support team</p>
-              </div>
-              <div className="text-[#6b7280] group-hover:text-[#8b5cf6] transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </Link>
-
-            <Link 
-              href="/test-api"
-              className="bg-white rounded-2xl border border-border p-6 flex items-center gap-4 hover:bg-[#f8f9fa] transition-colors group"
-            >
-              <div className="text-[#6b7280] group-hover:text-[#8b5cf6] transition-colors">
-                <FlaskConical className="w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium text-[#1a1a1a] group-hover:text-[#8b5cf6] transition-colors">Test API</h3>
-                <p className="text-sm text-[#6b7280]">Run TESTApi endpoint from UI</p>
               </div>
               <div className="text-[#6b7280] group-hover:text-[#8b5cf6] transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

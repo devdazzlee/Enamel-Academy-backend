@@ -46,6 +46,19 @@ const toFormData = (payload: CPDExternalPayload): FormData => {
   if (payload.evidence) {
     fd.append("evidence", payload.evidence);
   }
+  
+  // Log FormData entries for debugging (in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('FormData being sent to API:');
+    for (const [key, value] of fd.entries()) {
+      if (value instanceof File) {
+        console.log(`  ${key}: File - ${value.name} (${value.size} bytes, type: ${value.type})`);
+      } else {
+        console.log(`  ${key}: ${value}`);
+      }
+    }
+  }
+  
   return fd;
 };
 

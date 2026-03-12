@@ -51,7 +51,7 @@ export default function ThankYouPage() {
             
             <button 
               onClick={() => router.push('/courses')}
-              className="w-full px-6 py-3 border border-border rounded-lg font-medium hover:bg-accent transition flex items-center justify-center gap-2"
+              className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition flex items-center justify-center gap-2"
             >
               <BookOpen size={20} />
               Browse Courses
@@ -59,7 +59,7 @@ export default function ThankYouPage() {
 
             <button 
               onClick={() => router.push('/')}
-              className="w-full px-6 py-3 border border-border rounded-lg font-medium hover:bg-accent transition flex items-center justify-center gap-2 text-sm"
+              className="w-full px-6 py-3 text-foreground font-medium hover:text-primary transition flex items-center justify-center gap-2 text-sm"
             >
               <Home size={18} />
               Back to Home

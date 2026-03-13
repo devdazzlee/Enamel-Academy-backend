@@ -294,6 +294,28 @@ export const dashboardService = {
 
   async continueLearning(): Promise<ContinueLearningCourse[]> {
     const response = await authApi.get(API_PATHS.dashboard.continueLearning);
+    const root = response.data as Record<string, unknown>;
+    
+    // Handle API response where data is an array of objects with 'course' property
+    if (root.success && Array.isArray(root.data)) {
+      const courses: ContinueLearningCourse[] = [];
+      for (const item of root.data) {
+        if (!item || typeof item !== "object") continue;
+        const itemObj = item as Record<string, unknown>;
+        // Extract course from the nested structure
+        const courseData = (itemObj.course && typeof itemObj.course === "object" 
+          ? itemObj.course 
+          : itemObj) as Record<string, unknown>;
+        
+        const normalized = toDashboardItem(courseData);
+        if (normalized) {
+          courses.push(normalized as ContinueLearningCourse);
+        }
+      }
+      return courses;
+    }
+    
+    // Fallback to original normalization
     const normalized = normalizeDashboardRoot(response.data);
     return normalized.continueLearning ?? [];
   },

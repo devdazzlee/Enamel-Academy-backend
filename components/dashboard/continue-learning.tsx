@@ -45,20 +45,20 @@ export function ContinueLearning() {
 
   if (isLoading) {
     return (
-      <section className="mb-6 sm:mb-8">
-        <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
-          <Play className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+      <section className="mb-4 sm:mb-6">
+        <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 flex items-center gap-2">
+          <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
           <span className="text-primary">Complete Your</span>{" "}
           <span className="text-muted-foreground">On-Going Courses</span>
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="bg-card rounded-2xl border border-border overflow-hidden animate-pulse">
-              <div className="h-32 sm:h-40 bg-muted" />
-              <div className="p-3 sm:p-4 space-y-2">
-                <div className="h-4 bg-muted rounded w-3/4" />
-                <div className="h-3 bg-muted rounded w-1/2" />
-                <div className="h-2 bg-muted rounded" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-card rounded-lg border border-border overflow-hidden animate-pulse">
+              <div className="h-24 sm:h-28 bg-muted" />
+              <div className="p-2.5 sm:p-3 space-y-2">
+                <div className="h-3 bg-muted rounded w-3/4" />
+                <div className="h-2 bg-muted rounded w-1/2" />
+                <div className="h-1.5 bg-muted rounded" />
               </div>
             </div>
           ))}
@@ -69,21 +69,21 @@ export function ContinueLearning() {
 
   if (courses.length === 0) {
     return (
-      <section className="mb-6 sm:mb-8">
-        <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
-          <Play className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+      <section className="mb-4 sm:mb-6">
+        <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 flex items-center gap-2">
+          <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
           <span className="text-primary">Complete Your</span>{" "}
           <span className="text-muted-foreground">On-Going Courses</span>
         </h2>
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="text-center py-8 text-muted-foreground">
           {hasError ? (
             <>
-              <p className="text-sm">Unable to load ongoing courses.</p>
+              <p className="text-xs sm:text-sm">Unable to load ongoing courses.</p>
               <p className="text-xs mt-1">Please refresh and try again.</p>
             </>
           ) : (
             <>
-              <p className="text-sm">No ongoing courses yet.</p>
+              <p className="text-xs sm:text-sm">No ongoing courses yet.</p>
               <p className="text-xs mt-1">Start a course to see your progress here.</p>
             </>
           )}
@@ -93,31 +93,31 @@ export function ContinueLearning() {
   }
 
   return (
-    <section className="mb-6 sm:mb-8">
-      <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
-        <Play className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+    <section className="mb-4 sm:mb-6">
+      <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 flex items-center gap-2">
+        <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
         <span className="text-primary">Complete Your</span>{" "}
         <span className="text-muted-foreground">On-Going Courses</span>
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {courses.map((course) => (
-          <div key={course.id} className="bg-card rounded-2xl border border-border overflow-hidden">
-            <div className="relative h-32 sm:h-40">
+          <div key={course.id} className="bg-card rounded-lg border border-border overflow-hidden">
+            <div className="relative h-24 sm:h-28">
               <img
                 src={course.thumbnail ?? "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=200&fit=crop"}
                 alt={course.title ?? "Course"}
                 className="absolute inset-0 w-full h-full object-cover"
               />
             </div>
-            <div className="p-3 sm:p-4">
-              <h3 className="font-semibold text-foreground mb-2 sm:mb-3 text-sm sm:text-base line-clamp-2">
+            <div className="p-2.5 sm:p-3">
+              <h3 className="font-semibold text-foreground mb-1.5 sm:mb-2 text-xs sm:text-sm line-clamp-2">
                 {course.title ?? "Untitled Course"}
               </h3>
-              <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
+              <div className="flex items-center justify-between text-xs mb-1">
                 <span className="text-muted-foreground">Progress</span>
-                <span className="text-foreground">{course.progress ?? 0}%</span>
+                <span className="text-foreground font-medium">{Math.round(course.progress ?? 0)}%</span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden mb-3 sm:mb-4">
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-2 sm:mb-2.5">
                 <div
                   className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
                   style={{ width: `${course.progress ?? 0}%` }}
@@ -125,7 +125,7 @@ export function ContinueLearning() {
               </div>
               <button 
                 onClick={() => handleResume(String(course.id))}
-                className="w-full py-2.5 sm:py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-xs sm:text-sm"
+                className="w-full py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-xs"
               >
                 Resume Course
               </button>

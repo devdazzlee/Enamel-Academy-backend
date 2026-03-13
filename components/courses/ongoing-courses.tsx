@@ -4,11 +4,11 @@ import { useEffect, useState } from "react"
 import { FileText } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-import { coursesService, type ApiCourse, type OngoingCoursesSummary } from "@/lib/api/courses"
+import { coursesService, type OngoingCourse, type OngoingCoursesSummary } from "@/lib/api/courses"
 
 export function OngoingCourses() {
   const router = useRouter()
-  const [courses, setCourses] = useState<ApiCourse[]>([])
+  const [courses, setCourses] = useState<OngoingCourse[]>([])
   const [summary, setSummary] = useState<OngoingCoursesSummary>({
     totalOngoing: 0,
     totalEnrolled: 0,
@@ -64,11 +64,11 @@ export function OngoingCourses() {
             <div key={i} className="h-16 sm:h-20 rounded-xl bg-muted animate-pulse" />
           ))}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="bg-card rounded-2xl border border-border overflow-hidden animate-pulse">
-              <div className="h-32 sm:h-40 bg-muted" />
-              <div className="p-3 sm:p-4 space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-card rounded-xl border border-border overflow-hidden animate-pulse">
+              <div className="h-28 sm:h-32 bg-muted" />
+              <div className="p-2.5 sm:p-3 space-y-2">
                 <div className="h-4 bg-muted rounded w-3/4" />
                 <div className="h-3 bg-muted rounded w-1/2" />
                 <div className="h-2 bg-muted rounded" />
@@ -142,36 +142,42 @@ export function OngoingCourses() {
           <p className="text-lg sm:text-xl font-semibold text-foreground">{summary.totalCompletionPercentage}%</p>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {courses.map((course) => {
-          const progress = course.progress ?? 0
+          const progress = course.progress_percentage ?? course.progress ?? 0
           const image = course.thumbnail ?? course.image
+          const lastActivity = course.last_activity
           return (
-            <div key={course.id} className="bg-card rounded-2xl border border-border overflow-hidden">
-              <div className="relative h-32 sm:h-40">
+            <div key={course.id} className="bg-card rounded-xl border border-border overflow-hidden">
+              <div className="relative h-28 sm:h-32">
                 <img
                   src={image ?? "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=200&fit=crop"}
                   alt={course.title ?? "Course"}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
               </div>
-              <div className="p-3 sm:p-4">
-                <h3 className="font-semibold text-foreground mb-2 sm:mb-3 text-sm sm:text-base line-clamp-2">
+              <div className="p-2.5 sm:p-3">
+                <h3 className="font-semibold text-foreground mb-2 text-sm line-clamp-2">
                   {course.title ?? "Untitled Course"}
                 </h3>
-                <div className="flex items-center justify-between text-xs sm:text-sm mb-1">
+                <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-muted-foreground">Progress</span>
-                  <span className="text-foreground">{progress}%</span>
+                  <span className="text-foreground font-medium">{Math.round(progress)}%</span>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden mb-3 sm:mb-4">
+                <div className="h-2 bg-muted rounded-full overflow-hidden mb-3">
                   <div
                     className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
+                {lastActivity && lastActivity !== "No activity" && (
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Last: {lastActivity}
+                  </div>
+                )}
                 <button
                   onClick={() => handleResumeCourse(course.id)}
-                  className="w-full py-2.5 sm:py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-xs sm:text-sm"
+                  className="w-full py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors text-xs sm:text-sm"
                 >
                   Resume Course
                 </button>

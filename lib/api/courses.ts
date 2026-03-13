@@ -70,6 +70,17 @@ export type ApiCourse = {
   instructor?: string;
   level?: string;
   students_count?: number;
+  // Extended progress fields from detail API
+  progress_percentage?: number;
+  completed_steps?: number;
+  total_steps?: number;
+  last_activity_date?: string;
+  incomplete_step?: {
+    type?: string;
+    id?: number;
+    title?: string;
+    lesson_id?: number;
+  };
 };
 
 export type ApiCategory = {
@@ -162,8 +173,22 @@ export type OngoingCoursesSummary = {
   totalCompletionPercentage: number;
 };
 
+export type OngoingCourse = ApiCourse & {
+  progress_percentage?: number;
+  completed_steps?: number;
+  total_steps?: number;
+  last_activity?: string;
+  estimated_completion?: string;
+  incomplete_step?: {
+    type?: string;
+    id?: number;
+    title?: string;
+    lesson_id?: number;
+  };
+};
+
 export type OngoingCoursesResult = {
-  courses: ApiCourse[];
+  courses: OngoingCourse[];
   summary: OngoingCoursesSummary;
 };
 
@@ -479,8 +504,48 @@ const normalizeCourses = (raw: unknown): ApiCourse[] => {
     const category = (course.difficulty as string | undefined);
     if (typeof category === "string" && category.length > 0) result.category = category;
     
-    const progress = ((course.user_progress as Record<string, unknown>)?.percentage as number | undefined);
-    if (typeof progress === "number") result.progress = progress;
+    // Check for progress in multiple locations (new API structure)
+    // Priority: data.progress (dashboard API) > course.progress > course.user_progress
+    const rootProgressObj = (data.progress as Record<string, unknown> | undefined);
+    const courseProgressObj = (course.progress as Record<string, unknown> | undefined);
+    const userProgressObj = (course.user_progress as Record<string, unknown> | undefined);
+    
+    // Use root progress if available (dashboard API), otherwise use course progress
+    const progressObj = rootProgressObj || courseProgressObj;
+    
+    // Priority: progress.percentage/overall_percentage > user_progress.percentage
+    const progressPercent = progressObj 
+      ? (toNumber(progressObj.percentage) ?? toNumber(progressObj.overall_percentage))
+      : (userProgressObj ? toNumber(userProgressObj.percentage) : undefined);
+    
+    if (progressPercent !== undefined) {
+      result.progress = progressPercent;
+      result.progress_percentage = progressPercent;
+    }
+    
+    // Capture additional progress fields from progress object (check both root and course level)
+    const finalProgressObj = rootProgressObj || courseProgressObj;
+    if (finalProgressObj) {
+      const completedSteps = toNumber(finalProgressObj.completed_steps);
+      if (completedSteps !== undefined) result.completed_steps = completedSteps;
+      
+      const totalSteps = toNumber(finalProgressObj.total_steps);
+      if (totalSteps !== undefined) result.total_steps = totalSteps;
+      
+      const lastActivity = finalProgressObj.last_activity_date as string | undefined;
+      if (typeof lastActivity === "string") result.last_activity_date = lastActivity;
+      
+      const incompleteStep = finalProgressObj.incomplete_step;
+      if (incompleteStep && typeof incompleteStep === "object") {
+        const step = incompleteStep as Record<string, unknown>;
+        result.incomplete_step = {
+          type: step.type as string | undefined,
+          id: toNumber(step.id),
+          title: step.title as string | undefined,
+          lesson_id: toNumber(step.lesson_id),
+        };
+      }
+    }
     
     const enrolled = (course.is_enrolled as boolean | undefined);
     if (typeof enrolled === "boolean") result.enrolled = enrolled;
@@ -527,8 +592,44 @@ const normalizeCourses = (raw: unknown): ApiCourse[] => {
     if (typeof duration === "string" && duration.length > 0) apiCourse.duration = duration;
     const category = (course.difficulty as string | undefined);
     if (typeof category === "string" && category.length > 0) apiCourse.category = category;
-    const progress = ((course.user_progress as Record<string, unknown>)?.percentage as number | undefined);
-    if (typeof progress === "number") apiCourse.progress = progress;
+    
+    // Check for progress in multiple locations (new API structure)
+    const progressObj = (course.progress as Record<string, unknown> | undefined);
+    const userProgressObj = (course.user_progress as Record<string, unknown> | undefined);
+    
+    // Priority: progress.percentage/overall_percentage > user_progress.percentage
+    const progressPercent = progressObj 
+      ? (toNumber(progressObj.percentage) ?? toNumber(progressObj.overall_percentage))
+      : (userProgressObj ? toNumber(userProgressObj.percentage) : undefined);
+    
+    if (progressPercent !== undefined) {
+      apiCourse.progress = progressPercent;
+      apiCourse.progress_percentage = progressPercent;
+    }
+    
+    // Capture additional progress fields from progress object
+    if (progressObj) {
+      const completedSteps = toNumber(progressObj.completed_steps);
+      if (completedSteps !== undefined) apiCourse.completed_steps = completedSteps;
+      
+      const totalSteps = toNumber(progressObj.total_steps);
+      if (totalSteps !== undefined) apiCourse.total_steps = totalSteps;
+      
+      const lastActivity = progressObj.last_activity_date as string | undefined;
+      if (typeof lastActivity === "string") apiCourse.last_activity_date = lastActivity;
+      
+      const incompleteStep = progressObj.incomplete_step;
+      if (incompleteStep && typeof incompleteStep === "object") {
+        const step = incompleteStep as Record<string, unknown>;
+        apiCourse.incomplete_step = {
+          type: step.type as string | undefined,
+          id: toNumber(step.id),
+          title: step.title as string | undefined,
+          lesson_id: toNumber(step.lesson_id),
+        };
+      }
+    }
+    
     const enrolled = (course.is_enrolled as boolean | undefined);
     if (typeof enrolled === "boolean") apiCourse.enrolled = enrolled;
     const lessons = (course.total_topics as number | undefined);
@@ -572,8 +673,61 @@ const normalizeOngoing = (raw: unknown): OngoingCoursesResult => {
     ? data.summary
     : {}) as Record<string, unknown>;
 
+  // Normalize base course data
+  const baseCourses = normalizeCourses({ data: { courses: ongoingCourses } });
+  
+  // Enhance with ongoing-specific fields
+  const enhancedCourses: OngoingCourse[] = baseCourses.map((baseCourse, index) => {
+    const rawCourse = ongoingCourses[index] as Record<string, unknown> | undefined;
+    if (!rawCourse || typeof rawCourse !== "object") {
+      return baseCourse as OngoingCourse;
+    }
+
+    const ongoingCourse: OngoingCourse = { ...baseCourse };
+    
+    // Use progress_percentage if available, otherwise fall back to progress
+    const progressPercent = toNumber(rawCourse.progress_percentage);
+    if (progressPercent !== undefined) {
+      ongoingCourse.progress_percentage = progressPercent;
+      ongoingCourse.progress = progressPercent; // Also set progress for compatibility
+    }
+    
+    const completedSteps = toNumber(rawCourse.completed_steps);
+    if (completedSteps !== undefined) {
+      ongoingCourse.completed_steps = completedSteps;
+    }
+    
+    const totalSteps = toNumber(rawCourse.total_steps);
+    if (totalSteps !== undefined) {
+      ongoingCourse.total_steps = totalSteps;
+    }
+    
+    const lastActivity = rawCourse.last_activity as string | undefined;
+    if (typeof lastActivity === "string") {
+      ongoingCourse.last_activity = lastActivity;
+    }
+    
+    const estimatedCompletion = rawCourse.estimated_completion as string | undefined;
+    if (typeof estimatedCompletion === "string") {
+      ongoingCourse.estimated_completion = estimatedCompletion;
+    }
+    
+    const incompleteStep = rawCourse.incomplete_step;
+    if (incompleteStep && typeof incompleteStep === "object") {
+      const step = incompleteStep as Record<string, unknown>;
+      ongoingCourse.incomplete_step = {
+        type: step.type as string | undefined,
+        id: toNumber(step.id),
+        title: step.title as string | undefined,
+        lesson_id: toNumber(step.lesson_id),
+      };
+    }
+    
+    return ongoingCourse;
+  });
+
   return {
-    courses: normalizeCourses({ data: { courses: ongoingCourses } }),
+    courses: enhancedCourses,
     summary: {
       totalOngoing: toNumber(summaryRaw.total_ongoing) ?? 0,
       totalEnrolled: toNumber(summaryRaw.total_enrolled) ?? 0,

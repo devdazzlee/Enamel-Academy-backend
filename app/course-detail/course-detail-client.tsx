@@ -560,10 +560,13 @@ export function CourseDetailClient() {
   const mainDescription = typeof mainDescriptionRaw === 'string' && mainDescriptionRaw.trim() 
     ? mainDescriptionRaw 
     : "";
-  // Use raw HTML if available, otherwise use sanitized text
-  const descriptionHtml = mainDescription || settingsDescription || "";
-  const descriptionText = descriptionHtml || "No description returned by API.";
-  const hasDescriptionHtml = descriptionHtml && descriptionHtml !== "No description returned by API." && descriptionHtml.includes('<');
+  
+  // Prioritize settings.short_description if available, otherwise use main description
+  // settings.short_description is the primary source for course description
+  const descriptionHtml = settingsDescription || mainDescription || "";
+  const descriptionText = descriptionHtml || "";
+  // Check if description contains HTML tags (not just empty or plain text)
+  const hasDescriptionHtml = descriptionHtml && descriptionHtml.trim().length > 0 && descriptionHtml.includes('<');
   const difficultyLabel = sanitizeApiText(apiCourse.difficulty ?? (course as any).level ?? "", "");
   const formatLabel = sanitizeApiText(apiCourse.format ?? "", "");
   const planLabel = sanitizeApiText(apiCourse.plan ?? "", "");
@@ -600,7 +603,7 @@ export function CourseDetailClient() {
           {/* Main Content - Left Side */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-8">
             {/* Hero Image */}
-            <div className="relative rounded-lg overflow-hidden shadow-lg">
+            <div className="relative rounded-lg overflow-hidden shadow-lg h-64 sm:h-80 md:h-96">
               {bannerImage ? (
               <img 
                   src={bannerImage}
@@ -608,7 +611,7 @@ export function CourseDetailClient() {
                 className="w-full h-full object-cover"
               />
               ) : (
-                <div className="w-full h-64 bg-gray-200" />
+                <div className="w-full h-full bg-gray-200" />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
                 <div className="p-4 sm:p-6 md:p-8 text-white">
@@ -636,15 +639,15 @@ export function CourseDetailClient() {
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">About This Course</h2>
               {hasDescriptionHtml ? (
                 <div 
-                  className="text-gray-600 text-sm leading-relaxed prose prose-sm max-w-none"
+                  className="text-gray-600 text-sm sm:text-base leading-relaxed prose prose-sm max-w-none mb-4 sm:mb-6 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4"
                   dangerouslySetInnerHTML={{ __html: descriptionHtml }}
                 />
-              ) : (
-                <p className="text-gray-600 text-sm leading-relaxed">
+              ) : descriptionText && descriptionText.trim().length > 0 ? (
+                <p className="text-gray-600 text-sm sm:text-base leading-relaxed mb-4 sm:mb-6">
                   {descriptionText}
                 </p>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+              ) : null}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm mt-4 sm:mt-6">
                 {difficultyLabel && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <BarChart size={16} />

@@ -45,6 +45,7 @@ interface Answer {
 type AssessmentQuestion = {
   id: number
   question: string
+  questionTitle?: string
   description?: string
   options: string[]
   correctAnswer: number
@@ -156,6 +157,7 @@ export default function CoursePlayerPage() {
   const [assignmentDetailSummary, setAssignmentDetailSummary] = useState("")
   const [quizDetailSummary, setQuizDetailSummary] = useState("")
   const [quizAttemptsSummary, setQuizAttemptsSummary] = useState("")
+  const [currentQuizTitle, setCurrentQuizTitle] = useState("")
   const [assessmentMetaLoading, setAssessmentMetaLoading] = useState(false)
   const [assessmentMetaError, setAssessmentMetaError] = useState("")
   const [selectedAssignmentId, setSelectedAssignmentId] = useState("")
@@ -336,8 +338,12 @@ export default function CoursePlayerPage() {
         setAssessmentMetaLoading(true)
         setAssessmentMetaError("")
         const optionalApiErrors: string[] = []
-        const [courseResponse, assessmentsResponse, assignmentsResponse, quizzesResponse, quizStatsResponse, assignmentStatsResponse] = await Promise.all([
+        const [courseResponse, dashboardResponse, assessmentsResponse, assignmentsResponse, quizzesResponse, quizStatsResponse, assignmentStatsResponse] = await Promise.all([
           authApi.get(API_PATHS.courses.details, { params: { id: courseId } }),
+          authApi.get(API_PATHS.dashboard.courseById(courseId)).catch((error) => {
+            optionalApiErrors.push(getApiErrorMessage(error))
+            return null
+          }),
           assignmentService.courseAssessments(courseId).catch((error) => {
             optionalApiErrors.push(getApiErrorMessage(error))
             return null
@@ -361,9 +367,15 @@ export default function CoursePlayerPage() {
         ])
         const data = courseResponse.data
         if (data?.success && data?.data) {
-          setCourse(data.data)
-          setCourseContent(data.data.course ?? {})
-          setIsCourseCompletedByApi(Boolean((data.data.course as Record<string, unknown> | undefined)?.is_completed))
+          // Merge dashboard data if available (contains resume_point and progress)
+          let mergedData = data.data
+          if (dashboardResponse?.data?.success && dashboardResponse.data.data) {
+            const dashboardData = dashboardResponse.data.data as Record<string, unknown>
+            mergedData = { ...data.data, ...dashboardData }
+          }
+          setCourse(mergedData)
+          setCourseContent(mergedData.course ?? {})
+          setIsCourseCompletedByApi(Boolean((mergedData.course as Record<string, unknown> | undefined)?.is_completed))
 
           // Fetch assessment questions from API only - no hardcoded fallback
           const assessmentsRoot = (assessmentsResponse && typeof assessmentsResponse === "object" ? assessmentsResponse : {}) as Record<string, unknown>
@@ -438,10 +450,11 @@ export default function CoursePlayerPage() {
           const mappedAssignments: AssessmentSummaryItem[] = assignmentList.map((item, idx) => {
             const row = toRecord(item)
             const apiId = toIdString(row) || null
-            const id = apiId || `assignment-${idx + 1}`
+            const id = apiId || String(idx + 1)
+            const assignmentTitle = pickString(row.title, "")
             return {
               id,
-              title: pickString(row.title, `Assignment ${idx + 1}`),
+              title: assignmentTitle || id,
               status: toStatus(row),
               apiId,
             }
@@ -449,10 +462,11 @@ export default function CoursePlayerPage() {
           const mappedQuizzes: AssessmentSummaryItem[] = quizList.map((item, idx) => {
             const row = toRecord(item)
             const apiId = toIdString(row) || null
-            const id = apiId || `quiz-${idx + 1}`
+            const id = apiId || String(idx + 1)
+            const quizTitle = pickString(row.title, "")
             return {
               id,
-              title: pickString(row.title, `Quiz ${idx + 1}`),
+              title: quizTitle || id,
               status: toStatus(row),
               apiId,
             }
@@ -466,34 +480,37 @@ export default function CoursePlayerPage() {
             const quizQuestionsFromApi: AssessmentQuestion[] = []
             for (const quizItem of quizList) {
               const quiz = toRecord(quizItem)
+              const quizTitle = pickString(quiz.title, "")
+              // Store quiz title from first quiz if not already set
+              if (quizTitle && !currentQuizTitle) {
+                setCurrentQuizTitle(quizTitle)
+              }
               const questions = Array.isArray(quiz.questions) ? quiz.questions : []
               for (const q of questions) {
                 const question = toRecord(q)
                 const rawTitle = pickString(question.title, "")
                 const rawDescription = pickString(question.description, "")
                 const sanitizedTitle = sanitizeApiText(rawTitle, "")
-                const sanitizedDescription = sanitizeApiText(rawDescription, "")
+                // Strip HTML from description but keep the text content
+                const sanitizedDescription = rawDescription 
+                  ? rawDescription.replace(/<[^>]*>/g, "").trim()
+                  : sanitizeApiText(rawDescription, "")
 
-                // API sends title as a label (e.g. "Question 1") and description as the actual question text.
-                // Use description as the primary question if it contains meaningful content.
-                const descriptionIsLabel = /^question\s*\d*$/i.test(sanitizedDescription.trim())
-                const titleIsLabel = /^question\s*\d*$/i.test(sanitizedTitle.trim())
+                // Store title and description separately
+                // Title is usually "Question 1" or similar label
+                // Description contains the actual question text
+                let questionTitle: string | undefined = sanitizedTitle || undefined
+                let questionText: string = sanitizedDescription || sanitizedTitle || ""
 
-                let questionText: string
-                let questionLabel: string | undefined
-
-                if (sanitizedDescription && !descriptionIsLabel) {
-                  // Description has the real question → use it as primary
-                  questionText = sanitizedDescription
-                  questionLabel = titleIsLabel ? undefined : sanitizedTitle || undefined
-                } else if (sanitizedTitle && !titleIsLabel) {
-                  // Title has the real question
+                // If description is empty but title has content, use title as question
+                if (!sanitizedDescription && sanitizedTitle) {
                   questionText = sanitizedTitle
-                  questionLabel = undefined
-                } else {
-                  // Both are labels or empty — use whichever is available
-                  questionText = sanitizedTitle || sanitizedDescription || ""
-                  questionLabel = undefined
+                  questionTitle = undefined
+                }
+
+                // If title is just "Question X", we can use it as a label or skip it
+                if (questionTitle && /^question\s*\d*$/i.test(questionTitle.trim())) {
+                  // It's just a label, we'll use it as the question title
                 }
 
                 if (!questionText) continue
@@ -548,7 +565,8 @@ export default function CoursePlayerPage() {
                   quizQuestionsFromApi.push({
                     id: typeof question.id === "number" ? question.id : quizQuestionsFromApi.length + 1,
                     question: questionText,
-                    description: questionLabel,
+                    questionTitle: questionTitle,
+                    description: undefined,
                     options,
                     correctAnswer,
                     explanation: sanitizeApiText(question.explanation ?? question.feedback ?? "", "Review the course content and retry this question."),
@@ -585,8 +603,12 @@ export default function CoursePlayerPage() {
 
           const firstAssignmentId = mappedAssignments[0]?.apiId
           const firstQuizId = mappedQuizzes[0]?.apiId
+          const firstQuizTitle = mappedQuizzes[0]?.title || ""
           if (firstAssignmentId) setSelectedAssignmentId(firstAssignmentId)
-          if (firstQuizId) setSelectedQuizId(firstQuizId)
+          if (firstQuizId) {
+            setSelectedQuizId(firstQuizId)
+            setCurrentQuizTitle(firstQuizTitle)
+          }
           const detailCalls: Promise<unknown>[] = []
           const detailKeys: Array<"assignment" | "quiz" | "attempts"> = []
           if (firstAssignmentId) {
@@ -617,14 +639,17 @@ export default function CoursePlayerPage() {
           const quizDetailData = toRecord(toRecord(quizDetailRes).data)
           const attempts = toArrayFromRoot(quizAttemptsRes, ["attempts", "items", "results"])
 
+          const assignmentTitleFromDetail = pickString(assignmentDetailData.title, "")
           setAssignmentDetailSummary(
             firstAssignmentId
-              ? pickString(assignmentDetailData.title, `Assignment ${firstAssignmentId} loaded from API`)
+              ? assignmentTitleFromDetail ? `${assignmentTitleFromDetail} loaded from API` : `Assignment ${firstAssignmentId} loaded from API`
               : "No assignment details available."
           )
+          const quizTitleFromDetail = pickString(quizDetailData.title, firstQuizTitle)
+          if (quizTitleFromDetail) setCurrentQuizTitle(quizTitleFromDetail)
           setQuizDetailSummary(
             firstQuizId
-              ? pickString(quizDetailData.title, `Quiz ${firstQuizId} loaded from API`)
+              ? `${quizTitleFromDetail || firstQuizId} loaded from API`
               : "No quiz details available."
           )
           setQuizAttemptsSummary(
@@ -738,7 +763,7 @@ export default function CoursePlayerPage() {
       const detail = await assignmentService.assignmentDetails(assignmentId)
       const root = (detail && typeof detail === "object" ? detail : {}) as Record<string, unknown>
       const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>
-      const title = typeof data.title === "string" && data.title.trim() ? data.title : `Assignment ${assignmentId}`
+      const title = typeof data.title === "string" && data.title.trim() ? data.title : ""
       setAssignmentDetailSummary(`${title} loaded from API.`)
     } catch {
       setInsightActionError("Unable to load selected assignment details.")
@@ -758,8 +783,9 @@ export default function CoursePlayerPage() {
       ])
       const detailRoot = (detail && typeof detail === "object" ? detail : {}) as Record<string, unknown>
       const detailData = (detailRoot.data && typeof detailRoot.data === "object" ? detailRoot.data : detailRoot) as Record<string, unknown>
-      const title = typeof detailData.title === "string" && detailData.title.trim() ? detailData.title : `Quiz ${quizId}`
-      setQuizDetailSummary(`${title} loaded from API.`)
+      const title = typeof detailData.title === "string" && detailData.title.trim() ? detailData.title : ""
+      if (title) setCurrentQuizTitle(title)
+      setQuizDetailSummary(title ? `${title} loaded from API.` : `Quiz ${quizId} loaded from API.`)
 
       const attemptsRoot = (attemptsRes && typeof attemptsRes === "object" ? attemptsRes : {}) as Record<string, unknown>
       const attemptsData = (attemptsRoot.data && typeof attemptsRoot.data === "object" ? attemptsRoot.data : attemptsRoot) as Record<string, unknown>
@@ -781,24 +807,19 @@ export default function CoursePlayerPage() {
           const rawTitle = pickString(question.title, "")
           const rawDescription = pickString(question.description, "")
           const sanitizedTitle = sanitizeApiText(rawTitle, "")
-          const sanitizedDescription = sanitizeApiText(rawDescription, "")
+          // Strip HTML from description but keep the text content
+          const sanitizedDescription = rawDescription 
+            ? rawDescription.replace(/<[^>]*>/g, "").trim()
+            : sanitizeApiText(rawDescription, "")
 
-          // API sends title as a label (e.g. "Question 1") and description as the actual question text.
-          const descriptionIsLabel = /^question\s*\d*$/i.test(sanitizedDescription.trim())
-          const titleIsLabel = /^question\s*\d*$/i.test(sanitizedTitle.trim())
+          // Store title and description separately
+          let questionTitle: string | undefined = sanitizedTitle || undefined
+          let questionText: string = sanitizedDescription || sanitizedTitle || ""
 
-          let questionText: string
-          let questionLabel: string | undefined
-
-          if (sanitizedDescription && !descriptionIsLabel) {
-            questionText = sanitizedDescription
-            questionLabel = titleIsLabel ? undefined : sanitizedTitle || undefined
-          } else if (sanitizedTitle && !titleIsLabel) {
+          // If description is empty but title has content, use title as question
+          if (!sanitizedDescription && sanitizedTitle) {
             questionText = sanitizedTitle
-            questionLabel = undefined
-          } else {
-            questionText = sanitizedTitle || sanitizedDescription || ""
-            questionLabel = undefined
+            questionTitle = undefined
           }
 
           if (!questionText) continue
@@ -852,7 +873,8 @@ export default function CoursePlayerPage() {
             quizQuestionsFromDetail.push({
               id: typeof question.id === "number" ? question.id : quizQuestionsFromDetail.length + 1,
               question: questionText,
-              description: questionLabel,
+              questionTitle: questionTitle,
+              description: undefined,
               options,
               correctAnswer,
               explanation: sanitizeApiText(question.explanation ?? question.feedback ?? "", "Review the course content and retry this question."),
@@ -1519,6 +1541,7 @@ export default function CoursePlayerPage() {
     void trackCourseProgress(learnPage, progressPct, isCompleted, 0)
   }, [learnPage, activeSection]) // Only depend on actual state changes, not functions
 
+  // Resume from URL parameter (legacy support)
   useEffect(() => {
     if (!resumeLessonParam || resumeApplied || lessonSteps.length === 0) return
     const target = resumeLessonParam.toLowerCase()
@@ -1534,6 +1557,98 @@ export default function CoursePlayerPage() {
     }
     setResumeApplied(true)
   }, [resumeLessonParam, resumeApplied, lessonSteps])
+
+  // Resume from API progress data (resume_point or incomplete_step)
+  // This runs AFTER course data and lessonSteps are loaded
+  useEffect(() => {
+    // Only run once when all dependencies are ready
+    if (resumeApplied || lessonSteps.length === 0 || !course || loading) return
+    
+    const applyResumePoint = () => {
+      try {
+        // Get data from course object (already merged with dashboard data)
+        const courseData = course as Record<string, unknown>
+        
+        // Check if course is completed - if so, don't resume
+        const courseObj = (courseData.course && typeof courseData.course === "object" ? courseData.course : {}) as Record<string, unknown>
+        const isCompleted = Boolean(courseObj.is_completed)
+        if (isCompleted) {
+          setResumeApplied(true)
+          return
+        }
+        
+        // Check for resume_point first (more specific)
+        const resumePoint = (courseData.resume_point && typeof courseData.resume_point === "object" ? courseData.resume_point : null) as Record<string, unknown> | null
+        const progress = (courseData.progress && typeof courseData.progress === "object" ? courseData.progress : {}) as Record<string, unknown>
+        const incompleteStep = (progress.incomplete_step && typeof progress.incomplete_step === "object" ? progress.incomplete_step : null) as Record<string, unknown> | null
+        
+        // Priority: resume_point > incomplete_step
+        const resumeData = resumePoint || incompleteStep
+        if (!resumeData) {
+          setResumeApplied(true)
+          return
+        }
+        
+        const resumeType = pickString(resumeData.type, "")
+        
+        // If it's a quiz, switch to assess section
+        if (resumeType === "quiz") {
+          const quizId = pickString(resumeData.id, "")
+          if (quizId && quizItems.length > 0) {
+            const quizExists = quizItems.some(q => q.apiId === quizId)
+            if (quizExists) {
+              setSelectedQuizId(quizId)
+              setActiveSection("assess")
+              setResumeApplied(true)
+              console.log('[Resume] Resumed to quiz:', quizId)
+              return
+            }
+          }
+          setResumeApplied(true)
+          return
+        }
+        
+        // For lessons and topics, we need to find the lesson
+        // If it's a topic, use lesson_id; if it's a lesson, use id
+        let lessonIdToFind: string = ""
+        if (resumeType === "topic") {
+          // For topics, use the lesson_id from resume_point (this is the key fix)
+          lessonIdToFind = pickString(resumeData.lesson_id, "")
+        } else {
+          // For lessons, use the id
+          lessonIdToFind = pickString(resumeData.id ?? resumeData.lesson_id, "")
+        }
+        
+        if (!lessonIdToFind) {
+          setResumeApplied(true)
+          return
+        }
+        
+        // Find the lesson by ID (exact match)
+        const stepIndex = lessonSteps.findIndex((step) => {
+          const stepId = String(step.id || "")
+          return stepId === lessonIdToFind
+        })
+        
+        if (stepIndex >= 0) {
+          setActiveSection("learn")
+          // learnPages[0] is Course Overview, so lessons start at index 1
+          setLearnPage(stepIndex + 1)
+          setNavGuardMessage("")
+          setResumeApplied(true)
+          console.log('[Resume] Successfully resumed to lesson:', { stepIndex: stepIndex + 1, lessonId: lessonIdToFind, lessonTitle: lessonSteps[stepIndex].title })
+        } else {
+          console.warn('[Resume] Could not find lesson with ID:', lessonIdToFind, 'Available lesson IDs:', lessonSteps.map(s => s.id))
+          setResumeApplied(true)
+        }
+      } catch (error) {
+        console.error('[Resume] Failed to apply resume point:', error)
+        setResumeApplied(true)
+      }
+    }
+    
+    applyResumePoint()
+  }, [course, lessonSteps, resumeApplied, courseId, loading, quizItems])
 
   const sectionItems: { key: Section; label: string; number: number }[] = [
     { key: "about", label: "About", number: 1 },
@@ -2041,7 +2156,9 @@ export default function CoursePlayerPage() {
     if (quizQuestions.length === 0) {
       return (
         <div>
-          <h1 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1">Assessment</h1>
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1">
+            {currentQuizTitle || "Assessment"}
+          </h1>
           <p className="text-gray-500 text-xs sm:text-sm mb-4 sm:mb-6">No assessment questions available from API yet.</p>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-4 sm:p-8">
             <p className="text-sm text-gray-700">You can continue to resources and feedback.</p>
@@ -2071,82 +2188,93 @@ export default function CoursePlayerPage() {
 
     return (
       <div>
-        <h1 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1">Assessment</h1>
-        <p className="text-gray-500 text-xs sm:text-sm mb-4 sm:mb-6">Answer all questions to complete this section</p>
+        <div className="mb-4">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">
+            {currentQuizTitle ? currentQuizTitle : "Assessment"}
+          </h1>
+          <p className="text-gray-600 text-xs sm:text-sm">Answer all questions to complete this section</p>
+        </div>
 
         {/* Progress indicator */}
-        <div className="mb-4 sm:mb-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 mb-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs sm:text-sm text-gray-600">
+            <span className="text-xs sm:text-sm text-gray-700 font-medium">
               {selectedAnswers.filter((a: number | null) => a !== null).length} of {quizQuestions.length} answered
             </span>
-            <span className="text-xs sm:text-sm font-medium text-purple-600">
+            <span className="text-sm sm:text-base font-bold text-purple-600">
               {quizQuestions.length > 0
                 ? Math.round((selectedAnswers.filter((a: number | null) => a !== null).length / quizQuestions.length) * 100)
                 : 0}%
             </span>
                 </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
             <div
-              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+              className="bg-gradient-to-r from-purple-600 to-purple-700 h-full rounded-full transition-all duration-500 ease-out"
               style={{ width: `${quizQuestions.length > 0 ? (selectedAnswers.filter((a: number | null) => a !== null).length / quizQuestions.length) * 100 : 0}%` }}
             />
                 </div>
               </div>
 
         {/* Questions */}
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-3 sm:space-y-4">
           {quizQuestions.map((q, qi) => (
             <div
               key={q.id}
-              className={`bg-white border rounded-xl p-4 sm:p-6 transition-colors ${
+              className={`bg-white border-2 rounded-lg p-3 sm:p-4 transition-all duration-200 shadow-sm ${
                 selectedAnswers[qi] !== null
-                  ? "border-purple-200 bg-purple-50/30"
-                  : "border-gray-200"
+                  ? "border-purple-300 bg-purple-50/50 shadow-md"
+                  : "border-gray-200 hover:border-gray-300"
               }`}
             >
-              {/* Question number + text */}
-              <div className="flex gap-3 mb-4">
-                <span className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-100 text-purple-700 text-xs sm:text-sm font-bold flex items-center justify-center">
-                  {qi + 1}
-                </span>
-                <div className="pt-1">
-                  <p className="font-medium text-gray-900 text-sm sm:text-base leading-snug">
-                    {q.question}
-                  </p>
-                  {q.description && (
-                    <p className="text-gray-500 text-xs sm:text-sm mt-1">{q.description}</p>
-                  )}
+              {/* Question number + title + text */}
+              <div className="mb-3">
+                <div className="flex items-start gap-2 mb-2">
+                  <span className="shrink-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-purple-100 text-purple-700 text-xs sm:text-sm font-bold flex items-center justify-center">
+                    {qi + 1}
+                  </span>
+                  <div className="flex-1 pt-0.5">
+                    {q.questionTitle && (
+                      <h3 className="font-semibold text-gray-800 text-xs sm:text-sm mb-1">
+                        {q.questionTitle}
+                      </h3>
+                    )}
+                    <p className="font-medium text-gray-900 text-sm sm:text-base leading-relaxed">
+                      {q.question}
+                    </p>
+                    {q.description && (
+                      <p className="text-gray-600 text-xs sm:text-sm mt-1 leading-relaxed">{q.description}</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Options */}
-              <div className="grid grid-cols-1 gap-2 pl-10 sm:pl-11">
+              <div className="grid grid-cols-1 gap-2 pl-0">
                 {q.options.map((opt, oi) => {
                   const isSelected = selectedAnswers[qi] === oi
                   return (
-                  <button 
-                    key={oi}
-                    onClick={() => {
-                      const copy = [...selectedAnswers]
-                      copy[qi] = oi
-                      setSelectedAnswers(copy)
-                    }}
-                      className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-all duration-150 flex items-center gap-3 ${
+                    <button 
+                      key={oi}
+                      onClick={() => {
+                        const copy = [...selectedAnswers]
+                        copy[qi] = oi
+                        setSelectedAnswers(copy)
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs sm:text-sm transition-all duration-150 flex items-center gap-2 ${
                         isSelected
                           ? "border-purple-600 bg-purple-50 text-purple-700 font-medium shadow-sm"
                           : "border-gray-200 hover:border-purple-300 hover:bg-gray-50 text-gray-700"
                       }`}
                     >
-                      <span className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      <span className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                         isSelected ? "border-purple-600 bg-purple-600" : "border-gray-300"
                       }`}>
                         {isSelected && (
                           <span className="w-2 h-2 rounded-full bg-white" />
                         )}
                       </span>
-                      <span>{opt}</span>
-                  </button>
+                      <span className="flex-1">{opt}</span>
+                    </button>
                   )
                 })}
               </div>
@@ -2155,24 +2283,26 @@ export default function CoursePlayerPage() {
         </div>
 
         {/* Submit */}
-        <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-        {!allAnswered && (
-            <p className="text-amber-600 text-xs sm:text-sm">
-              Please answer all questions before submitting.
-            </p>
-          )}
-          <div className="sm:ml-auto">
-                        <button
-            onClick={handleCheckAnswers}
-            disabled={!allAnswered}
-            className={`px-6 py-3 rounded-lg font-semibold text-sm transition-colors ${
-              allAnswered
-                  ? "bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-              Submit Assessment
-          </button>
+        <div className="mt-4 sm:mt-6 bg-white border border-gray-200 rounded-lg p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            {!allAnswered && (
+              <p className="text-amber-600 text-xs sm:text-sm font-medium">
+                Please answer all questions before submitting.
+              </p>
+            )}
+            <div className={`${!allAnswered ? 'sm:ml-auto' : 'w-full sm:w-auto'}`}>
+              <button
+                onClick={handleCheckAnswers}
+                disabled={!allAnswered}
+                className={`w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold text-sm sm:text-base transition-all duration-200 ${
+                  allAnswered
+                    ? "bg-purple-600 text-white hover:bg-purple-700 shadow-md hover:shadow-lg"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                Submit Assessment
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -2268,9 +2398,16 @@ export default function CoursePlayerPage() {
                   ) : (
                     <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mt-0.5 flex-shrink-0" />
                   )}
-                  <h4 className="font-semibold text-gray-900 text-xs sm:text-base">
-                    Q{qi + 1} {q.question}
+                  <div>
+                    {q.questionTitle && (
+                      <h4 className="font-semibold text-gray-800 text-xs sm:text-sm mb-1">
+                        {q.questionTitle}
+                      </h4>
+                    )}
+                    <h4 className="font-semibold text-gray-900 text-sm sm:text-base">
+                      {q.questionTitle ? q.question : `Q${qi + 1}: ${q.question}`}
                   </h4>
+                  </div>
                 </div>
 
                 <div className="space-y-2 mb-3">
@@ -2315,38 +2452,72 @@ export default function CoursePlayerPage() {
     return renderCompleted()
   }
 
+  const getFeaturePageUrl = (title: string): string | null => {
+    const titleLower = title.toLowerCase()
+    // Certificate of Completion
+    if (titleLower.includes("certificate") && titleLower.includes("completion")) {
+      return `/course/${courseId}/features/certificate`
+    }
+    // Lifetime Access
+    if (titleLower.includes("lifetime") && titleLower.includes("access")) {
+      return `/course/${courseId}/features/lifetime-access`
+    }
+    // Quizzes & Assessments
+    if ((titleLower.includes("quiz") || titleLower.includes("quizzes")) && 
+        (titleLower.includes("assessment") || titleLower.includes("assessments"))) {
+      return `/course/${courseId}/features/quizzes-assessments`
+    }
+    // Downloadable Resources
+    if ((titleLower.includes("downloadable") || titleLower.includes("download")) && 
+        (titleLower.includes("resource") || titleLower.includes("resources"))) {
+      return `/course/${courseId}/features/downloadable-resources`
+    }
+    return null
+  }
+
   const renderResources = () => (
     <div>
       <h1 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1">Resources</h1>
       <p className="text-gray-500 text-xs sm:text-sm mb-4 sm:mb-6">Additional resources and further reading</p>
 
       <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-6 space-y-2 sm:space-y-3">
-        {resources.map((r, i) => (
+        {resources.map((r, i) => {
+          const featurePageUrl = getFeaturePageUrl(r.title)
+          const hasLink = r.url || featurePageUrl
+          
+          return (
           <button
             key={r.id || i}
             type="button"
-            onClick={() => handleOpenResource(r)}
-            disabled={!r.url}
+              onClick={() => {
+                if (featurePageUrl) {
+                  router.push(featurePageUrl)
+                } else if (r.url) {
+                  handleOpenResource(r)
+                }
+              }}
+              disabled={!hasLink}
             className={`w-full flex items-center justify-between p-3 sm:p-4 border rounded-lg sm:rounded-xl transition-colors group ${
-              r.url
+                hasLink
                 ? "border-gray-200 hover:border-purple-300 hover:bg-purple-50/30"
                 : "border-gray-200 bg-gray-50 cursor-not-allowed"
             }`}
           >
             <div className="flex items-start gap-3 text-left">
-              <Link2 className={`w-5 h-5 mt-0.5 flex-shrink-0 ${r.url ? "text-purple-600" : "text-gray-400"}`} />
+                <Link2 className={`w-5 h-5 mt-0.5 flex-shrink-0 ${hasLink ? "text-purple-600" : "text-gray-400"}`} />
               <div>
-                <h3 className={`font-semibold text-sm sm:text-base transition-colors ${r.url ? "text-gray-900 group-hover:text-purple-700" : "text-gray-700"}`}>
+                  <h3 className={`font-semibold text-sm sm:text-base transition-colors ${hasLink ? "text-gray-900 group-hover:text-purple-700" : "text-gray-700"}`}>
                   {i + 1}. {r.title}
                 </h3>
                 <p className="text-gray-500 text-xs sm:text-sm mt-0.5">{r.description}</p>
               </div>
             </div>
-            <span className={`text-xs sm:text-sm font-medium ${r.url ? "text-purple-600" : "text-gray-400"}`}>
-              {resourceActionLoadingId === r.id ? "Opening..." : r.url ? "Open" : "No link"}
+              <span className={`text-xs sm:text-sm font-medium ${hasLink ? "text-purple-600" : "text-gray-400"}`}>
+                {resourceActionLoadingId === r.id ? "Opening..." : featurePageUrl ? "View" : r.url ? "Open" : "No link"}
             </span>
           </button>
-        ))}
+          )
+        })}
         {resourceActionError && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs sm:text-sm text-red-700">
             {resourceActionError}
@@ -2491,39 +2662,9 @@ export default function CoursePlayerPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <button
-            onClick={async () => {
-              // If we already have the URL from API, open directly
-              if (certificateUrl) {
-                window.open(certificateUrl, '_blank')
-                return
-              }
-              // Otherwise fetch from API on click
-              try {
-                const res = await certificatesService.getCourseCertificate(courseId)
-                const certRoot = (res && typeof res === "object" ? res : {}) as Record<string, unknown>
-                const certData = (certRoot.data && typeof certRoot.data === "object" ? certRoot.data : certRoot) as Record<string, unknown>
-                const url = pickString(certData.certificate_url ?? certData.certificateUrl, "")
-                const dlUrl = pickString(certData.download_url ?? certData.downloadUrl, "")
-                if (url) {
-                  setCertificateUrl(url)
-                  if (dlUrl) setCertificateDownloadUrl(dlUrl)
-                  window.open(url, '_blank')
-                } else {
-                  const errorMsg = typeof certRoot.message === "string" ? certRoot.message : ""
-                  if (errorMsg.includes("not completed")) {
-                    alert("Certificate is not available yet. The quiz step needs to be completed through LearnDash's native interface for the backend to recognize course completion. Please complete the quiz in LearnDash and try again.")
-                  } else {
-                    alert("Certificate is not available from the API yet. The backend may still be processing your completion.")
-                  }
-                }
-              } catch (err: any) {
-                const errorMsg = err?.response?.data?.message || err?.message || ""
-                if (errorMsg.includes("not completed")) {
-                  alert("Certificate is not available yet. The quiz step needs to be completed through LearnDash's native interface for the backend to recognize course completion. Please complete the quiz in LearnDash and try again.")
-                } else {
-                  alert("Unable to fetch certificate. Please try again later.")
-                }
-              }
+            onClick={() => {
+              // Navigate to certificate view page which will fetch and display the certificate
+              router.push(`/course/${courseId}/certificate`)
             }}
             className="px-3 sm:px-4 py-2.5 sm:py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-xs sm:text-sm"
           >

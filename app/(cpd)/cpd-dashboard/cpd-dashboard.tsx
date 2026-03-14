@@ -227,13 +227,16 @@ export default function CPDDashboard() {
           // Only include if we have a title from API
           if (!title) return null;
           const type = getText(row.activity_type ?? row.type, 'External');
+          const category = getText(row.gdc_category ?? row.category, '');
+          // Determine icon: if certificate_url exists, it's a platform course (award), otherwise external (file)
+          const hasCertificate = Boolean(row.certificate_url);
           return {
             title,
-            date: formatDate(row.date_completed ?? row.date ?? row.completed_at ?? row.completion_date),
+            date: formatDate(row.date_completed ?? row.date ?? row.completed_at ?? row.completion_date ?? row.completion_date_formatted),
             hours: getNum(row.hours ?? row.duration_hours ?? row.cpd_hours, 0),
-            category: getText(row.gdc_category ?? row.category, ''),
+            category: category || undefined, // Only set if category exists
             type,
-            icon: type.toLowerCase().includes('platform') ? 'award' : 'file',
+            icon: hasCertificate || type.toLowerCase().includes('platform') ? 'award' : 'file',
           } as RecentActivityView;
         }).filter((activity): activity is RecentActivityView => activity !== null);
         setRecentActivities(recent);
@@ -508,9 +511,11 @@ export default function CPDDashboard() {
                             <span>{activity.hours} hours</span>
                           </span>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            <span className="px-1.5 sm:px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-                              {activity.category}
-                            </span>
+                            {activity.category && (
+                              <span className="px-1.5 sm:px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                                {activity.category}
+                              </span>
+                            )}
                             <span className="px-1.5 sm:px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-xs">
                               {activity.type}
                             </span>

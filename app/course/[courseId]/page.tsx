@@ -44,6 +44,7 @@ interface Answer {
 
 type AssessmentQuestion = {
   id: number
+  questionId?: string | number // Original question ID from API
   question: string
   questionTitle?: string
   description?: string
@@ -194,6 +195,32 @@ export default function CoursePlayerPage() {
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>([])
   const [showResults, setShowResults] = useState(false)
   const [assessmentScore, setAssessmentScore] = useState(0)
+  const [quizSubmissionResponse, setQuizSubmissionResponse] = useState<{
+    attempt_id?: number
+    attempt_number?: number
+    score?: number
+    earned_points?: number
+    total_points?: number
+    passed?: boolean
+    passing_score?: number
+    time_taken?: number
+    question_results?: Record<string, {
+      question_id: number
+      title?: string
+      type?: string
+      user_answer: number | number[] | string
+      correct_answer: number[] | string[]
+      is_correct: boolean
+      points?: number
+      points_earned?: number
+    }>
+    course_progress?: {
+      completed_steps?: number
+      total_steps?: number
+      percentage?: number
+      is_completed?: boolean
+    }
+  } | null>(null)
 
   // Evaluate additional state
   const [ratings, setRatings] = useState<number[]>(feedbackCriteria.map(() => 0))
@@ -207,6 +234,8 @@ export default function CoursePlayerPage() {
   const [certificateUrl, setCertificateUrl] = useState<string>("")
   const [certificateDownloadUrl, setCertificateDownloadUrl] = useState<string>("")
   const [quizBlockingCompletion, setQuizBlockingCompletion] = useState<{ quizId: string; quizTitle: string } | null>(null)
+  const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false)
+  const [quizSubmitError, setQuizSubmitError] = useState("")
   
   // Track completed lessons and topics to avoid marking them complete multiple times
   // Use refs instead of state to prevent infinite loops in useEffect
@@ -562,8 +591,10 @@ export default function CoursePlayerPage() {
 
                 // Only add if it has at least 2 options
                 if (options.length >= 2) {
+                  const questionIdFromApi = (question.id ?? question.question_id ?? question.questionId) as string | number | undefined
                   quizQuestionsFromApi.push({
                     id: typeof question.id === "number" ? question.id : quizQuestionsFromApi.length + 1,
+                    questionId: questionIdFromApi, // Store original question ID from API
                     question: questionText,
                     questionTitle: questionTitle,
                     description: undefined,
@@ -870,8 +901,10 @@ export default function CoursePlayerPage() {
           }
 
           if (options.length >= 2) {
+            const questionIdFromApi = (question.id ?? question.question_id ?? question.questionId) as string | number | undefined
             quizQuestionsFromDetail.push({
               id: typeof question.id === "number" ? question.id : quizQuestionsFromDetail.length + 1,
+              questionId: questionIdFromApi, // Store original question ID from API
               question: questionText,
               questionTitle: questionTitle,
               description: undefined,
@@ -1687,6 +1720,11 @@ export default function CoursePlayerPage() {
   const handleCheckAnswers = async () => {
     const unanswered = selectedAnswers.filter((a) => a === null).length
     if (unanswered > 0) return
+    
+    // Check if we have a quiz ID to submit
+    if (!selectedQuizId) {
+      console.warn('[Quiz] No quiz ID selected, cannot submit to API')
+      // Still calculate score locally for display
     let correct = 0
     quizQuestions.forEach((q, i) => {
       if (selectedAnswers[i] === q.correctAnswer) correct++
@@ -1696,11 +1734,107 @@ export default function CoursePlayerPage() {
     setAssessmentScore(correct)
     setShowResults(true)
     setAssessmentCompleted(isPassed)
+      return
+    }
 
-    // Note: Quiz completion cannot be marked via API — the backend has no quiz submission endpoint
-    // and the progress endpoint doesn't accept quiz_id. The quiz step must be completed through
-    // LearnDash's native interface for the backend to recognize completion.
-    // The frontend will still show completion based on derived logic (all modules complete).
+    setIsSubmittingQuiz(true)
+    setQuizSubmitError("")
+
+    try {
+      // Format answers according to API structure
+      // The API expects: { questionId: selectedOptionIndex }
+      // where questionId is the actual question ID from the API (as string)
+      // and selectedOptionIndex is 1-based (not 0-based)
+      const answers: Record<string, number> = {}
+      quizQuestions.forEach((q, i) => {
+        const selectedOption = selectedAnswers[i]
+        if (selectedOption !== null) {
+          // Use the original question ID from API, fallback to q.id
+          const questionId = q.questionId !== undefined ? String(q.questionId) : String(q.id)
+          // API expects 1-based index (add 1 to 0-based selectedOption)
+          // Postman examples show: "789": 1 (first option), "790": [1, 2] (first and second options)
+          answers[questionId] = selectedOption + 1
+        }
+      })
+
+      // Calculate score locally
+      let correct = 0
+      quizQuestions.forEach((q, i) => {
+        if (selectedAnswers[i] === q.correctAnswer) correct++
+      })
+      const scorePercValue = quizQuestions.length > 0 ? (correct / quizQuestions.length) * 100 : 0
+      const isPassed = scorePercValue >= 80
+
+      // Submit quiz to API
+      console.log('[Quiz] Submitting quiz to API:', {
+        courseId,
+        quizId: selectedQuizId,
+        answersCount: Object.keys(answers).length,
+        answers
+      })
+
+      const submitResponse = await assignmentService.submitQuiz(courseId, selectedQuizId, {
+        answers,
+        time_taken: 0, // TODO: Track actual time taken if needed
+      })
+
+      console.log('[Quiz] Quiz submitted successfully:', submitResponse)
+
+      // Extract response data
+      const responseRoot = (submitResponse && typeof submitResponse === "object" ? submitResponse : {}) as Record<string, unknown>
+      const responseData = (responseRoot.data && typeof responseRoot.data === "object" ? responseRoot.data : responseRoot) as Record<string, unknown>
+      
+      // Store the full response
+      setQuizSubmissionResponse(responseData as any)
+
+      // Use API response for score and pass status
+      const apiScore = typeof responseData.score === "number" ? responseData.score : 0
+      const apiPassed = typeof responseData.passed === "boolean" ? responseData.passed : false
+      const apiPassingScore = typeof responseData.passing_score === "number" ? responseData.passing_score : 70
+      const apiEarnedPoints = typeof responseData.earned_points === "number" ? responseData.earned_points : 0
+      const apiTotalPoints = typeof responseData.total_points === "number" ? responseData.total_points : 1
+
+      // Calculate score percentage from API
+      const apiScorePercent = apiTotalPoints > 0 ? (apiEarnedPoints / apiTotalPoints) * 100 : 0
+
+      console.log('[Quiz] API Response:', {
+        score: apiScore,
+        earned_points: apiEarnedPoints,
+        total_points: apiTotalPoints,
+        scorePercent: apiScorePercent,
+        passed: apiPassed,
+        passing_score: apiPassingScore
+      })
+
+      // Update UI state with API data
+      setAssessmentScore(apiEarnedPoints) // Use earned points as score
+      setShowResults(true)
+      setAssessmentCompleted(apiPassed) // Use API's passed status
+
+      // Refresh course progress to reflect quiz completion
+      try {
+        await checkCompletionAndCertificate()
+      } catch (progressError) {
+        console.error('[Quiz] Failed to refresh progress after submission:', progressError)
+      }
+    } catch (error: any) {
+      console.error('[Quiz] Failed to submit quiz:', error)
+      const errorMsg = error?.response?.data?.message || error?.message || "Failed to submit quiz. Please try again."
+      setQuizSubmitError(errorMsg)
+      
+      // Still show results locally even if API call failed
+      let correct = 0
+      quizQuestions.forEach((q, i) => {
+        if (selectedAnswers[i] === q.correctAnswer) correct++
+      })
+      const scorePercValue = quizQuestions.length > 0 ? (correct / quizQuestions.length) * 100 : 0
+      const isPassed = scorePercValue >= 80
+      setAssessmentScore(correct)
+      setShowResults(true)
+      setAssessmentCompleted(isPassed)
+    } finally {
+      setIsSubmittingQuiz(false)
+    }
   }
 
   const handleRetry = () => {
@@ -1708,10 +1842,21 @@ export default function CoursePlayerPage() {
     setShowResults(false)
     setAssessmentScore(0)
     setAssessmentCompleted(false)
+    setQuizSubmissionResponse(null) // Clear previous submission response
   }
 
-  const passed = quizQuestions.length > 0 ? (assessmentScore / quizQuestions.length) * 100 >= 80 : false
-  const scorePercent = quizQuestions.length > 0 ? ((assessmentScore / quizQuestions.length) * 100).toFixed(1) : "0.0"
+  // Use API response if available, otherwise calculate locally
+  const apiPassingScore = quizSubmissionResponse?.passing_score ?? 70
+  const apiTotalPoints = quizSubmissionResponse?.total_points ?? quizQuestions.length
+  const apiEarnedPoints = quizSubmissionResponse?.earned_points ?? assessmentScore
+  const apiPassed = quizSubmissionResponse?.passed ?? false
+  
+  // Calculate score percentage
+  const apiScorePercent = apiTotalPoints > 0 ? (apiEarnedPoints / apiTotalPoints) * 100 : 0
+  
+  // Use API data if available, otherwise fallback to local calculation
+  const passed = quizSubmissionResponse ? apiPassed : (quizQuestions.length > 0 ? (assessmentScore / quizQuestions.length) * 100 >= apiPassingScore : false)
+  const scorePercent = quizSubmissionResponse ? apiScorePercent.toFixed(1) : (quizQuestions.length > 0 ? ((assessmentScore / quizQuestions.length) * 100).toFixed(1) : "0.0")
 
   const handleSectionNavigation = (target: Section) => {
     setNavGuardMessage("")
@@ -2230,8 +2375,8 @@ export default function CoursePlayerPage() {
               <div className="mb-3">
                 <div className="flex items-start gap-2 mb-2">
                   <span className="shrink-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-purple-100 text-purple-700 text-xs sm:text-sm font-bold flex items-center justify-center">
-                    {qi + 1}
-                  </span>
+                  {qi + 1}
+                </span>
                   <div className="flex-1 pt-0.5">
                     {q.questionTitle && (
                       <h3 className="font-semibold text-gray-800 text-xs sm:text-sm mb-1">
@@ -2239,11 +2384,11 @@ export default function CoursePlayerPage() {
                       </h3>
                     )}
                     <p className="font-medium text-gray-900 text-sm sm:text-base leading-relaxed">
-                      {q.question}
-                    </p>
-                    {q.description && (
+                    {q.question}
+                  </p>
+                  {q.description && (
                       <p className="text-gray-600 text-xs sm:text-sm mt-1 leading-relaxed">{q.description}</p>
-                    )}
+                  )}
                   </div>
                 </div>
               </div>
@@ -2253,13 +2398,13 @@ export default function CoursePlayerPage() {
                 {q.options.map((opt, oi) => {
                   const isSelected = selectedAnswers[qi] === oi
                   return (
-                    <button 
-                      key={oi}
-                      onClick={() => {
-                        const copy = [...selectedAnswers]
-                        copy[qi] = oi
-                        setSelectedAnswers(copy)
-                      }}
+                  <button 
+                    key={oi}
+                    onClick={() => {
+                      const copy = [...selectedAnswers]
+                      copy[qi] = oi
+                      setSelectedAnswers(copy)
+                    }}
                       className={`w-full text-left px-3 py-2 rounded-lg border text-xs sm:text-sm transition-all duration-150 flex items-center gap-2 ${
                         isSelected
                           ? "border-purple-600 bg-purple-50 text-purple-700 font-medium shadow-sm"
@@ -2274,7 +2419,7 @@ export default function CoursePlayerPage() {
                         )}
                       </span>
                       <span className="flex-1">{opt}</span>
-                    </button>
+                  </button>
                   )
                 })}
               </div>
@@ -2284,24 +2429,36 @@ export default function CoursePlayerPage() {
 
         {/* Submit */}
         <div className="mt-4 sm:mt-6 bg-white border border-gray-200 rounded-lg p-3 sm:p-4">
+          {quizSubmitError && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-xs sm:text-sm">{quizSubmitError}</p>
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            {!allAnswered && (
+        {!allAnswered && (
               <p className="text-amber-600 text-xs sm:text-sm font-medium">
-                Please answer all questions before submitting.
-              </p>
-            )}
+              Please answer all questions before submitting.
+            </p>
+          )}
             <div className={`${!allAnswered ? 'sm:ml-auto' : 'w-full sm:w-auto'}`}>
-              <button
-                onClick={handleCheckAnswers}
-                disabled={!allAnswered}
-                className={`w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold text-sm sm:text-base transition-all duration-200 ${
-                  allAnswered
+                        <button
+            onClick={handleCheckAnswers}
+            disabled={!allAnswered || isSubmittingQuiz}
+                className={`w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
+              allAnswered && !isSubmittingQuiz
                     ? "bg-purple-600 text-white hover:bg-purple-700 shadow-md hover:shadow-lg"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
-              >
-                Submit Assessment
-              </button>
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+              {isSubmittingQuiz ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Submitting...</span>
+                </>
+              ) : (
+                "Submit Assessment"
+              )}
+          </button>
             </div>
           </div>
         </div>
@@ -2345,8 +2502,16 @@ export default function CoursePlayerPage() {
           <p className={`text-sm mt-1 ${passed ? "text-green-600" : "text-red-600"}`}>
             {passed
               ? "You have successfully passed this assessment"
-              : "You need 80% to pass. Please review the material and try again."}
+              : `You need ${quizSubmissionResponse?.passing_score ?? 70}% to pass. Please review the material and try again.`}
           </p>
+          {quizSubmissionResponse && (
+            <div className="mt-2 text-xs text-gray-600">
+              Score: {quizSubmissionResponse.earned_points ?? 0} / {quizSubmissionResponse.total_points ?? 0} points
+              {quizSubmissionResponse.attempt_number && (
+                <span className="ml-2">(Attempt {quizSubmissionResponse.attempt_number})</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -2385,10 +2550,38 @@ export default function CoursePlayerPage() {
 
         {/* Answer Review */}
         <h3 className="text-purple-600 font-semibold text-lg mb-4">Answer Review</h3>
+        {quizSubmissionResponse?.course_progress && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              Course Progress: {quizSubmissionResponse.course_progress.completed_steps ?? 0} / {quizSubmissionResponse.course_progress.total_steps ?? 0} steps 
+              ({quizSubmissionResponse.course_progress.percentage?.toFixed(1) ?? 0}%)
+            </p>
+          </div>
+        )}
         <div className="space-y-6">
           {quizQuestions.map((q, qi) => {
+            // Get API result for this question if available
+            const questionId = String(q.questionId ?? q.id)
+            const apiResult = quizSubmissionResponse?.question_results?.[questionId]
+            const isCorrectFromApi = apiResult?.is_correct
+            const userAnswerFromApi = apiResult?.user_answer
+            const correctAnswerFromApi = apiResult?.correct_answer
             const userAnswer = selectedAnswers[qi]
-            const isCorrect = userAnswer === q.correctAnswer
+            // Use API result if available, otherwise use local calculation
+            const isCorrect = apiResult ? (isCorrectFromApi ?? false) : (userAnswer === q.correctAnswer)
+            // Convert API's 1-based answer to 0-based for display (if API result exists)
+            const userAnswerIndex = apiResult && typeof userAnswerFromApi === "number" 
+              ? userAnswerFromApi - 1 // Convert from 1-based to 0-based
+              : userAnswer
+            // Get correct answer indices from API (convert from 1-based to 0-based)
+            const correctAnswerIndices = apiResult && Array.isArray(correctAnswerFromApi)
+              ? correctAnswerFromApi.map((ans: number | string) => {
+                  if (typeof ans === "number") return ans - 1
+                  // If it's a string, try to find the matching option index
+                  const optIndex = q.options.findIndex(opt => opt.toLowerCase() === String(ans).toLowerCase())
+                  return optIndex >= 0 ? optIndex : 0
+                })
+              : [q.correctAnswer]
 
             return (
               <div key={q.id} className="border border-gray-200 rounded-lg sm:rounded-xl p-3 sm:p-5">
@@ -2412,8 +2605,13 @@ export default function CoursePlayerPage() {
 
                 <div className="space-y-2 mb-3">
                   {q.options.map((opt, oi) => {
-                    const isCorrectOpt = oi === q.correctAnswer
-                    const isUserOpt = oi === userAnswer
+                    // Use API results if available
+                    const isCorrectOpt = apiResult 
+                      ? correctAnswerIndices.includes(oi)
+                      : oi === q.correctAnswer
+                    const isUserOpt = apiResult
+                      ? (typeof userAnswerIndex === "number" && oi === userAnswerIndex)
+                      : oi === userAnswer
                     let classes = "border-gray-200 bg-white"
                     if (isCorrectOpt) classes = "border-green-300 bg-green-50"
                     else if (isUserOpt && !isCorrect) classes = "border-red-300 bg-red-50"

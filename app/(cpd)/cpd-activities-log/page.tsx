@@ -24,6 +24,7 @@ type Activity = {
   type: string;
   status: string;
   files: number;
+  certificate_url?: string | null;
 };
 
 export default function CPDActivitiesLog() {
@@ -42,6 +43,8 @@ export default function CPDActivitiesLog() {
   const [apiTypeOptions, setApiTypeOptions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [summaryData, setSummaryData] = useState<Record<string, unknown> | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -69,9 +72,14 @@ export default function CPDActivitiesLog() {
         const historyRoot = (historyRaw && typeof historyRaw === "object" ? historyRaw : {}) as Record<string, unknown>;
         const data = (historyRoot.data && typeof historyRoot.data === "object" ? historyRoot.data : historyRoot) as Record<string, unknown>;
         const summaryRoot = (summaryRaw && typeof summaryRaw === "object" ? summaryRaw : {}) as Record<string, unknown>;
-        const summaryData = (summaryRoot.data && typeof summaryRoot.data === "object" ? summaryRoot.data : summaryRoot) as Record<string, unknown>;
-        const summaryRecent = Array.isArray(summaryData.recent_activity) ? summaryData.recent_activity : [];
-        const summaryCourses = Array.isArray(summaryData.courses) ? summaryData.courses : [];
+        const summaryDataParsed = (summaryRoot.data && typeof summaryRoot.data === "object" ? summaryRoot.data : summaryRoot) as Record<string, unknown>;
+        setSummaryData(summaryDataParsed);
+        const summaryRecent = Array.isArray(summaryDataParsed.recent_activity) ? summaryDataParsed.recent_activity : [];
+        const summaryCourses = Array.isArray(summaryDataParsed.courses) ? summaryDataParsed.courses : [];
+        
+        const analyticsRoot = (analyticsRaw && typeof analyticsRaw === "object" ? analyticsRaw : {}) as Record<string, unknown>;
+        const analyticsDataParsed = (analyticsRoot.data && typeof analyticsRoot.data === "object" ? analyticsRoot.data : analyticsRoot) as Record<string, unknown>;
+        setAnalyticsData(analyticsDataParsed);
         const list = Array.isArray(data.history)
           ? data.history
           : Array.isArray(data.activities)
@@ -91,34 +99,35 @@ export default function CPDActivitiesLog() {
                 : [];
         const mapped: Activity[] = (list as unknown[]).map((item, idx) => {
           const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
-          const dateRaw = getText(row.date_completed ?? row.date ?? row.completed_at ?? row.completion_date ?? row.last_activity, "");
+          const dateRaw = getText(row.completion_date_formatted ?? row.date_completed ?? row.date ?? row.completed_at ?? row.completion_date ?? row.last_activity, "");
           const inferredType = row.course_id ? "Platform Course" : "External";
           const statusText =
             getText(row.status)
             || (typeof row.completed === "boolean" ? (row.completed ? "Completed" : "In Progress") : "")
             || "Verified";
           return {
-            id: getText(row.id, String(idx + 1)),
+            id: getText(row.id ?? row.course_id, String(idx + 1)),
             title: getText(row.title ?? row.activity_name ?? row.course_title ?? row.name, "Untitled activity"),
-            description: getText(row.description ?? row.learning_outcomes, "No description provided."),
+            description: getText(row.description ?? row.learning_outcomes, ""),
             date: toDate(dateRaw),
             hours: getNum(row.hours ?? row.duration_hours ?? row.cpd_hours, 0),
             category: getText(row.gdc_category ?? row.category ?? row.category_name, "General"),
             type: getText(row.activity_type ?? row.type, inferredType),
             status: statusText,
             files: getNum(row.evidence_files_count ?? row.files ?? row.evidence_count, 0),
+            certificate_url: getText(row.certificate_url, null) || null,
           };
         });
         setActivities(mapped);
 
         // Build filter options from dedicated API metadata + history fallback.
-        const analyticsRoot = (analyticsRaw && typeof analyticsRaw === "object" ? analyticsRaw : {}) as Record<string, unknown>;
-        const analyticsData = (analyticsRoot.data && typeof analyticsRoot.data === "object" ? analyticsRoot.data : analyticsRoot) as Record<string, unknown>;
-        const analyticsCategories = Array.isArray(analyticsData.category_hours)
-          ? analyticsData.category_hours
-          : Array.isArray(analyticsData.categories)
-            ? analyticsData.categories
-            : [];
+        const analyticsCategories = Array.isArray(analyticsDataParsed.category_breakdown)
+          ? analyticsDataParsed.category_breakdown
+          : Array.isArray(analyticsDataParsed.category_hours)
+            ? analyticsDataParsed.category_hours
+            : Array.isArray(analyticsDataParsed.categories)
+              ? analyticsDataParsed.categories
+              : [];
 
         const requirementsRoot = (requirementsRaw && typeof requirementsRaw === "object" ? requirementsRaw : {}) as Record<string, unknown>;
         const requirementsData = (requirementsRoot.data && typeof requirementsRoot.data === "object" ? requirementsRoot.data : requirementsRoot) as Record<string, unknown>;
@@ -134,11 +143,11 @@ export default function CPDActivitiesLog() {
         const parsedApiCategories = Array.from(
           new Set(
             [
-              ...mapped.map((a) => a.category),
+              ...mapped.map((a) => a.category).filter(Boolean),
               ...(analyticsCategories as unknown[]).map((item) => {
                 if (typeof item === "string") return item;
                 const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
-                return getText(row.name ?? row.category, "");
+                return getText(row.category ?? row.name, "");
               }),
               ...(requirementCategories as unknown[]).map((item) => {
                 if (typeof item === "string") return item;
@@ -180,44 +189,38 @@ export default function CPDActivitiesLog() {
   }, []);
 
   const categoryBreakdown = useMemo(() => {
+    const getText = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+    const getNum = (v: unknown, fallback = 0) =>
+      typeof v === "number" ? v : (typeof v === "string" && !Number.isNaN(Number(v)) ? Number(v) : fallback);
+    
+    // Use analytics API category_breakdown if available, otherwise calculate from activities
+    if (analyticsData && Array.isArray(analyticsData.category_breakdown)) {
+      return (analyticsData.category_breakdown as unknown[]).map((item) => {
+        const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+        return {
+          name: getText(row.category ?? row.name, ""),
+          hours: getNum(row.hours, 0),
+        };
+      }).filter((cat) => cat.name && cat.hours > 0);
+    }
+    // Fallback to calculating from activities
     const grouped = activities.reduce<Record<string, number>>((acc, activity) => {
       const key = activity.category || "General";
       acc[key] = (acc[key] || 0) + (activity.hours || 0);
       return acc;
     }, {});
-    return Object.entries(grouped).map(([name, hours]) => ({ name, hours }));
-  }, [activities]);
-  // Default GDC Categories
-  const defaultGdcCategories = [
-    'Clinical',
-    'Management & Leadership',
-    'Communication',
-    'Professionalism',
-    'Research & Audit',
-    'Education & Training'
-  ];
-
-  // Default Activity Types
-  const defaultActivityTypes = [
-    'Course',
-    'Workshop',
-    'Conference',
-    'Webinar',
-    'Reading',
-    'Peer Review'
-  ];
-
+    return Object.entries(grouped).map(([name, hours]) => ({ name, hours })).filter((cat) => cat.hours > 0);
+  }, [activities, analyticsData]);
+  // Only use API categories/types - no hardcoded defaults
   const categoryOptions = useMemo(
     () => {
-      const combined = Array.from(new Set([...defaultGdcCategories, ...apiCategoryOptions]));
-      return combined.length > 0 ? combined : defaultGdcCategories;
+      return apiCategoryOptions.length > 0 ? apiCategoryOptions : [];
     },
     [apiCategoryOptions]
   );
   const typeOptions = useMemo(
     () => {
-      const combined = Array.from(new Set([...defaultActivityTypes, ...apiTypeOptions]));
-      return combined.length > 0 ? combined : defaultActivityTypes;
+      return apiTypeOptions.length > 0 ? apiTypeOptions : [];
     },
     [apiTypeOptions]
   );
@@ -242,13 +245,18 @@ export default function CPDActivitiesLog() {
   );
 
   const handleDownloadCertificate = (activity: Activity) => {
-    // Create a simple certificate download
+    // If certificate_url exists from API, use it
+    if (activity.certificate_url) {
+      window.open(activity.certificate_url, '_blank');
+      return;
+    }
+    // Fallback: Create a simple certificate download
     const certificateContent = `
 CPD Certificate of Completion
 ============================
 
 Activity: ${activity.title}
-Description: ${activity.description}
+${activity.description ? `Description: ${activity.description}` : ''}
 Date: ${activity.date}
 Duration: ${activity.hours} CPD Hours
 Category: ${activity.category}
@@ -321,11 +329,48 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
     setYearFilter(defaultYear);
   };
 
-  const totalRecords = activities.length;
-  const totalHours = activities.reduce((sum, item) => sum + item.hours, 0);
-  const verifiedHours = activities
-    .filter((item) => item.status.toLowerCase().includes("verified") || item.status.toLowerCase().includes("completed"))
-    .reduce((sum, item) => sum + item.hours, 0);
+  // Get stats from API data (summary/analytics) instead of calculating from activities
+  const getNum = (v: unknown, fallback = 0) =>
+    typeof v === "number" ? v : (typeof v === "string" && !Number.isNaN(Number(v)) ? Number(v) : fallback);
+  
+  const getSummaryValue = (path: string[]) => {
+    if (!summaryData) return null;
+    let current: unknown = summaryData;
+    for (const key of path) {
+      if (current && typeof current === "object") {
+        current = (current as Record<string, unknown>)[key];
+      } else {
+        return null;
+      }
+    }
+    return typeof current === "number" ? current : null;
+  };
+  
+  const getAnalyticsValue = (path: string[]) => {
+    if (!analyticsData) return null;
+    let current: unknown = analyticsData;
+    for (const key of path) {
+      if (current && typeof current === "object") {
+        current = (current as Record<string, unknown>)[key];
+      } else {
+        return null;
+      }
+    }
+    return typeof current === "number" ? current : null;
+  };
+  
+  const totalRecords = getSummaryValue(["summary", "lifetime_courses"]) 
+    ?? getAnalyticsValue(["quick_stats", "total_lifetime_courses"])
+    ?? activities.length;
+  
+  const totalHours = getSummaryValue(["summary", "lifetime_hours"])
+    ?? getAnalyticsValue(["quick_stats", "total_lifetime_hours"])
+    ?? activities.reduce((sum, item) => sum + item.hours, 0);
+  
+  const verifiedHours = getSummaryValue(["summary", "verified_hours"])
+    ?? getSummaryValue(["verified_hours"])
+    ?? totalHours; // If no verified hours, assume all are verified
+  
   const withEvidence = activities.filter((item) => item.files > 0).length;
 
   return (
@@ -367,45 +412,80 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
         </div>
 
         {/* Stats Cards */}
-        {isLoading && (
-          <div className="mt-6 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
-            <Spinner />
-            Loading CPD activity log...
-          </div>
-        )}
         {loadError && (
           <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
             {loadError}
           </div>
         )}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-6 sm:mt-8">
-          <StatCard
-            icon={<FileText className="text-purple-600" size={24} />}
-            label="Total Records"
-            value={String(totalRecords)}
-          />
-          <StatCard
-            icon={<Clock className="text-purple-600" size={24} />}
-            label="Total Hours"
-            value={totalHours.toFixed(1)}
-          />
-          <StatCard
-            icon={<CheckCircle className="text-green-600" size={24} />}
-            label="Verified Hours"
-            value={verifiedHours.toFixed(1)}
-          />
-          <StatCard
-            icon={<FileText className="text-purple-600" size={24} />}
-            label="With Evidence"
-            value={String(withEvidence)}
-          />
+          {isLoading ? (
+            <>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 animate-pulse">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                      <div className="h-8 bg-gray-200 rounded w-16"></div>
+                    </div>
+                    <div className="bg-gray-200 p-2 sm:p-3 rounded-lg w-10 h-10"></div>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              <StatCard
+                icon={<FileText className="text-purple-600" size={24} />}
+                label="Total Records"
+                value={String(totalRecords)}
+              />
+              <StatCard
+                icon={<Clock className="text-purple-600" size={24} />}
+                label="Total Hours"
+                value={totalHours.toFixed(1)}
+              />
+              <StatCard
+                icon={<CheckCircle className="text-green-600" size={24} />}
+                label="Verified Hours"
+                value={verifiedHours.toFixed(1)}
+              />
+              <StatCard
+                icon={<FileText className="text-purple-600" size={24} />}
+                label="With Evidence"
+                value={String(withEvidence)}
+              />
+            </>
+          )}
         </div>
 
         {/* Main Content */}
-        <div className="flex flex-col lg:flex-row gap-6 mt-6 sm:mt-8">
+        <div className="flex flex-col lg:flex-row gap-6 mt-6 sm:mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Filters Sidebar */}
           <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 lg:sticky lg:top-6">
+              {isLoading ? (
+                <div className="animate-pulse space-y-6">
+                  <div className="h-6 bg-gray-200 rounded w-20"></div>
+                  <div className="space-y-4">
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                  </div>
+                  <div className="h-8 bg-gray-200 rounded w-24"></div>
+                  <div className="pt-8 border-t border-gray-200">
+                    <div className="h-5 bg-gray-200 rounded w-32 mb-4"></div>
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i}>
+                          <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
+                          <div className="h-2 bg-gray-200 rounded"></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
               <div className="flex items-center space-x-2 mb-6">
                 <Filter className="text-purple-600" size={20} />
                 <h3 className="font-semibold text-gray-900">Filters</h3>
@@ -532,23 +612,29 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
               {/* Hours by Category */}
               <div className="mt-8 pt-8 border-t border-gray-200">
                 <h4 className="font-semibold text-gray-900 mb-4">Hours by Category</h4>
-                <div className="space-y-3">
-                  {categoryBreakdown.map((cat, index) => (
-                    <div key={index}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-700">{cat.name}</span>
-                        <span className="font-semibold text-gray-900">{cat.hours}h</span>
+                {categoryBreakdown.length > 0 ? (
+                  <div className="space-y-3">
+                    {categoryBreakdown.map((cat, index) => (
+                      <div key={index}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-700">{cat.name}</span>
+                          <span className="font-semibold text-gray-900">{cat.hours}h</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div
+                            className="bg-purple-600 h-1.5 rounded-full"
+                            style={{ width: `${categoryBreakdown.length ? (cat.hours / Math.max(...categoryBreakdown.map((i) => i.hours), 1)) * 100 : 0}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div
-                          className="bg-purple-600 h-1.5 rounded-full"
-                          style={{ width: `${categoryBreakdown.length ? (cat.hours / Math.max(...categoryBreakdown.map((i) => i.hours), 1)) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500">No category data available</p>
+                )}
               </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -557,9 +643,35 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
             <div className="bg-white rounded-xl shadow-sm border border-gray-100">
               <div className="p-4 sm:p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-purple-700">All CPD Activities</h3>
-                <p className="text-sm text-gray-600">Showing {filteredActivities.length} records</p>
+                <p className="text-sm text-gray-600">
+                  {isLoading ? "Loading..." : `Showing ${filteredActivities.length} records`}
+                </p>
               </div>
 
+              {isLoading ? (
+                <div className="p-4 sm:p-6">
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/2 mb-3"></div>
+                        <div className="flex gap-2">
+                          <div className="h-6 bg-gray-200 rounded w-20"></div>
+                          <div className="h-6 bg-gray-200 rounded w-20"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : filteredActivities.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <p className="text-sm">No activities found.</p>
+                  {activities.length === 0 && (
+                    <p className="text-xs mt-1">No CPD activities returned by API.</p>
+                  )}
+                </div>
+              ) : (
+                <>
               {/* Mobile Card View */}
               <div className="lg:hidden">
                 <div className="divide-y divide-gray-200">
@@ -568,7 +680,9 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-gray-900 text-sm mb-1">{activity.title}</h4>
-                          <p className="text-xs text-gray-600 line-clamp-2">{activity.description}</p>
+                          {activity.description && (
+                            <p className="text-xs text-gray-600 line-clamp-2">{activity.description}</p>
+                          )}
                         </div>
                         <button 
                           onClick={() => handleViewActivity(activity)}
@@ -613,87 +727,93 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
               </div>
 
               {/* Desktop Table View */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full min-w-[1600px]">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-[450px]">
-                        Activity
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-[160px]">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-[120px]">
-                        Hours
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-[200px]">
-                        Category
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-[200px]">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-[150px]">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider w-[120px]">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredActivities.map((activity) => (
-                      <tr key={activity.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="font-semibold text-gray-900 text-sm">{activity.title}</div>
-                            <div className="text-xs text-gray-600 mt-1 whitespace-normal">{activity.description}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-1 text-sm text-gray-700">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span>{activity.date}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-1 text-sm text-gray-700">
-                            <Clock size={16} className="text-gray-400" />
-                            <span>{activity.hours}h</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-700">{activity.category}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            activity.type === 'Platform Course'
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-gray-200 text-gray-700'
-                          }`}>
-                            {activity.type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-1">
-                            <CheckCircle size={16} className="text-green-600" />
-                            <span className="text-sm text-gray-700">{activity.files} file</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                        <button 
-                          onClick={() => handleViewActivity(activity)}
-                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <Eye size={16} className="text-gray-600" />
-                        </button>
-                        </td>
+              <div className="hidden lg:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Activity
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Hours
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Category
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredActivities.map((activity) => (
+                        <tr key={activity.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-4">
+                          <div className="max-w-xs">
+                            <div className="font-semibold text-gray-900 text-sm">{activity.title}</div>
+                            {activity.description && (
+                              <div className="text-xs text-gray-600 mt-1 line-clamp-2">{activity.description}</div>
+                            )}
+                          </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center space-x-1 text-sm text-gray-700">
+                              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="whitespace-nowrap">{activity.date}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center space-x-1 text-sm text-gray-700">
+                              <Clock size={16} className="text-gray-400 shrink-0" />
+                              <span>{activity.hours}h</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="text-sm text-gray-700">{activity.category}</span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+                              activity.type === 'Platform Course'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-gray-200 text-gray-700'
+                            }`}>
+                              {activity.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center space-x-1">
+                              <CheckCircle size={16} className="text-green-600 shrink-0" />
+                              <span className="text-sm text-gray-700">{activity.files} file</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <button 
+                              onClick={() => handleViewActivity(activity)}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                              <Eye size={16} className="text-gray-600" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -731,7 +851,9 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 leading-tight">{selectedActivity.title}</h4>
-                    <p className="text-gray-600 text-xs sm:text-sm mt-0.5 sm:mt-1 line-clamp-2">{selectedActivity.description}</p>
+                    {selectedActivity.description && (
+                      <p className="text-gray-600 text-xs sm:text-sm mt-0.5 sm:mt-1 line-clamp-2">{selectedActivity.description}</p>
+                    )}
                   </div>
                 </div>
               </div>

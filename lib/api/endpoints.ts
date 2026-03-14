@@ -73,6 +73,8 @@ export const API_PATHS = {
     quizStats: (id: string | number) => `/wp-json/reactapi/v1/courses/${id}/quiz-stats`,
     assignmentDetails: (id: string) => `/wp-json/reactapi/v1/assignments/${id}`,
     quizDetails: (id: string | number) => `/wp-json/reactapi/v1/quizzes/${id}`,
+    quizDetailsWithQuestions: (id: string | number) => `/wp-json/reactapi/v1/quizzes/${id}/details`,
+    quizSubmit: (courseId: string | number, quizId: string | number) => `/wp-json/reactapi/v1/courses/${courseId}/quizzes/${quizId}/submit`,
     quizAttempts: (id: string | number) => `/wp-json/reactapi/v1/quizzes/${id}/attempts`,
   },
   cpd: {

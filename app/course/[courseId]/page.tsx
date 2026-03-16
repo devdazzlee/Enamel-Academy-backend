@@ -49,6 +49,7 @@ type AssessmentQuestion = {
   questionTitle?: string
   description?: string
   options: string[]
+  optionIds?: (number | string)[] // Option IDs from API (matching correct_answers format)
   correctAnswer: number
   explanation: string
 }
@@ -544,17 +545,35 @@ export default function CoursePlayerPage() {
 
                 if (!questionText) continue
 
-                // Extract options
+                // Extract options and their IDs
                 let options: string[] = []
+                let optionIds: (number | string)[] = []
                 if (Array.isArray(question.options)) {
-                  options = question.options.map((opt: unknown) => {
-                    if (typeof opt === "string") return sanitizeApiText(opt, "")
-                    if (typeof opt === "object" && opt !== null) {
+                  question.options.forEach((opt: unknown, idx: number) => {
+                    let optionText = ""
+                    let optionId: number | string | undefined = undefined
+                    
+                    if (typeof opt === "string") {
+                      optionText = sanitizeApiText(opt, "")
+                      optionId = idx // Fallback to index if no ID
+                    } else if (typeof opt === "object" && opt !== null) {
                       const optObj = opt as Record<string, unknown>
-                      return sanitizeApiText(optObj.label ?? optObj.text ?? optObj.option ?? optObj.value ?? "", "")
+                      optionText = sanitizeApiText(optObj.label ?? optObj.text ?? optObj.option ?? optObj.value ?? "", "")
+                      // Extract option ID (id, value, or index)
+                      if (typeof optObj.id === "number" || typeof optObj.id === "string") {
+                        optionId = optObj.id
+                      } else if (typeof optObj.value === "number" || typeof optObj.value === "string") {
+                        optionId = optObj.value
+                      } else {
+                        optionId = idx // Fallback to index
+                      }
                     }
-                    return ""
-                  }).filter((opt: string) => opt.length > 0)
+                    
+                    if (optionText.length > 0) {
+                      options.push(optionText)
+                      optionIds.push(optionId ?? idx)
+                    }
+                  })
                 }
 
                 // If no options, detect yes/no from question text or type
@@ -562,29 +581,50 @@ export default function CoursePlayerPage() {
                   const combined = `${sanitizedTitle} ${sanitizedDescription}`.toLowerCase()
                   if ((combined.includes("yes") && combined.includes("no")) || question.type === "single") {
                     options = ["Yes", "No"]
+                    optionIds = [0, 1] // Default IDs for Yes/No
                   }
                 }
 
-                // Extract correct answer
+                // Extract correct answer (as index, not option ID)
                 let correctAnswer = 0
                 if (Array.isArray(question.correct_answers) && question.correct_answers.length > 0) {
                   const firstCorrect = question.correct_answers[0]
                   if (typeof firstCorrect === "number") {
-                    correctAnswer = firstCorrect
+                    // This is an option ID, find the index that matches
+                    if (optionIds.length > 0) {
+                      const correctIdx = optionIds.findIndex(id => id === firstCorrect)
+                      correctAnswer = correctIdx >= 0 ? correctIdx : 0
+                    } else {
+                      // Fallback: assume it's already an index
+                      correctAnswer = firstCorrect
+                    }
                   } else if (typeof firstCorrect === "string") {
                     const idx = options.findIndex(opt => opt.toLowerCase() === firstCorrect.toLowerCase())
                     if (idx >= 0) correctAnswer = idx
                   } else if (typeof firstCorrect === "object" && firstCorrect !== null) {
                     const co = firstCorrect as Record<string, unknown>
                     const cv = co.value ?? co.answer ?? co.label
-                    if (typeof cv === "number") correctAnswer = cv
-                    else if (typeof cv === "string") {
+                    if (typeof cv === "number") {
+                      // This might be an option ID, find the index
+                      if (optionIds.length > 0) {
+                        const correctIdx = optionIds.findIndex(id => id === cv)
+                        correctAnswer = correctIdx >= 0 ? correctIdx : 0
+                      } else {
+                        correctAnswer = cv
+                      }
+                    } else if (typeof cv === "string") {
                       const idx = options.findIndex(opt => opt.toLowerCase() === cv.toLowerCase())
                       if (idx >= 0) correctAnswer = idx
                     }
                   }
                 } else if (typeof question.correct_answer === "number") {
-                  correctAnswer = question.correct_answer
+                  // Check if this is an option ID or index
+                  if (optionIds.length > 0) {
+                    const correctIdx = optionIds.findIndex(id => id === question.correct_answer)
+                    correctAnswer = correctIdx >= 0 ? correctIdx : question.correct_answer
+                  } else {
+                    correctAnswer = question.correct_answer
+                  }
                 } else if (typeof question.correct_answer_index === "number") {
                   correctAnswer = question.correct_answer_index
                 }
@@ -599,6 +639,7 @@ export default function CoursePlayerPage() {
                     questionTitle: questionTitle,
                     description: undefined,
                     options,
+                    optionIds: optionIds.length > 0 ? optionIds : undefined,
                     correctAnswer,
                     explanation: sanitizeApiText(question.explanation ?? question.feedback ?? "", "Review the course content and retry this question."),
                   })
@@ -855,17 +896,35 @@ export default function CoursePlayerPage() {
 
           if (!questionText) continue
 
-          // Extract options
+          // Extract options and their IDs
           let options: string[] = []
+          let optionIds: (number | string)[] = []
           if (Array.isArray(question.options)) {
-            options = question.options.map((opt: unknown) => {
-              if (typeof opt === "string") return sanitizeApiText(opt, "")
-              if (typeof opt === "object" && opt !== null) {
+            question.options.forEach((opt: unknown, idx: number) => {
+              let optionText = ""
+              let optionId: number | string | undefined = undefined
+              
+              if (typeof opt === "string") {
+                optionText = sanitizeApiText(opt, "")
+                optionId = idx // Fallback to index if no ID
+              } else if (typeof opt === "object" && opt !== null) {
                 const optObj = opt as Record<string, unknown>
-                return sanitizeApiText(optObj.label ?? optObj.text ?? optObj.option ?? optObj.value ?? "", "")
+                optionText = sanitizeApiText(optObj.label ?? optObj.text ?? optObj.option ?? optObj.value ?? "", "")
+                // Extract option ID (id, value, or index)
+                if (typeof optObj.id === "number" || typeof optObj.id === "string") {
+                  optionId = optObj.id
+                } else if (typeof optObj.value === "number" || typeof optObj.value === "string") {
+                  optionId = optObj.value
+                } else {
+                  optionId = idx // Fallback to index
+                }
               }
-              return ""
-            }).filter((opt: string) => opt.length > 0)
+              
+              if (optionText.length > 0) {
+                options.push(optionText)
+                optionIds.push(optionId ?? idx)
+              }
+            })
           }
 
           // If no options, detect yes/no from question text or type
@@ -873,29 +932,50 @@ export default function CoursePlayerPage() {
             const combined = `${sanitizedTitle} ${sanitizedDescription}`.toLowerCase()
             if ((combined.includes("yes") && combined.includes("no")) || question.type === "single") {
               options = ["Yes", "No"]
+              optionIds = [0, 1] // Default IDs for Yes/No
             }
           }
 
-          // Extract correct answer
+          // Extract correct answer (as index, not option ID)
           let correctAnswer = 0
           if (Array.isArray(question.correct_answers) && question.correct_answers.length > 0) {
             const firstCorrect = question.correct_answers[0]
             if (typeof firstCorrect === "number") {
-              correctAnswer = firstCorrect
+              // This is an option ID, find the index that matches
+              if (optionIds.length > 0) {
+                const correctIdx = optionIds.findIndex(id => id === firstCorrect)
+                correctAnswer = correctIdx >= 0 ? correctIdx : 0
+              } else {
+                // Fallback: assume it's already an index
+                correctAnswer = firstCorrect
+              }
             } else if (typeof firstCorrect === "string") {
               const idx = options.findIndex(opt => opt.toLowerCase() === firstCorrect.toLowerCase())
               if (idx >= 0) correctAnswer = idx
             } else if (typeof firstCorrect === "object" && firstCorrect !== null) {
               const co = firstCorrect as Record<string, unknown>
               const cv = co.value ?? co.answer ?? co.label
-              if (typeof cv === "number") correctAnswer = cv
-              else if (typeof cv === "string") {
+              if (typeof cv === "number") {
+                // This might be an option ID, find the index
+                if (optionIds.length > 0) {
+                  const correctIdx = optionIds.findIndex(id => id === cv)
+                  correctAnswer = correctIdx >= 0 ? correctIdx : 0
+                } else {
+                  correctAnswer = cv
+                }
+              } else if (typeof cv === "string") {
                 const idx = options.findIndex(opt => opt.toLowerCase() === cv.toLowerCase())
                 if (idx >= 0) correctAnswer = idx
               }
             }
           } else if (typeof question.correct_answer === "number") {
-            correctAnswer = question.correct_answer
+            // Check if this is an option ID or index
+            if (optionIds.length > 0) {
+              const correctIdx = optionIds.findIndex(id => id === question.correct_answer)
+              correctAnswer = correctIdx >= 0 ? correctIdx : question.correct_answer
+            } else {
+              correctAnswer = question.correct_answer
+            }
           } else if (typeof question.correct_answer_index === "number") {
             correctAnswer = question.correct_answer_index
           }
@@ -909,6 +989,7 @@ export default function CoursePlayerPage() {
               questionTitle: questionTitle,
               description: undefined,
               options,
+              optionIds: optionIds.length > 0 ? optionIds : undefined,
               correctAnswer,
               explanation: sanitizeApiText(question.explanation ?? question.feedback ?? "", "Review the course content and retry this question."),
             })
@@ -1742,18 +1823,31 @@ export default function CoursePlayerPage() {
 
     try {
       // Format answers according to API structure
-      // The API expects: { questionId: selectedOptionIndex }
-      // where questionId is the actual question ID from the API (as string)
-      // and selectedOptionIndex is 1-based (not 0-based)
-      const answers: Record<string, number> = {}
+      // NOTE: There appears to be a backend bug where correct answers are marked as incorrect
+      // Even when user_answer: 0 matches correct_answer: [0], is_correct returns false
+      // This needs to be fixed on the backend - the comparison logic is not working correctly
+      // 
+      // Current format: sending option ID as number (0-based to match correct_answers format)
+      // Postman examples show 1-based numbers, but correct_answers uses 0-based arrays
+      const answers: Record<string, number | number[]> = {}
       quizQuestions.forEach((q, i) => {
         const selectedOption = selectedAnswers[i]
         if (selectedOption !== null) {
           // Use the original question ID from API, fallback to q.id
           const questionId = q.questionId !== undefined ? String(q.questionId) : String(q.id)
-          // API expects 1-based index (add 1 to 0-based selectedOption)
-          // Postman examples show: "789": 1 (first option), "790": [1, 2] (first and second options)
-          answers[questionId] = selectedOption + 1
+          // Get the option ID from the selected option index
+          // If optionIds are available, use them; otherwise fallback to index
+          let optionId: number
+          if (q.optionIds && q.optionIds.length > selectedOption) {
+            const idValue = q.optionIds[selectedOption]
+            optionId = typeof idValue === "number" ? idValue : Number(idValue) || selectedOption
+          } else {
+            // Fallback to index if optionIds not available
+            optionId = selectedOption
+          }
+          // Send option ID as number (0-based) to match correct_answers format
+          // Backend should check if optionId is in correct_answer array, but currently has a bug
+          answers[questionId] = optionId
         }
       })
 

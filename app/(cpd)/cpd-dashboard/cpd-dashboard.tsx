@@ -623,7 +623,7 @@ export default function CPDDashboard() {
                       <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
                         <div 
                           className="bg-purple-600 h-1.5 sm:h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${(category.hours / category.total) * 100}%` }}
+                          style={{ width: `${Math.min((category.hours / category.total) * 100, 100)}%` }}
                         />
                       </div>
                     </div>

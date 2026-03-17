@@ -14,6 +14,12 @@ import {
 import { useRouter } from 'next/navigation';
 import { cpdService } from "@/lib/api/cpd";
 
+type EvidenceFile = {
+  file_name: string;
+  file_url: string;
+  file_size: string;
+};
+
 type Activity = {
   id: string | number;
   title: string;
@@ -25,6 +31,8 @@ type Activity = {
   status: string;
   files: number;
   certificate_url?: string | null;
+  has_evidence?: boolean;
+  evidence_file?: EvidenceFile | null;
 };
 
 export default function CPDActivitiesLog() {
@@ -105,6 +113,13 @@ export default function CPDActivitiesLog() {
             getText(row.status)
             || (typeof row.completed === "boolean" ? (row.completed ? "Completed" : "In Progress") : "")
             || "Verified";
+          const evidenceRaw = row.evidence_file && typeof row.evidence_file === "object" ? row.evidence_file as Record<string, unknown> : null;
+          const evidenceFile: EvidenceFile | null = evidenceRaw ? {
+            file_name: getText(evidenceRaw.file_name, "Evidence file"),
+            file_url: getText(evidenceRaw.file_url, ""),
+            file_size: getText(evidenceRaw.file_size, ""),
+          } : null;
+          const hasEvidence = row.has_evidence === true || !!evidenceFile;
           return {
             id: getText(row.id ?? row.course_id, String(idx + 1)),
             title: getText(row.title ?? row.activity_name ?? row.course_title ?? row.name, "Untitled activity"),
@@ -114,8 +129,10 @@ export default function CPDActivitiesLog() {
             category: getText(row.gdc_category ?? row.category ?? row.category_name, "General"),
             type: getText(row.activity_type ?? row.type, inferredType),
             status: statusText,
-            files: getNum(row.evidence_files_count ?? row.files ?? row.evidence_count, 0),
+            files: getNum(row.evidence_files_count ?? row.files ?? row.evidence_count, hasEvidence ? 1 : 0),
             certificate_url: getText(row.certificate_url, null) || null,
+            has_evidence: hasEvidence,
+            evidence_file: evidenceFile,
           };
         });
         setActivities(mapped);
@@ -280,16 +297,11 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
   };
 
   const handleViewEvidenceFiles = (activity: Activity) => {
-    // Simulate viewing evidence files - in a real app, this would open a file viewer
-    const evidenceFiles = [
-      { name: 'Certificate of Completion.pdf', type: 'PDF', size: '2.3 MB' },
-      { name: 'Attendance Record.pdf', type: 'PDF', size: '1.1 MB' },
-      { name: 'Course Evaluation.pdf', type: 'PDF', size: '856 KB' }
-    ].slice(0, activity.files);
-
-    alert(`Evidence Files for ${activity.title}:\n\n${evidenceFiles.map((file, index) => 
-      `${index + 1}. ${file.name} (${file.type}, ${file.size})`
-    ).join('\n')}\n\nIn a production environment, this would open a file viewer or download manager.`);
+    if (activity.evidence_file && activity.evidence_file.file_url) {
+      window.open(activity.evidence_file.file_url, '_blank');
+      return;
+    }
+    alert(`No evidence files available for "${activity.title}".`);
   };
 
   const handleViewActivity = (activity: Activity) => {
@@ -916,15 +928,17 @@ Issued on: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'lo
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 sm:mt-8">
-                <button 
+                <button
                   onClick={() => handleDownloadCertificate(selectedActivity)}
-                  className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm sm:text-base"
+                  disabled={!selectedActivity.certificate_url}
+                  className={`flex-1 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium transition-colors text-xs sm:text-base ${selectedActivity.certificate_url ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
                 >
                   Download Certificate
                 </button>
-                <button 
+                <button
                   onClick={() => handleViewEvidenceFiles(selectedActivity)}
-                  className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors text-xs sm:text-sm sm:text-base"
+                  disabled={!selectedActivity.evidence_file?.file_url}
+                  className={`flex-1 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium transition-colors text-xs sm:text-base ${selectedActivity.evidence_file?.file_url ? 'border border-gray-300 hover:bg-gray-50 text-gray-700' : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'}`}
                 >
                   View Evidence Files
                 </button>

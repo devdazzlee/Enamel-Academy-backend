@@ -98,8 +98,9 @@ export default function SignupPage() {
         role: formData.iAmA,
       })
       router.push("/dashboard")
-    } catch {
-      setError("Signup failed. Please try again.")
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Signup failed. Please try again."
+      setError(message)
     }
   }
 

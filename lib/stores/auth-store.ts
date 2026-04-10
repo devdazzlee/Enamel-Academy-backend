@@ -1,7 +1,26 @@
 import { create } from "zustand";
+import { AxiosError } from "axios";
 
 import { authService, type LoginPayload, type RegisterPayload } from "@/lib/api/auth";
 import { tokenStorage } from "@/lib/api/token";
+
+const extractApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof AxiosError) {
+    const data = error.response?.data;
+    if (data && typeof data === "object") {
+      const message = (data as { message?: unknown }).message;
+      if (typeof message === "string" && message.trim().length > 0) {
+        return message;
+      }
+    }
+  }
+
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return fallback;
+};
 
 type AuthState = {
   token: string | null;
@@ -37,7 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       tokenStorage.set(result.token);
       set({ token: result.token, isAuthenticated: true, isLoading: false, hasHydrated: true });
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Login failed";
+      const message = extractApiErrorMessage(e, "Login failed");
       tokenStorage.clear();
       set({ token: null, isAuthenticated: false, isLoading: false, error: message, hasHydrated: true });
       throw new Error(message);
@@ -51,7 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       tokenStorage.set(result.token);
       set({ token: result.token, isAuthenticated: true, isLoading: false, hasHydrated: true });
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Register failed";
+      const message = extractApiErrorMessage(e, "Register failed");
       tokenStorage.clear();
       set({ token: null, isAuthenticated: false, isLoading: false, error: message, hasHydrated: true });
       throw new Error(message);
